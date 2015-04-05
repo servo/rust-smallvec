@@ -11,22 +11,28 @@ use std::fmt;
 use std::iter::{IntoIterator, FromIterator};
 use std::marker::PhantomData;
 use std::mem;
+use std::ops;
 use std::ptr;
 use std::slice;
 
 // Generic code for all small vectors
 
-pub trait VecLike<T> {
+pub trait VecLike<T>:
+        ops::Index<usize> +
+        ops::IndexMut<usize> +
+        ops::Index<ops::Range<usize>> +
+        ops::IndexMut<ops::Range<usize>> +
+        ops::Index<ops::RangeFrom<usize>> +
+        ops::IndexMut<ops::RangeFrom<usize>> +
+        ops::Index<ops::RangeTo<usize>> +
+        ops::IndexMut<ops::RangeTo<usize>> +
+        ops::Index<ops::RangeFull> +
+        ops::IndexMut<ops::RangeFull> +
+        ops::Deref +
+        ops::DerefMut {
+
     fn len(&self) -> usize;
     fn push(&mut self, value: T);
-
-    fn slice_mut<'a>(&'a mut self, start: usize, end: usize) -> &'a mut [T];
-
-    #[inline]
-    fn slice_from_mut<'a>(&'a mut self, start: usize) -> &'a mut [T] {
-        let len = self.len();
-        self.slice_mut(start, len)
-    }
 }
 
 impl<T> VecLike<T> for Vec<T> {
@@ -38,11 +44,6 @@ impl<T> VecLike<T> for Vec<T> {
     #[inline]
     fn push(&mut self, value: T) {
         Vec::push(self, value);
-    }
-
-    #[inline]
-    fn slice_mut<'a>(&'a mut self, start: usize, end: usize) -> &'a mut [T] {
-        &mut self[start..end]
     }
 }
 
@@ -342,38 +343,42 @@ macro_rules! def_small_vector(
                 }
             }
 
-            pub fn slice<'a>(&'a self, start: usize, end: usize) -> &'a [T] {
-                assert!(start <= end);
-                assert!(end <= self.len());
-                unsafe {
-                    slice::from_raw_parts(self.begin().offset(start as isize), end - start)
-                }
-            }
-
-            pub fn as_slice<'a>(&'a self) -> &'a [T] {
-                self.slice(0, self.len())
-            }
-
-            pub fn as_slice_mut<'a>(&'a mut self) -> &'a mut [T] {
-                let len = self.len();
-                self.slice_mut(0, len)
-            }
-
-            pub fn slice_mut<'a>(&'a mut self, start: usize, end: usize) -> &'a mut [T] {
-                assert!(start <= end);
-                assert!(end <= self.len());
-                unsafe {
-                    slice::from_raw_parts_mut(self.begin_mut().offset(start as isize), end - start)
-                }
-            }
-
-            pub fn slice_from_mut<'a>(&'a mut self, start: usize) -> &'a mut [T] {
-                let len = self.len();
-                self.slice_mut(start, len)
-            }
-
             fn fail_bounds_check(&self, index: usize) {
                 panic!("index {} beyond length ({})", index, self.len())
+            }
+        }
+
+        impl<T> ops::Deref for $name<T> {
+            type Target = [T];
+            #[inline]
+            fn deref(&self) -> &[T] {
+                unsafe {
+                    slice::from_raw_parts(self.begin(), self.len())
+                }
+            }
+        }
+
+        impl<T> ops::DerefMut for $name<T> {
+            #[inline]
+            fn deref_mut(&mut self) -> &mut [T] {
+                unsafe {
+                    slice::from_raw_parts_mut(self.begin_mut(), self.len())
+                }
+            }
+        }
+
+        impl<T, I> ops::Index<I> for $name<T> where [T]: ops::Index<I> {
+            type Output = <[T] as ops::Index<I>>::Output;
+            #[inline]
+            fn index(&self, index: I) -> &<[T] as ops::Index<I>>::Output {
+                &(&*self)[index]
+            }
+        }
+
+        impl<T, I> ops::IndexMut<I> for $name<T> where [T]: ops::IndexMut<I> {
+            #[inline]
+            fn index_mut(&mut self, index: I) -> &mut <[T] as ops::Index<I>>::Output {
+                &mut (&mut *self)[index]
             }
         }
 
@@ -386,11 +391,6 @@ macro_rules! def_small_vector(
             #[inline]
             fn push(&mut self, value: T) {
                 $name::push(self, value);
-            }
-
-            #[inline]
-            fn slice_mut<'a>(&'a mut self, start: usize, end: usize) -> &'a mut [T] {
-                $name::slice_mut(self, start, end)
             }
         }
 
@@ -431,7 +431,7 @@ macro_rules! def_small_vector(
 
         impl<T: fmt::Debug> fmt::Debug for $name<T> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                write!(f, "{:?}", self.as_slice())
+                write!(f, "{:?}", &**self)
             }
         }
 
@@ -501,7 +501,7 @@ pub mod tests {
         let mut v = SmallVec16::new();
         v.push("hello".to_owned());
         v.push("there".to_owned());
-        assert_eq!(v.as_slice(), &[
+        assert_eq!(&*v, &[
             "hello".to_owned(),
             "there".to_owned(),
         ][..]);
@@ -514,7 +514,7 @@ pub mod tests {
         v.push("there".to_owned());
         v.push("burma".to_owned());
         v.push("shave".to_owned());
-        assert_eq!(v.as_slice(), &[
+        assert_eq!(&*v, &[
             "hello".to_owned(),
             "there".to_owned(),
             "burma".to_owned(),
@@ -533,7 +533,7 @@ pub mod tests {
         v.push("there".to_owned());
         v.push("burma".to_owned());
         v.push("shave".to_owned());
-        assert_eq!(v.as_slice(), &[
+        assert_eq!(&*v, &[
             "hello".to_owned(),
             "there".to_owned(),
             "burma".to_owned(),
