@@ -46,194 +46,6 @@ impl<T> VecLike<T> for Vec<T> {
     }
 }
 
-pub trait SmallVecPrivate<T> {
-    unsafe fn set_len(&mut self, new_len: usize);
-    unsafe fn set_cap(&mut self, new_cap: usize);
-    fn data(&self, index: usize) -> *const T;
-    fn mut_data(&mut self, index: usize) -> *mut T;
-    unsafe fn ptr(&self) -> *const T;
-    unsafe fn mut_ptr(&mut self) -> *mut T;
-    unsafe fn set_ptr(&mut self, new_ptr: *mut T);
-}
-
-pub trait SmallVec<T> : SmallVecPrivate<T> {
-    fn inline_size(&self) -> usize;
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool;
-    fn cap(&self) -> usize;
-
-    fn spilled(&self) -> bool {
-        self.cap() > self.inline_size()
-    }
-
-    fn begin(&self) -> *const T {
-        unsafe {
-            if self.spilled() {
-                self.ptr()
-            } else {
-                self.data(0)
-            }
-        }
-    }
-
-    fn begin_mut(&mut self) -> *mut T {
-        self.begin() as *mut T
-    }
-
-    fn end(&self) -> *const T {
-        unsafe {
-            self.begin().offset(self.len() as isize)
-        }
-    }
-
-    fn end_mut(&mut self) -> *mut T {
-        self.end() as *mut T
-    }
-
-    fn iter<'a>(&'a self) -> SmallVecIterator<'a,T> {
-        SmallVecIterator {
-            ptr: self.begin(),
-            end: self.end(),
-            _lifetime: PhantomData,
-        }
-    }
-
-    fn mut_iter<'a>(&'a mut self) -> SmallVecMutIterator<'a,T> {
-        SmallVecMutIterator {
-            ptr: self.begin_mut(),
-            end: self.end_mut(),
-            _lifetime: PhantomData,
-        }
-    }
-
-    /// NB: For efficiency reasons (avoiding making a second copy of the inline elements), this
-    /// actually clears out the original array instead of moving it.
-    fn into_iter<'a>(&'a mut self) -> SmallVecMoveIterator<'a,T> {
-        unsafe {
-            let ptr_opt = if self.spilled() {
-                Some(self.mut_ptr())
-            } else {
-                None
-            };
-            let cap = self.cap();
-            let inline_size = self.inline_size();
-            self.set_cap(inline_size);
-            self.set_len(0);
-            let iter = self.mut_iter();
-            SmallVecMoveIterator {
-                allocation: ptr_opt,
-                cap: cap,
-                iter: iter,
-            }
-        }
-    }
-
-    fn push(&mut self, value: T) {
-        let cap = self.cap();
-        if self.len() == cap {
-            self.grow(cmp::max(cap * 2, 1))
-        }
-        let end = self.end_mut();
-        unsafe {
-            ptr::write(end, value);
-            let len = self.len();
-            self.set_len(len + 1)
-        }
-    }
-
-    fn push_all_move<V:SmallVec<T>>(&mut self, mut other: V) {
-        for value in other.into_iter() {
-            self.push(value)
-        }
-    }
-
-    fn pop(&mut self) -> Option<T> {
-        if self.len() == 0 {
-            return None
-        }
-        let last_index = self.len() - 1;
-        if (last_index as isize) < 0 {
-            panic!("overflow")
-        }
-        unsafe {
-            let end_ptr = self.begin_mut().offset(last_index as isize);
-            let value = ptr::replace(end_ptr, mem::uninitialized());
-            self.set_len(last_index);
-            Some(value)
-        }
-    }
-
-    fn grow(&mut self, new_cap: usize) {
-        unsafe {
-            let mut vec: Vec<T> = Vec::with_capacity(new_cap);
-            let new_alloc = vec.as_mut_ptr();
-            mem::forget(vec);
-            ptr::copy_nonoverlapping(self.begin(), new_alloc, self.len());
-
-            if self.spilled() {
-                deallocate(self.mut_ptr(), self.cap())
-            } else {
-                ptr::write_bytes(self.begin_mut(), 0, self.len())
-            }
-
-            self.set_ptr(new_alloc);
-            self.set_cap(new_cap)
-        }
-    }
-
-    fn get<'a>(&'a self, index: usize) -> &'a T {
-        if index >= self.len() {
-            self.fail_bounds_check(index)
-        }
-        unsafe {
-            &*self.begin().offset(index as isize)
-        }
-    }
-
-    fn get_mut<'a>(&'a mut self, index: usize) -> &'a mut T {
-        if index >= self.len() {
-            self.fail_bounds_check(index)
-        }
-        unsafe {
-            &mut *self.begin_mut().offset(index as isize)
-        }
-    }
-
-    fn slice<'a>(&'a self, start: usize, end: usize) -> &'a [T] {
-        assert!(start <= end);
-        assert!(end <= self.len());
-        unsafe {
-            slice::from_raw_parts(self.begin().offset(start as isize), end - start)
-        }
-    }
-
-    fn as_slice<'a>(&'a self) -> &'a [T] {
-        self.slice(0, self.len())
-    }
-
-    fn as_slice_mut<'a>(&'a mut self) -> &'a mut [T] {
-        let len = self.len();
-        self.slice_mut(0, len)
-    }
-
-    fn slice_mut<'a>(&'a mut self, start: usize, end: usize) -> &'a mut [T] {
-        assert!(start <= end);
-        assert!(end <= self.len());
-        unsafe {
-            slice::from_raw_parts_mut(self.begin_mut().offset(start as isize), end - start)
-        }
-    }
-
-    fn slice_from_mut<'a>(&'a mut self, start: usize) -> &'a mut [T] {
-        let len = self.len();
-        self.slice_mut(start, len)
-    }
-
-    fn fail_bounds_check(&self, index: usize) {
-        panic!("index {} beyond length ({})", index, self.len())
-    }
-}
-
 unsafe fn deallocate<T>(ptr: *mut T, capacity: usize) {
     let _vec: Vec<T> = Vec::from_raw_parts(ptr, 0, capacity);
     // Let it drop.
@@ -359,7 +171,7 @@ macro_rules! def_small_vector(
             data: [T; $size],
         }
 
-        impl<T> SmallVecPrivate<T> for $name<T> {
+        impl<T> $name<T> {
             unsafe fn set_len(&mut self, new_len: usize) {
                 self.len = new_len
             }
@@ -368,10 +180,6 @@ macro_rules! def_small_vector(
             }
             fn data(&self, index: usize) -> *const T {
                 let ptr: *const T = &self.data[index];
-                ptr
-            }
-            fn mut_data(&mut self, index: usize) -> *mut T {
-                let ptr: *mut T = &mut self.data[index];
                 ptr
             }
             unsafe fn ptr(&self) -> *const T {
@@ -383,20 +191,189 @@ macro_rules! def_small_vector(
             unsafe fn set_ptr(&mut self, new_ptr: *mut T) {
                 self.ptr = new_ptr as *const T
             }
-        }
 
-        impl<T> SmallVec<T> for $name<T> {
-            fn inline_size(&self) -> usize {
+            pub fn inline_size(&self) -> usize {
                 $size
             }
-            fn len(&self) -> usize {
+            pub fn len(&self) -> usize {
                 self.len
             }
-            fn is_empty(&self) -> bool {
+            pub fn is_empty(&self) -> bool {
                 self.len == 0
             }
-            fn cap(&self) -> usize {
+            pub fn cap(&self) -> usize {
                 self.cap
+            }
+
+            pub fn spilled(&self) -> bool {
+                self.cap() > self.inline_size()
+            }
+
+            pub fn begin(&self) -> *const T {
+                unsafe {
+                    if self.spilled() {
+                        self.ptr()
+                    } else {
+                        self.data(0)
+                    }
+                }
+            }
+
+            pub fn begin_mut(&mut self) -> *mut T {
+                self.begin() as *mut T
+            }
+
+            pub fn end(&self) -> *const T {
+                unsafe {
+                    self.begin().offset(self.len() as isize)
+                }
+            }
+
+            pub fn end_mut(&mut self) -> *mut T {
+                self.end() as *mut T
+            }
+
+            pub fn iter<'a>(&'a self) -> SmallVecIterator<'a,T> {
+                SmallVecIterator {
+                    ptr: self.begin(),
+                    end: self.end(),
+                    _lifetime: PhantomData,
+                }
+            }
+
+            pub fn mut_iter<'a>(&'a mut self) -> SmallVecMutIterator<'a,T> {
+                SmallVecMutIterator {
+                    ptr: self.begin_mut(),
+                    end: self.end_mut(),
+                    _lifetime: PhantomData,
+                }
+            }
+
+            /// NB: For efficiency reasons (avoiding making a second copy of the inline elements), this
+            /// actually clears out the original array instead of moving it.
+            pub fn into_iter<'a>(&'a mut self) -> SmallVecMoveIterator<'a,T> {
+                unsafe {
+                    let ptr_opt = if self.spilled() {
+                        Some(self.mut_ptr())
+                    } else {
+                        None
+                    };
+                    let cap = self.cap();
+                    let inline_size = self.inline_size();
+                    self.set_cap(inline_size);
+                    self.set_len(0);
+                    let iter = self.mut_iter();
+                    SmallVecMoveIterator {
+                        allocation: ptr_opt,
+                        cap: cap,
+                        iter: iter,
+                    }
+                }
+            }
+
+            pub fn push(&mut self, value: T) {
+                let cap = self.cap();
+                if self.len() == cap {
+                    self.grow(cmp::max(cap * 2, 1))
+                }
+                let end = self.end_mut();
+                unsafe {
+                    ptr::write(end, value);
+                    let len = self.len();
+                    self.set_len(len + 1)
+                }
+            }
+
+            pub fn push_all_move<V: IntoIterator<Item=T>>(&mut self, other: V) {
+                for value in other {
+                    self.push(value)
+                }
+            }
+
+            pub fn pop(&mut self) -> Option<T> {
+                if self.len() == 0 {
+                    return None
+                }
+                let last_index = self.len() - 1;
+                if (last_index as isize) < 0 {
+                    panic!("overflow")
+                }
+                unsafe {
+                    let end_ptr = self.begin_mut().offset(last_index as isize);
+                    let value = ptr::replace(end_ptr, mem::uninitialized());
+                    self.set_len(last_index);
+                    Some(value)
+                }
+            }
+
+            pub fn grow(&mut self, new_cap: usize) {
+                unsafe {
+                    let mut vec: Vec<T> = Vec::with_capacity(new_cap);
+                    let new_alloc = vec.as_mut_ptr();
+                    mem::forget(vec);
+                    ptr::copy_nonoverlapping(self.begin(), new_alloc, self.len());
+
+                    if self.spilled() {
+                        deallocate(self.mut_ptr(), self.cap())
+                    } else {
+                        ptr::write_bytes(self.begin_mut(), 0, self.len())
+                    }
+
+                    self.set_ptr(new_alloc);
+                    self.set_cap(new_cap)
+                }
+            }
+
+            pub fn get<'a>(&'a self, index: usize) -> &'a T {
+                if index >= self.len() {
+                    self.fail_bounds_check(index)
+                }
+                unsafe {
+                    &*self.begin().offset(index as isize)
+                }
+            }
+
+            pub fn get_mut<'a>(&'a mut self, index: usize) -> &'a mut T {
+                if index >= self.len() {
+                    self.fail_bounds_check(index)
+                }
+                unsafe {
+                    &mut *self.begin_mut().offset(index as isize)
+                }
+            }
+
+            pub fn slice<'a>(&'a self, start: usize, end: usize) -> &'a [T] {
+                assert!(start <= end);
+                assert!(end <= self.len());
+                unsafe {
+                    slice::from_raw_parts(self.begin().offset(start as isize), end - start)
+                }
+            }
+
+            pub fn as_slice<'a>(&'a self) -> &'a [T] {
+                self.slice(0, self.len())
+            }
+
+            pub fn as_slice_mut<'a>(&'a mut self) -> &'a mut [T] {
+                let len = self.len();
+                self.slice_mut(0, len)
+            }
+
+            pub fn slice_mut<'a>(&'a mut self, start: usize, end: usize) -> &'a mut [T] {
+                assert!(start <= end);
+                assert!(end <= self.len());
+                unsafe {
+                    slice::from_raw_parts_mut(self.begin_mut().offset(start as isize), end - start)
+                }
+            }
+
+            pub fn slice_from_mut<'a>(&'a mut self, start: usize) -> &'a mut [T] {
+                let len = self.len();
+                self.slice_mut(start, len)
+            }
+
+            fn fail_bounds_check(&self, index: usize) {
+                panic!("index {} beyond length ({})", index, self.len())
             }
         }
 
@@ -513,7 +490,6 @@ def_small_vector!(SmallVec32, 32);
 
 #[cfg(test)]
 pub mod tests {
-    use SmallVec;
     use SmallVec2;
     use SmallVec16;
     use std::borrow::ToOwned;
