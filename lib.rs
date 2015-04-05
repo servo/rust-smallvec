@@ -5,18 +5,14 @@
 //! Small vectors in various sizes. These store a certain number of elements inline and fall back
 //! to the heap for larger allocations.
 
-#![feature(box_syntax, plugin, core, unsafe_destructor, alloc)]
-
 use std::mem::zeroed as i;
 use std::cmp;
 use std::fmt;
-use std::intrinsics;
 use std::iter::{IntoIterator, FromIterator};
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
-use std::raw::Slice;
-use std::rt::heap;
+use std::slice;
 
 // Generic code for all small vectors
 
@@ -115,7 +111,7 @@ pub trait SmallVec<T> : SmallVecPrivate<T> {
     fn into_iter<'a>(&'a mut self) -> SmallVecMoveIterator<'a,T> {
         unsafe {
             let ptr_opt = if self.spilled() {
-                Some(self.mut_ptr() as *mut u8)
+                Some(self.mut_ptr())
             } else {
                 None
             };
@@ -169,17 +165,15 @@ pub trait SmallVec<T> : SmallVecPrivate<T> {
 
     fn grow(&mut self, new_cap: usize) {
         unsafe {
-            let new_alloc: *mut T = mem::transmute(heap::allocate(mem::size_of::<T>() *
-                                                                            new_cap,
-                                                                  mem::min_align_of::<T>()));
+            let mut vec: Vec<T> = Vec::with_capacity(new_cap);
+            let new_alloc = vec.as_mut_ptr();
+            mem::forget(vec);
             ptr::copy_nonoverlapping(self.begin(), new_alloc, self.len());
 
             if self.spilled() {
-                heap::deallocate(self.mut_ptr() as *mut u8,
-                                 mem::size_of::<T>() * self.cap(),
-                                 mem::min_align_of::<T>())
+                deallocate(self.mut_ptr(), self.cap())
             } else {
-                intrinsics::write_bytes(self.begin_mut(), 0, self.len())
+                ptr::write_bytes(self.begin_mut(), 0, self.len())
             }
 
             self.set_ptr(new_alloc);
@@ -209,10 +203,7 @@ pub trait SmallVec<T> : SmallVecPrivate<T> {
         assert!(start <= end);
         assert!(end <= self.len());
         unsafe {
-            mem::transmute(Slice {
-                data: self.begin().offset(start as isize),
-                len: (end - start)
-            })
+            slice::from_raw_parts(self.begin().offset(start as isize), end - start)
         }
     }
 
@@ -229,10 +220,7 @@ pub trait SmallVec<T> : SmallVecPrivate<T> {
         assert!(start <= end);
         assert!(end <= self.len());
         unsafe {
-            mem::transmute(Slice {
-                data: self.begin().offset(start as isize),
-                len: (end - start)
-            })
+            slice::from_raw_parts_mut(self.begin_mut().offset(start as isize), end - start)
         }
     }
 
@@ -245,6 +233,12 @@ pub trait SmallVec<T> : SmallVecPrivate<T> {
         panic!("index {} beyond length ({})", index, self.len())
     }
 }
+
+unsafe fn deallocate<T>(ptr: *mut T, capacity: usize) {
+    let _vec: Vec<T> = Vec::from_raw_parts(ptr, 0, capacity);
+    // Let it drop.
+}
+
 
 pub struct SmallVecIterator<'a, T: 'a> {
     ptr: *const T,
@@ -316,7 +310,7 @@ impl<'a,T> Iterator for SmallVecMutIterator<'a,T> {
 }
 
 pub struct SmallVecMoveIterator<'a, T: 'a> {
-    allocation: Option<*mut u8>,
+    allocation: Option<*mut T>,
     cap: usize,
     iter: SmallVecMutIterator<'a,T>,
 }
@@ -338,7 +332,6 @@ impl<'a, T: 'a> Iterator for SmallVecMoveIterator<'a,T> {
     }
 }
 
-#[unsafe_destructor]
 impl<'a, T: 'a> Drop for SmallVecMoveIterator<'a,T> {
     fn drop(&mut self) {
         // Destroy the remaining elements.
@@ -348,9 +341,7 @@ impl<'a, T: 'a> Drop for SmallVecMoveIterator<'a,T> {
             None => {}
             Some(allocation) => {
                 unsafe {
-                    heap::deallocate(allocation,
-                                     mem::size_of::<T>() * self.cap,
-                                     mem::min_align_of::<T>())
+                    deallocate(allocation, self.cap)
                 }
             }
         }
@@ -481,7 +472,6 @@ macro_rules! def_small_vector(
             }
         }
 
-        #[unsafe_destructor]
         impl<T> Drop for $name<T> {
             fn drop(&mut self) {
                 if !self.spilled() {
@@ -494,9 +484,7 @@ macro_rules! def_small_vector(
                         *ptr.offset(i as isize) = mem::uninitialized();
                     }
 
-                    heap::deallocate(self.mut_ptr() as *mut u8,
-                                     mem::size_of::<T>() * self.cap(),
-                                     mem::min_align_of::<T>())
+                    deallocate(self.mut_ptr(), self.cap())
                 }
             }
         }
