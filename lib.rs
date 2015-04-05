@@ -9,7 +9,6 @@ use std::mem::zeroed as i;
 use std::cmp;
 use std::fmt;
 use std::iter::{IntoIterator, FromIterator};
-use std::marker::PhantomData;
 use std::mem;
 use std::ops;
 use std::ptr;
@@ -52,80 +51,10 @@ unsafe fn deallocate<T>(ptr: *mut T, capacity: usize) {
     // Let it drop.
 }
 
-
-pub struct SmallVecIterator<'a, T: 'a> {
-    ptr: *const T,
-    end: *const T,
-    _lifetime: PhantomData<&'a T>
-}
-
-impl<'a,T> Iterator for SmallVecIterator<'a,T> {
-    type Item = &'a T;
-
-    #[inline]
-    fn next(&mut self) -> Option<&'a T> {
-        unsafe {
-            if self.ptr == self.end {
-                return None
-            }
-            let old = self.ptr;
-            self.ptr = if mem::size_of::<T>() == 0 {
-                mem::transmute(self.ptr as usize + 1)
-            } else {
-                self.ptr.offset(1)
-            };
-            Some(&*old)
-        }
-    }
-}
-
-impl<'a,T> DoubleEndedIterator for SmallVecIterator<'a,T> {
-    #[inline]
-    fn next_back(&mut self) -> Option<&'a T> {
-        unsafe {
-            if self.ptr == self.end {
-                return None
-            }
-            self.end = if mem::size_of::<T>() == 0 {
-                mem::transmute(self.end as usize - 1)
-            } else {
-                self.end.offset(-1)
-            };
-            Some(mem::transmute(self.end))
-        }
-    }
-}
-
-pub struct SmallVecMutIterator<'a, T: 'a> {
-    ptr: *mut T,
-    end: *mut T,
-    _lifetime: PhantomData<&'a T>,
-}
-
-impl<'a,T> Iterator for SmallVecMutIterator<'a,T> {
-    type Item = &'a mut T;
-
-    #[inline]
-    fn next(&mut self) -> Option<&'a mut T> {
-        unsafe {
-            if self.ptr == self.end {
-                return None
-            }
-            let old = self.ptr;
-            self.ptr = if mem::size_of::<T>() == 0 {
-                mem::transmute(self.ptr as usize + 1)
-            } else {
-                self.ptr.offset(1)
-            };
-            Some(&mut *old)
-        }
-    }
-}
-
 pub struct SmallVecMoveIterator<'a, T: 'a> {
     allocation: Option<*mut T>,
     cap: usize,
-    iter: SmallVecMutIterator<'a,T>,
+    iter: slice::IterMut<'a,T>,
 }
 
 impl<'a, T: 'a> Iterator for SmallVecMoveIterator<'a,T> {
@@ -234,22 +163,6 @@ macro_rules! def_small_vector(
                 self.end() as *mut T
             }
 
-            pub fn iter<'a>(&'a self) -> SmallVecIterator<'a,T> {
-                SmallVecIterator {
-                    ptr: self.begin(),
-                    end: self.end(),
-                    _lifetime: PhantomData,
-                }
-            }
-
-            pub fn mut_iter<'a>(&'a mut self) -> SmallVecMutIterator<'a,T> {
-                SmallVecMutIterator {
-                    ptr: self.begin_mut(),
-                    end: self.end_mut(),
-                    _lifetime: PhantomData,
-                }
-            }
-
             /// NB: For efficiency reasons (avoiding making a second copy of the inline elements), this
             /// actually clears out the original array instead of moving it.
             pub fn into_iter<'a>(&'a mut self) -> SmallVecMoveIterator<'a,T> {
@@ -263,7 +176,7 @@ macro_rules! def_small_vector(
                     let inline_size = self.inline_size();
                     self.set_cap(inline_size);
                     self.set_len(0);
-                    let iter = self.mut_iter();
+                    let iter = self.iter_mut();
                     SmallVecMoveIterator {
                         allocation: ptr_opt,
                         cap: cap,
@@ -323,28 +236,6 @@ macro_rules! def_small_vector(
                     self.set_ptr(new_alloc);
                     self.set_cap(new_cap)
                 }
-            }
-
-            pub fn get<'a>(&'a self, index: usize) -> &'a T {
-                if index >= self.len() {
-                    self.fail_bounds_check(index)
-                }
-                unsafe {
-                    &*self.begin().offset(index as isize)
-                }
-            }
-
-            pub fn get_mut<'a>(&'a mut self, index: usize) -> &'a mut T {
-                if index >= self.len() {
-                    self.fail_bounds_check(index)
-                }
-                unsafe {
-                    &mut *self.begin_mut().offset(index as isize)
-                }
-            }
-
-            fn fail_bounds_check(&self, index: usize) {
-                panic!("index {} beyond length ({})", index, self.len())
             }
         }
 
