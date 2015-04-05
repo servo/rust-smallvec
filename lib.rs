@@ -17,31 +17,31 @@ use std::slice;
 // Generic code for all small vectors
 
 pub trait VecLike<T> {
-    fn vec_len(&self) -> usize;
-    fn vec_push(&mut self, value: T);
+    fn len(&self) -> usize;
+    fn push(&mut self, value: T);
 
-    fn vec_slice_mut<'a>(&'a mut self, start: usize, end: usize) -> &'a mut [T];
+    fn slice_mut<'a>(&'a mut self, start: usize, end: usize) -> &'a mut [T];
 
     #[inline]
-    fn vec_slice_from_mut<'a>(&'a mut self, start: usize) -> &'a mut [T] {
-        let len = self.vec_len();
-        self.vec_slice_mut(start, len)
+    fn slice_from_mut<'a>(&'a mut self, start: usize) -> &'a mut [T] {
+        let len = self.len();
+        self.slice_mut(start, len)
     }
 }
 
 impl<T> VecLike<T> for Vec<T> {
     #[inline]
-    fn vec_len(&self) -> usize {
-        self.len()
+    fn len(&self) -> usize {
+        Vec::len(self)
     }
 
     #[inline]
-    fn vec_push(&mut self, value: T) {
-        self.push(value);
+    fn push(&mut self, value: T) {
+        Vec::push(self, value);
     }
 
     #[inline]
-    fn vec_slice_mut<'a>(&'a mut self, start: usize, end: usize) -> &'a mut [T] {
+    fn slice_mut<'a>(&'a mut self, start: usize, end: usize) -> &'a mut [T] {
         &mut self[start..end]
     }
 }
@@ -379,18 +379,18 @@ macro_rules! def_small_vector(
 
         impl<T> VecLike<T> for $name<T> {
             #[inline]
-            fn vec_len(&self) -> usize {
-                self.len()
+            fn len(&self) -> usize {
+                $name::len(self)
             }
 
             #[inline]
-            fn vec_push(&mut self, value: T) {
-                self.push(value);
+            fn push(&mut self, value: T) {
+                $name::push(self, value);
             }
 
             #[inline]
-            fn vec_slice_mut<'a>(&'a mut self, start: usize, end: usize) -> &'a mut [T] {
-                self.slice_mut(start, end)
+            fn slice_mut<'a>(&'a mut self, start: usize, end: usize) -> &'a mut [T] {
+                $name::slice_mut(self, start, end)
             }
         }
 
