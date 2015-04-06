@@ -221,9 +221,9 @@ macro_rules! def_small_vector(
             }
 
             pub fn grow(&mut self, new_cap: usize) {
+                let mut vec: Vec<T> = Vec::with_capacity(new_cap);
+                let new_alloc = vec.as_mut_ptr();
                 unsafe {
-                    let mut vec: Vec<T> = Vec::with_capacity(new_cap);
-                    let new_alloc = vec.as_mut_ptr();
                     mem::forget(vec);
                     ptr::copy_nonoverlapping(self.begin(), new_alloc, self.len());
 
