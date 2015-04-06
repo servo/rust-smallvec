@@ -17,15 +17,15 @@ use std::slice;
 // Generic code for all small vectors
 
 pub trait VecLike<T>:
-        ops::Index<usize> +
+        ops::Index<usize, Output=T> +
         ops::IndexMut<usize> +
-        ops::Index<ops::Range<usize>> +
+        ops::Index<ops::Range<usize>, Output=[T]> +
         ops::IndexMut<ops::Range<usize>> +
-        ops::Index<ops::RangeFrom<usize>> +
+        ops::Index<ops::RangeFrom<usize>, Output=[T]> +
         ops::IndexMut<ops::RangeFrom<usize>> +
-        ops::Index<ops::RangeTo<usize>> +
+        ops::Index<ops::RangeTo<usize>, Output=[T]> +
         ops::IndexMut<ops::RangeTo<usize>> +
-        ops::Index<ops::RangeFull> +
+        ops::Index<ops::RangeFull, Output=[T]> +
         ops::IndexMut<ops::RangeFull> +
         ops::Deref +
         ops::DerefMut {
@@ -90,7 +90,25 @@ impl<'a, T: 'a> Drop for SmallVecMoveIterator<'a,T> {
     }
 }
 
-// Concrete implementations
+
+macro_rules! impl_index {
+    ($name: ident, $index_type: ty, $output_type: ty) => {
+        impl<T> ops::Index<$index_type> for $name<T> {
+            type Output = $output_type;
+            #[inline]
+            fn index(&self, index: $index_type) -> &$output_type {
+                &(&*self)[index]
+            }
+        }
+
+        impl<T> ops::IndexMut<$index_type> for $name<T> {
+            #[inline]
+            fn index_mut(&mut self, index: $index_type) -> &mut $output_type {
+                &mut (&mut *self)[index]
+            }
+        }
+    }
+}
 
 macro_rules! def_small_vector(
     ($name:ident, $size:expr) => (
@@ -258,20 +276,11 @@ macro_rules! def_small_vector(
             }
         }
 
-        impl<T, I> ops::Index<I> for $name<T> where [T]: ops::Index<I> {
-            type Output = <[T] as ops::Index<I>>::Output;
-            #[inline]
-            fn index(&self, index: I) -> &<[T] as ops::Index<I>>::Output {
-                &(&*self)[index]
-            }
-        }
-
-        impl<T, I> ops::IndexMut<I> for $name<T> where [T]: ops::IndexMut<I> {
-            #[inline]
-            fn index_mut(&mut self, index: I) -> &mut <[T] as ops::Index<I>>::Output {
-                &mut (&mut *self)[index]
-            }
-        }
+        impl_index!($name, usize, T);
+        impl_index!($name, ops::Range<usize>, [T]);
+        impl_index!($name, ops::RangeFrom<usize>, [T]);
+        impl_index!($name, ops::RangeTo<usize>, [T]);
+        impl_index!($name, ops::RangeFull, [T]);
 
         impl<T> VecLike<T> for $name<T> {
             #[inline]
