@@ -97,14 +97,14 @@ macro_rules! impl_index {
             type Output = $output_type;
             #[inline]
             fn index(&self, index: $index_type) -> &$output_type {
-                &(&*self)[index]
+                &(&**self)[index]
             }
         }
 
         impl<T> ops::IndexMut<$index_type> for $name<T> {
             #[inline]
             fn index_mut(&mut self, index: $index_type) -> &mut $output_type {
-                &mut (&mut *self)[index]
+                &mut (&mut **self)[index]
             }
         }
     }
@@ -411,8 +411,10 @@ pub mod tests {
     pub fn test_spill() {
         let mut v = SmallVec2::new();
         v.push("hello".to_owned());
+        assert_eq!(v[0], "hello");
         v.push("there".to_owned());
         v.push("burma".to_owned());
+        assert_eq!(v[0], "hello");
         v.push("shave".to_owned());
         assert_eq!(&*v, &[
             "hello".to_owned(),
