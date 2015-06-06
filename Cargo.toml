@@ -6,6 +6,7 @@ license = "MPL-2.0"
 repository = "https://github.com/servo/rust-smallvec"
 description = "'Small vector' optimization: store up to a small number of items on the stack"
 readme = "README.md"
+documentation = "http://doc.servo.org/smallvec/"
 
 [lib]
 name = "smallvec"
