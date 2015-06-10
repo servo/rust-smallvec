@@ -5,8 +5,6 @@
 //! Small vectors in various sizes. These store a certain number of elements inline and fall back
 //! to the heap for larger allocations.
 
-extern crate nodrop;
-
 use std::cmp;
 use std::fmt;
 use std::iter::{IntoIterator, FromIterator};
@@ -15,7 +13,8 @@ use std::ops;
 use std::ptr;
 use std::slice;
 
-// Generic code for all small vectors
+use SmallVecData::{Inline, Heap};
+
 
 pub trait VecLike<T>:
         ops::Index<usize, Output=T> +
@@ -65,7 +64,7 @@ impl<'a, T: 'a> Iterator for SmallVecMoveIterator<'a,T> {
             None => None,
             Some(reference) => {
                 unsafe {
-                    Some(ptr::read(reference as *const T))
+                    Some(ptr::read(reference))
                 }
             }
         }
@@ -77,6 +76,11 @@ impl<'a, T: 'a> Drop for SmallVecMoveIterator<'a,T> {
         // Destroy the remaining elements.
         for _ in self.by_ref() {}
     }
+}
+
+enum SmallVecData<T, A> {
+    Inline { array: A },
+    Heap { ptr: *mut T, capacity: usize },
 }
 
 
@@ -103,30 +107,12 @@ macro_rules! def_small_vector(
     ($name:ident, $size:expr) => (
         pub struct $name<T> {
             len: usize,
-            cap: usize,
-            ptr: *const T,
-            data: nodrop::NoDrop<[T; $size]>,
+            data: SmallVecData<T, [T; $size]>,
         }
 
         impl<T> $name<T> {
             unsafe fn set_len(&mut self, new_len: usize) {
                 self.len = new_len
-            }
-            unsafe fn set_cap(&mut self, new_cap: usize) {
-                self.cap = new_cap
-            }
-            fn data(&self, index: usize) -> *const T {
-                let ptr: *const T = &self.data[index];
-                ptr
-            }
-            unsafe fn ptr(&self) -> *const T {
-                self.ptr
-            }
-            unsafe fn mut_ptr(&mut self) -> *mut T {
-                self.ptr as *mut T
-            }
-            unsafe fn set_ptr(&mut self, new_ptr: *mut T) {
-                self.ptr = new_ptr as *const T
             }
 
             pub fn inline_size(&self) -> usize {
@@ -139,25 +125,31 @@ macro_rules! def_small_vector(
                 self.len == 0
             }
             pub fn cap(&self) -> usize {
-                self.cap
+                match self.data {
+                    Inline { .. } => $size,
+                    Heap { capacity, .. } => capacity,
+                }
             }
 
             pub fn spilled(&self) -> bool {
-                self.cap() > self.inline_size()
+                match self.data {
+                    Inline { .. } => false,
+                    Heap { .. } => true,
+                }
             }
 
             pub fn begin(&self) -> *const T {
-                unsafe {
-                    if self.spilled() {
-                        self.ptr()
-                    } else {
-                        self.data(0)
-                    }
+                match self.data {
+                    Inline { ref array } => &array[0],
+                    Heap { ptr, .. } => ptr,
                 }
             }
 
             pub fn begin_mut(&mut self) -> *mut T {
-                self.begin() as *mut T
+                match self.data {
+                    Inline { ref mut array } => &mut array[0],
+                    Heap { ptr, .. } => ptr,
+                }
             }
 
             pub fn end(&self) -> *const T {
@@ -224,14 +216,14 @@ macro_rules! def_small_vector(
                     mem::forget(vec);
                     ptr::copy_nonoverlapping(self.begin(), new_alloc, self.len());
 
-                    if self.spilled() {
-                        deallocate(self.mut_ptr(), self.cap())
-                    } else {
-                        ptr::write_bytes(self.begin_mut(), 0, self.len())
+                    match self.data {
+                        Inline { .. } => {}
+                        Heap { ptr, capacity } => deallocate(ptr, capacity),
                     }
-
-                    self.set_ptr(new_alloc);
-                    self.set_cap(new_cap)
+                    ptr::write(&mut self.data, Heap {
+                        ptr: new_alloc,
+                        capacity: new_cap,
+                    });
                 }
             }
         }
@@ -320,9 +312,7 @@ macro_rules! def_small_vector(
                 unsafe {
                     $name {
                         len: 0,
-                        cap: $size,
-                        ptr: ptr::null(),
-                        data: nodrop::NoDrop::new(mem::zeroed()),
+                        data: Inline { array: mem::zeroed() },
                     }
                 }
             }
@@ -336,8 +326,15 @@ macro_rules! def_small_vector(
                         ptr::read(ptr.offset(i as isize));
                     }
 
-                    if self.spilled() {
-                        deallocate(self.mut_ptr(), self.cap())
+                    match self.data {
+                        Inline { .. } => {
+                            // Inhibit the array destructor.
+                            ptr::write(&mut self.data, Heap {
+                                ptr: ptr::null_mut(),
+                                capacity: 0,
+                            });
+                        }
+                        Heap { ptr, capacity } => deallocate(ptr, capacity),
                     }
                 }
             }
