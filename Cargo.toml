@@ -11,3 +11,6 @@ readme = "README.md"
 name = "smallvec"
 path = "lib.rs"
 doctest = false
+
+[dependencies]
+nodrop = "0.1.3"

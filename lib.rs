@@ -5,7 +5,8 @@
 //! Small vectors in various sizes. These store a certain number of elements inline and fall back
 //! to the heap for larger allocations.
 
-use std::mem::zeroed as i;
+extern crate nodrop;
+
 use std::cmp;
 use std::fmt;
 use std::iter::{IntoIterator, FromIterator};
@@ -52,8 +53,6 @@ unsafe fn deallocate<T>(ptr: *mut T, capacity: usize) {
 }
 
 pub struct SmallVecMoveIterator<'a, T: 'a> {
-    allocation: Option<*mut T>,
-    cap: usize,
     iter: slice::IterMut<'a,T>,
 }
 
@@ -66,8 +65,7 @@ impl<'a, T: 'a> Iterator for SmallVecMoveIterator<'a,T> {
             None => None,
             Some(reference) => {
                 unsafe {
-                    // Zero out the values as we go so they don't get double-freed.
-                    Some(mem::replace(reference, mem::zeroed()))
+                    Some(ptr::read(reference as *const T))
                 }
             }
         }
@@ -78,15 +76,6 @@ impl<'a, T: 'a> Drop for SmallVecMoveIterator<'a,T> {
     fn drop(&mut self) {
         // Destroy the remaining elements.
         for _ in self.by_ref() {}
-
-        match self.allocation {
-            None => {}
-            Some(allocation) => {
-                unsafe {
-                    deallocate(allocation, self.cap)
-                }
-            }
-        }
     }
 }
 
@@ -116,7 +105,7 @@ macro_rules! def_small_vector(
             len: usize,
             cap: usize,
             ptr: *const T,
-            data: [T; $size],
+            data: nodrop::NoDrop<[T; $size]>,
         }
 
         impl<T> $name<T> {
@@ -183,22 +172,12 @@ macro_rules! def_small_vector(
 
             /// NB: For efficiency reasons (avoiding making a second copy of the inline elements), this
             /// actually clears out the original array instead of moving it.
+            /// FIXME: Rename this to `drain`? It’s more like `Vec::drain` than `Vec::into_iter`.
             pub fn into_iter<'a>(&'a mut self) -> SmallVecMoveIterator<'a,T> {
                 unsafe {
-                    let ptr_opt = if self.spilled() {
-                        Some(self.mut_ptr())
-                    } else {
-                        None
-                    };
-                    let cap = self.cap();
-                    let inline_size = self.inline_size();
-                    self.set_cap(inline_size);
                     self.set_len(0);
-                    let iter = self.iter_mut();
                     SmallVecMoveIterator {
-                        allocation: ptr_opt,
-                        cap: cap,
-                        iter: iter,
+                        iter: self.iter_mut(),
                     }
                 }
             }
@@ -343,7 +322,7 @@ macro_rules! def_small_vector(
                         len: 0,
                         cap: $size,
                         ptr: ptr::null(),
-                        data: mem::zeroed(),
+                        data: nodrop::NoDrop::new(mem::zeroed()),
                     }
                 }
             }
@@ -351,17 +330,15 @@ macro_rules! def_small_vector(
 
         impl<T> Drop for $name<T> {
             fn drop(&mut self) {
-                if !self.spilled() {
-                    return
-                }
-
                 unsafe {
-                    let ptr = self.mut_ptr();
+                    let ptr = self.begin();
                     for i in 0 .. self.len() {
-                        *ptr.offset(i as isize) = mem::uninitialized();
+                        ptr::read(ptr.offset(i as isize));
                     }
 
-                    deallocate(self.mut_ptr(), self.cap())
+                    if self.spilled() {
+                        deallocate(self.mut_ptr(), self.cap())
+                    }
                 }
             }
         }
@@ -445,5 +422,17 @@ pub mod tests {
             "burma".to_owned(),
             "shave".to_owned(),
         ][..]);
+    }
+
+    /// https://github.com/servo/rust-smallvec/issues/4
+    #[test]
+    fn issue_4() {
+        SmallVec2::<Box<u32>>::new();
+    }
+
+    /// https://github.com/servo/rust-smallvec/issues/5
+    #[test]
+    fn issue_5() {
+        assert!(Some(SmallVec2::<&u32>::new()).is_some());
     }
 }
