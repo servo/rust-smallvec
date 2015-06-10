@@ -78,15 +78,157 @@ impl<'a, T: 'a> Drop for SmallVecMoveIterator<'a,T> {
     }
 }
 
-enum SmallVecData<T, A> {
+enum SmallVecData<A: Array> {
     Inline { array: A },
-    Heap { ptr: *mut T, capacity: usize },
+    Heap { ptr: *mut A::Item, capacity: usize },
 }
 
 
+pub struct SmallVec<A: Array> {
+    len: usize,
+    data: SmallVecData<A>,
+}
+
+impl<A: Array> SmallVec<A> {
+    unsafe fn set_len(&mut self, new_len: usize) {
+        self.len = new_len
+    }
+
+    pub fn inline_size(&self) -> usize {
+        A::size()
+    }
+    pub fn len(&self) -> usize {
+        self.len
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+    pub fn cap(&self) -> usize {
+        match self.data {
+            Inline { .. } => A::size(),
+            Heap { capacity, .. } => capacity,
+        }
+    }
+
+    pub fn spilled(&self) -> bool {
+        match self.data {
+            Inline { .. } => false,
+            Heap { .. } => true,
+        }
+    }
+
+    pub fn begin(&self) -> *const A::Item {
+        match self.data {
+            Inline { ref array } => array.ptr(),
+            Heap { ptr, .. } => ptr,
+        }
+    }
+
+    pub fn begin_mut(&mut self) -> *mut A::Item {
+        match self.data {
+            Inline { ref mut array } => array.ptr_mut(),
+            Heap { ptr, .. } => ptr,
+        }
+    }
+
+    pub fn end(&self) -> *const A::Item {
+        unsafe {
+            self.begin().offset(self.len() as isize)
+        }
+    }
+
+    pub fn end_mut(&mut self) -> *mut A::Item {
+        self.end() as *mut _
+    }
+
+    /// NB: For efficiency reasons (avoiding making a second copy of the inline elements), this
+    /// actually clears out the original array instead of moving it.
+    /// FIXME: Rename this to `drain`? It’s more like `Vec::drain` than `Vec::into_iter`.
+    pub fn into_iter<'a>(&'a mut self) -> SmallVecMoveIterator<'a, A::Item> {
+        unsafe {
+            self.set_len(0);
+            SmallVecMoveIterator {
+                iter: self.iter_mut(),
+            }
+        }
+    }
+
+    pub fn push(&mut self, value: A::Item) {
+        let cap = self.cap();
+        if self.len() == cap {
+            self.grow(cmp::max(cap * 2, 1))
+        }
+        let end = self.end_mut();
+        unsafe {
+            ptr::write(end, value);
+            let len = self.len();
+            self.set_len(len + 1)
+        }
+    }
+
+    pub fn push_all_move<V: IntoIterator<Item=A::Item>>(&mut self, other: V) {
+        for value in other {
+            self.push(value)
+        }
+    }
+
+    pub fn pop(&mut self) -> Option<A::Item> {
+        if self.len() == 0 {
+            return None
+        }
+        let last_index = self.len() - 1;
+        if (last_index as isize) < 0 {
+            panic!("overflow")
+        }
+        unsafe {
+            let end_ptr = self.begin_mut().offset(last_index as isize);
+            let value = ptr::replace(end_ptr, mem::uninitialized());
+            self.set_len(last_index);
+            Some(value)
+        }
+    }
+
+    pub fn grow(&mut self, new_cap: usize) {
+        let mut vec: Vec<A::Item> = Vec::with_capacity(new_cap);
+        let new_alloc = vec.as_mut_ptr();
+        unsafe {
+            mem::forget(vec);
+            ptr::copy_nonoverlapping(self.begin(), new_alloc, self.len());
+
+            match self.data {
+                Inline { .. } => {}
+                Heap { ptr, capacity } => deallocate(ptr, capacity),
+            }
+            ptr::write(&mut self.data, Heap {
+                ptr: new_alloc,
+                capacity: new_cap,
+            });
+        }
+    }
+}
+
+impl<A: Array> ops::Deref for SmallVec<A> {
+    type Target = [A::Item];
+    #[inline]
+    fn deref(&self) -> &[A::Item] {
+        unsafe {
+            slice::from_raw_parts(self.begin(), self.len())
+        }
+    }
+}
+
+impl<A: Array> ops::DerefMut for SmallVec<A> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut [A::Item] {
+        unsafe {
+            slice::from_raw_parts_mut(self.begin_mut(), self.len())
+        }
+    }
+}
+
 macro_rules! impl_index {
-    ($name: ident, $index_type: ty, $output_type: ty) => {
-        impl<T> ops::Index<$index_type> for $name<T> {
+    ($index_type: ty, $output_type: ty) => {
+        impl<A: Array> ops::Index<$index_type> for SmallVec<A> {
             type Output = $output_type;
             #[inline]
             fn index(&self, index: $index_type) -> &$output_type {
@@ -94,7 +236,7 @@ macro_rules! impl_index {
             }
         }
 
-        impl<T> ops::IndexMut<$index_type> for $name<T> {
+        impl<A: Array> ops::IndexMut<$index_type> for SmallVec<A> {
             #[inline]
             fn index_mut(&mut self, index: $index_type) -> &mut $output_type {
                 &mut (&mut **self)[index]
@@ -103,264 +245,142 @@ macro_rules! impl_index {
     }
 }
 
-macro_rules! def_small_vector(
-    ($name:ident, $size:expr) => (
-        pub struct $name<T> {
-            len: usize,
-            data: SmallVecData<T, [T; $size]>,
+impl_index!(usize, A::Item);
+impl_index!(ops::Range<usize>, [A::Item]);
+impl_index!(ops::RangeFrom<usize>, [A::Item]);
+impl_index!(ops::RangeTo<usize>, [A::Item]);
+impl_index!(ops::RangeFull, [A::Item]);
+
+
+impl<A: Array> VecLike<A::Item> for SmallVec<A> {
+    #[inline]
+    fn len(&self) -> usize {
+        SmallVec::len(self)
+    }
+
+    #[inline]
+    fn push(&mut self, value: A::Item) {
+        SmallVec::push(self, value);
+    }
+}
+
+impl<A: Array> FromIterator<A::Item> for SmallVec<A> {
+    fn from_iter<I: IntoIterator<Item=A::Item>>(iterable: I) -> SmallVec<A> {
+        let mut v = SmallVec::new();
+
+        let iter = iterable.into_iter();
+        let (lower_size_bound, _) = iter.size_hint();
+
+        if lower_size_bound > v.cap() {
+            v.grow(lower_size_bound);
         }
 
-        impl<T> $name<T> {
-            unsafe fn set_len(&mut self, new_len: usize) {
-                self.len = new_len
+        for elem in iter {
+            v.push(elem);
+        }
+
+        v
+    }
+}
+
+impl<A: Array> SmallVec<A> {
+    pub fn extend<I: Iterator<Item=A::Item>>(&mut self, iter: I) {
+        let (lower_size_bound, _) = iter.size_hint();
+
+        let target_len = self.len() + lower_size_bound;
+
+        if target_len > self.cap() {
+           self.grow(target_len);
+        }
+
+        for elem in iter {
+            self.push(elem);
+        }
+    }
+}
+
+impl<A: Array> fmt::Debug for SmallVec<A> where A::Item: fmt::Debug {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", &**self)
+    }
+}
+
+impl<A: Array> SmallVec<A> {
+    #[inline]
+    pub fn new() -> SmallVec<A> {
+        unsafe {
+            SmallVec {
+                len: 0,
+                data: Inline { array: mem::zeroed() },
+            }
+        }
+    }
+}
+
+impl<A: Array> Drop for SmallVec<A> {
+    fn drop(&mut self) {
+        unsafe {
+            let ptr = self.begin();
+            for i in 0 .. self.len() {
+                ptr::read(ptr.offset(i as isize));
             }
 
-            pub fn inline_size(&self) -> usize {
-                $size
-            }
-            pub fn len(&self) -> usize {
-                self.len
-            }
-            pub fn is_empty(&self) -> bool {
-                self.len == 0
-            }
-            pub fn cap(&self) -> usize {
-                match self.data {
-                    Inline { .. } => $size,
-                    Heap { capacity, .. } => capacity,
-                }
-            }
-
-            pub fn spilled(&self) -> bool {
-                match self.data {
-                    Inline { .. } => false,
-                    Heap { .. } => true,
-                }
-            }
-
-            pub fn begin(&self) -> *const T {
-                match self.data {
-                    Inline { ref array } => &array[0],
-                    Heap { ptr, .. } => ptr,
-                }
-            }
-
-            pub fn begin_mut(&mut self) -> *mut T {
-                match self.data {
-                    Inline { ref mut array } => &mut array[0],
-                    Heap { ptr, .. } => ptr,
-                }
-            }
-
-            pub fn end(&self) -> *const T {
-                unsafe {
-                    self.begin().offset(self.len() as isize)
-                }
-            }
-
-            pub fn end_mut(&mut self) -> *mut T {
-                self.end() as *mut T
-            }
-
-            /// NB: For efficiency reasons (avoiding making a second copy of the inline elements), this
-            /// actually clears out the original array instead of moving it.
-            /// FIXME: Rename this to `drain`? It’s more like `Vec::drain` than `Vec::into_iter`.
-            pub fn into_iter<'a>(&'a mut self) -> SmallVecMoveIterator<'a,T> {
-                unsafe {
-                    self.set_len(0);
-                    SmallVecMoveIterator {
-                        iter: self.iter_mut(),
-                    }
-                }
-            }
-
-            pub fn push(&mut self, value: T) {
-                let cap = self.cap();
-                if self.len() == cap {
-                    self.grow(cmp::max(cap * 2, 1))
-                }
-                let end = self.end_mut();
-                unsafe {
-                    ptr::write(end, value);
-                    let len = self.len();
-                    self.set_len(len + 1)
-                }
-            }
-
-            pub fn push_all_move<V: IntoIterator<Item=T>>(&mut self, other: V) {
-                for value in other {
-                    self.push(value)
-                }
-            }
-
-            pub fn pop(&mut self) -> Option<T> {
-                if self.len() == 0 {
-                    return None
-                }
-                let last_index = self.len() - 1;
-                if (last_index as isize) < 0 {
-                    panic!("overflow")
-                }
-                unsafe {
-                    let end_ptr = self.begin_mut().offset(last_index as isize);
-                    let value = ptr::replace(end_ptr, mem::uninitialized());
-                    self.set_len(last_index);
-                    Some(value)
-                }
-            }
-
-            pub fn grow(&mut self, new_cap: usize) {
-                let mut vec: Vec<T> = Vec::with_capacity(new_cap);
-                let new_alloc = vec.as_mut_ptr();
-                unsafe {
-                    mem::forget(vec);
-                    ptr::copy_nonoverlapping(self.begin(), new_alloc, self.len());
-
-                    match self.data {
-                        Inline { .. } => {}
-                        Heap { ptr, capacity } => deallocate(ptr, capacity),
-                    }
+            match self.data {
+                Inline { .. } => {
+                    // Inhibit the array destructor.
                     ptr::write(&mut self.data, Heap {
-                        ptr: new_alloc,
-                        capacity: new_cap,
+                        ptr: ptr::null_mut(),
+                        capacity: 0,
                     });
                 }
+                Heap { ptr, capacity } => deallocate(ptr, capacity),
             }
         }
+    }
+}
 
-        impl<T> ops::Deref for $name<T> {
-            type Target = [T];
-            #[inline]
-            fn deref(&self) -> &[T] {
-                unsafe {
-                    slice::from_raw_parts(self.begin(), self.len())
-                }
-            }
+impl<A: Array> Clone for SmallVec<A> where A::Item: Clone {
+    fn clone(&self) -> SmallVec<A> {
+        let mut new_vector = SmallVec::new();
+        for element in self.iter() {
+            new_vector.push((*element).clone())
         }
+        new_vector
+    }
+}
 
-        impl<T> ops::DerefMut for $name<T> {
-            #[inline]
-            fn deref_mut(&mut self) -> &mut [T] {
-                unsafe {
-                    slice::from_raw_parts_mut(self.begin_mut(), self.len())
-                }
+unsafe impl<A: Array> Send for SmallVec<A> where A::Item: Send {}
+
+pub type SmallVec1<T> = SmallVec<[T; 1]>;
+pub type SmallVec2<T> = SmallVec<[T; 2]>;
+pub type SmallVec4<T> = SmallVec<[T; 4]>;
+pub type SmallVec8<T> = SmallVec<[T; 8]>;
+pub type SmallVec16<T> = SmallVec<[T; 16]>;
+pub type SmallVec24<T> = SmallVec<[T; 24]>;
+pub type SmallVec32<T> = SmallVec<[T; 32]>;
+
+
+pub trait Array {
+    type Item;
+    fn size() -> usize;
+    fn ptr(&self) -> *const Self::Item;
+    fn ptr_mut(&mut self) -> *mut Self::Item;
+}
+
+macro_rules! impl_array(
+    ($($size:expr),+) => {
+        $(
+            impl<T> Array for [T; $size] {
+                type Item = T;
+                fn size() -> usize { $size }
+                fn ptr(&self) -> *const T { &self[0] }
+                fn ptr_mut(&mut self) -> *mut T { &mut self[0] }
             }
-        }
-
-        impl_index!($name, usize, T);
-        impl_index!($name, ops::Range<usize>, [T]);
-        impl_index!($name, ops::RangeFrom<usize>, [T]);
-        impl_index!($name, ops::RangeTo<usize>, [T]);
-        impl_index!($name, ops::RangeFull, [T]);
-
-        impl<T> VecLike<T> for $name<T> {
-            #[inline]
-            fn len(&self) -> usize {
-                $name::len(self)
-            }
-
-            #[inline]
-            fn push(&mut self, value: T) {
-                $name::push(self, value);
-            }
-        }
-
-        impl<T> FromIterator<T> for $name<T> {
-            fn from_iter<I: IntoIterator<Item=T>>(iterable: I) -> $name<T> {
-                let mut v = $name::new();
-
-                let iter = iterable.into_iter();
-                let (lower_size_bound, _) = iter.size_hint();
-
-                if lower_size_bound > v.cap() {
-                    v.grow(lower_size_bound);
-                }
-
-                for elem in iter {
-                    v.push(elem);
-                }
-
-                v
-            }
-        }
-
-        impl<T> $name<T> {
-            pub fn extend<I: Iterator<Item=T>>(&mut self, iter: I) {
-                let (lower_size_bound, _) = iter.size_hint();
-
-                let target_len = self.len() + lower_size_bound;
-
-                if target_len > self.cap() {
-                   self.grow(target_len);
-                }
-
-                for elem in iter {
-                    self.push(elem);
-                }
-            }
-        }
-
-        impl<T: fmt::Debug> fmt::Debug for $name<T> {
-            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                write!(f, "{:?}", &**self)
-            }
-        }
-
-        impl<T> $name<T> {
-            #[inline]
-            pub fn new() -> $name<T> {
-                unsafe {
-                    $name {
-                        len: 0,
-                        data: Inline { array: mem::zeroed() },
-                    }
-                }
-            }
-        }
-
-        impl<T> Drop for $name<T> {
-            fn drop(&mut self) {
-                unsafe {
-                    let ptr = self.begin();
-                    for i in 0 .. self.len() {
-                        ptr::read(ptr.offset(i as isize));
-                    }
-
-                    match self.data {
-                        Inline { .. } => {
-                            // Inhibit the array destructor.
-                            ptr::write(&mut self.data, Heap {
-                                ptr: ptr::null_mut(),
-                                capacity: 0,
-                            });
-                        }
-                        Heap { ptr, capacity } => deallocate(ptr, capacity),
-                    }
-                }
-            }
-        }
-
-        impl<T: Clone> Clone for $name<T> {
-            fn clone(&self) -> $name<T> {
-                let mut new_vector = $name::new();
-                for element in self.iter() {
-                    new_vector.push((*element).clone())
-                }
-                new_vector
-            }
-        }
-
-        unsafe impl<T: Send> Send for $name<T> {}
-    )
+        )+
+    }
 );
 
-def_small_vector!(SmallVec1, 1);
-def_small_vector!(SmallVec2, 2);
-def_small_vector!(SmallVec4, 4);
-def_small_vector!(SmallVec8, 8);
-def_small_vector!(SmallVec16, 16);
-def_small_vector!(SmallVec24, 24);
-def_small_vector!(SmallVec32, 32);
+impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32);
 
 #[cfg(test)]
 pub mod tests {
