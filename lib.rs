@@ -349,7 +349,7 @@ pub type SmallVec24<T> = SmallVec<[T; 24]>;
 pub type SmallVec32<T> = SmallVec<[T; 32]>;
 
 
-pub trait Array {
+pub unsafe trait Array {
     type Item;
     fn size() -> usize;
     fn ptr(&self) -> *const Self::Item;
@@ -359,7 +359,7 @@ pub trait Array {
 macro_rules! impl_array(
     ($($size:expr),+) => {
         $(
-            impl<T> Array for [T; $size] {
+            unsafe impl<T> Array for [T; $size] {
                 type Item = T;
                 fn size() -> usize { $size }
                 fn ptr(&self) -> *const T { &self[0] }
