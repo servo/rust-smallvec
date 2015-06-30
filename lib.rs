@@ -122,9 +122,18 @@ impl<A: Array> SmallVec<A> {
     /// FIXME: Rename this to `drain`? It’s more like `Vec::drain` than `Vec::into_iter`.
     pub fn into_iter<'a>(&'a mut self) -> SmallVecMoveIterator<'a, A::Item> {
         unsafe {
+            let current_len = self.len();
             self.set_len(0);
+
+            let ptr = match self.data {
+                Inline { ref mut array } => array.ptr_mut(),
+                Heap { ptr, .. } => ptr,
+            };
+
+            let slice = slice::from_raw_parts_mut(ptr, current_len);
+
             SmallVecMoveIterator {
-                iter: self.iter_mut(),
+                iter: slice.iter_mut(),
             }
         }
     }
@@ -373,6 +382,7 @@ impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32);
 
 #[cfg(test)]
 pub mod tests {
+    use SmallVec;
     use SmallVec2;
     use SmallVec16;
     use std::borrow::ToOwned;
@@ -440,5 +450,18 @@ pub mod tests {
     #[test]
     fn issue_5() {
         assert!(Some(SmallVec2::<&u32>::new()).is_some());
+    }
+
+    #[test]
+    fn into_iter() {
+        let mut v: SmallVec<[u8; 2]> = SmallVec::new();
+        v.push(3);
+        assert_eq!(v.into_iter().collect::<Vec<_>>(), &[3]);
+
+        // spilling the vec
+        v.push(3);
+        v.push(4);
+        v.push(5);
+        assert_eq!(v.into_iter().collect::<Vec<_>>(), &[3, 4, 5]);
     }
 }
