@@ -90,7 +90,7 @@ pub struct SmallVec<A: Array> {
 }
 
 impl<A: Array> SmallVec<A> {
-    unsafe fn set_len(&mut self, new_len: usize) {
+    pub unsafe fn set_len(&mut self, new_len: usize) {
         self.len = new_len
     }
 
@@ -188,6 +188,82 @@ impl<A: Array> SmallVec<A> {
                 ptr: new_alloc,
                 capacity: new_cap,
             });
+        }
+    }
+
+    pub fn reserve(&mut self, additional: usize) {
+        let len = self.len();
+        if self.capacity() - len < additional {
+            match len.checked_add(additional).and_then(usize::checked_next_power_of_two) {
+                Some(cap) => self.grow(cap),
+                None => self.grow(usize::max_value()),
+            }
+        }
+    }
+
+    pub fn reserve_exact(&mut self, additional: usize) {
+        let len = self.len();
+        if self.capacity() - len < additional {
+            match len.checked_add(additional) {
+                Some(cap) => self.grow(cap),
+                None => panic!("reserve_exact overflow"),
+            }
+        }
+    }
+
+    pub fn shrink_to_fit(&mut self) {
+        let len = self.len;
+        if self.spilled() && self.capacity() > len {
+            self.grow(len);
+        }
+    }
+
+    pub fn truncate(&mut self, len: usize) {
+        let end_ptr = self.as_ptr();
+        while len < self.len {
+            unsafe {
+                let last_index = self.len - 1;
+                self.set_len(last_index);
+                ptr::read(end_ptr.offset(last_index as isize));
+            }
+        }
+    }
+
+    pub fn swap_remove(&mut self, index: usize) -> A::Item {
+        let len = self.len;
+        self.swap(len - 1, index);
+        self.pop().unwrap()
+    }
+
+    pub fn clear(&mut self) {
+        self.truncate(0);
+    }
+
+    pub fn remove(&mut self, index: usize) -> A::Item {
+        let len = self.len();
+
+        assert!(index < len);
+
+        unsafe {
+            let ptr = self.as_mut_ptr().offset(index as isize);
+            let item = ptr::read(ptr);
+            ptr::copy(ptr.offset(1), ptr, len - index - 1);
+            self.set_len(len - 1);
+            item
+        }
+    }
+
+    pub fn insert(&mut self, index: usize, element: A::Item) {
+        self.reserve(1);
+
+        let len = self.len;
+        assert!(index <= len);
+
+        unsafe {
+            let ptr = self.as_mut_ptr().offset(index as isize);
+            ptr::copy(ptr, ptr.offset(1), len - index);
+            ptr::write(ptr, element);
+            self.set_len(len + 1);
         }
     }
 }
@@ -378,20 +454,20 @@ macro_rules! impl_array(
     }
 );
 
-impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32);
+impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32,
+            0x40, 0x80, 0x100, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000,
+            0x10000, 0x20000, 0x40000, 0x80000, 0x100000);
 
 #[cfg(test)]
 pub mod tests {
     use SmallVec;
-    use SmallVec2;
-    use SmallVec16;
     use std::borrow::ToOwned;
 
     // We heap allocate all these strings so that double frees will show up under valgrind.
 
     #[test]
     pub fn test_inline() {
-        let mut v = SmallVec16::new();
+        let mut v = SmallVec::<[_; 16]>::new();
         v.push("hello".to_owned());
         v.push("there".to_owned());
         assert_eq!(&*v, &[
@@ -402,7 +478,7 @@ pub mod tests {
 
     #[test]
     pub fn test_spill() {
-        let mut v = SmallVec2::new();
+        let mut v = SmallVec::<[_; 2]>::new();
         v.push("hello".to_owned());
         assert_eq!(v[0], "hello");
         v.push("there".to_owned());
@@ -419,7 +495,7 @@ pub mod tests {
 
     #[test]
     pub fn test_double_spill() {
-        let mut v = SmallVec2::new();
+        let mut v = SmallVec::<[_; 2]>::new();
         v.push("hello".to_owned());
         v.push("there".to_owned());
         v.push("burma".to_owned());
@@ -443,13 +519,13 @@ pub mod tests {
     /// https://github.com/servo/rust-smallvec/issues/4
     #[test]
     fn issue_4() {
-        SmallVec2::<Box<u32>>::new();
+        SmallVec::<[Box<u32>; 2]>::new();
     }
 
     /// https://github.com/servo/rust-smallvec/issues/5
     #[test]
     fn issue_5() {
-        assert!(Some(SmallVec2::<&u32>::new()).is_some());
+        assert!(Some(SmallVec::<[&u32; 2]>::new()).is_some());
     }
 
     #[test]
@@ -463,5 +539,43 @@ pub mod tests {
         v.push(4);
         v.push(5);
         assert_eq!(v.into_iter().collect::<Vec<_>>(), &[3, 4, 5]);
+    }
+
+    #[test]
+    fn test_capacity() {
+        let mut v: SmallVec<[u8; 2]> = SmallVec::new();
+        v.reserve(1);
+        assert_eq!(v.capacity(), 2);
+        assert!(!v.spilled());
+
+        v.reserve_exact(0x100);
+        assert!(v.capacity() >= 0x100);
+
+        v.push(0);
+        v.push(1);
+        v.push(2);
+        v.push(3);
+
+        v.shrink_to_fit();
+        assert!(v.capacity() < 0x100);
+    }
+
+    #[test]
+    fn test_truncate() {
+        let mut v: SmallVec<[Box<u8>; 8]> = SmallVec::new();
+
+        for x in 0..8 {
+            v.push(Box::new(x));
+        }
+        v.truncate(4);
+
+        assert_eq!(v.len(), 4);
+        assert!(!v.spilled());
+
+        assert_eq!(*v.swap_remove(1), 1);
+        assert_eq!(*v.remove(1), 3);
+        v.insert(1, Box::new(3));
+
+        assert_eq!(&v.iter().map(|v| **v).collect::<Vec<_>>(), &[0, 3, 2]);
     }
 }
