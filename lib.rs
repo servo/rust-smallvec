@@ -578,4 +578,21 @@ pub mod tests {
 
         assert_eq!(&v.iter().map(|v| **v).collect::<Vec<_>>(), &[0, 3, 2]);
     }
+
+    #[test]
+    #[should_panic]
+    fn test_drop_panic_smallvec() {
+        // This test should only panic once, and not double panic,
+        // which would mean a double drop
+        struct DropPanic;
+
+        impl Drop for DropPanic {
+            fn drop(&mut self) {
+                panic!("drop");
+            }
+        }
+
+        let mut v = SmallVec::<[_; 1]>::new();
+        v.push(DropPanic);
+    }
 }
