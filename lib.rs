@@ -83,6 +83,23 @@ enum SmallVecData<A: Array> {
     Heap { ptr: *mut A::Item, capacity: usize },
 }
 
+impl<A: Array> Drop for SmallVecData<A> {
+    fn drop(&mut self) {
+        unsafe {
+            match *self {
+                ref mut inline @ Inline { .. } => {
+                    // Inhibit the array destructor.
+                    ptr::write(inline, Heap {
+                        ptr: ptr::null_mut(),
+                        capacity: 0,
+                    });
+                }
+                Heap { ptr, capacity } => deallocate(ptr, capacity),
+            }
+        }
+    }
+}
+
 
 pub struct SmallVec<A: Array> {
     len: usize,
@@ -378,21 +395,12 @@ impl<A: Array> SmallVec<A> {
 
 impl<A: Array> Drop for SmallVec<A> {
     fn drop(&mut self) {
+        // Note on panic safety: dropping an element may panic,
+        // but the inner SmallVecData destructor will still run
         unsafe {
             let ptr = self.as_ptr();
             for i in 0 .. self.len {
                 ptr::read(ptr.offset(i as isize));
-            }
-
-            match self.data {
-                Inline { .. } => {
-                    // Inhibit the array destructor.
-                    ptr::write(&mut self.data, Heap {
-                        ptr: ptr::null_mut(),
-                        capacity: 0,
-                    });
-                }
-                Heap { ptr, capacity } => deallocate(ptr, capacity),
             }
         }
     }
@@ -577,5 +585,22 @@ pub mod tests {
         v.insert(1, Box::new(3));
 
         assert_eq!(&v.iter().map(|v| **v).collect::<Vec<_>>(), &[0, 3, 2]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_drop_panic_smallvec() {
+        // This test should only panic once, and not double panic,
+        // which would mean a double drop
+        struct DropPanic;
+
+        impl Drop for DropPanic {
+            fn drop(&mut self) {
+                panic!("drop");
+            }
+        }
+
+        let mut v = SmallVec::<[_; 1]>::new();
+        v.push(DropPanic);
     }
 }
