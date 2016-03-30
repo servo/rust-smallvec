@@ -83,6 +83,9 @@ enum SmallVecData<A: Array> {
     Heap { ptr: *mut A::Item, capacity: usize },
 }
 
+unsafe impl<A: Array + Send> Send for SmallVecData<A> {}
+unsafe impl<A: Array + Sync> Sync for SmallVecData<A> {}
+
 impl<A: Array> Drop for SmallVecData<A> {
     fn drop(&mut self) {
         unsafe {
