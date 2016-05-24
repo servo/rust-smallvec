@@ -419,6 +419,30 @@ impl<A: Array> Clone for SmallVec<A> where A::Item: Clone {
     }
 }
 
+impl<A: Array, B: Array> PartialEq<SmallVec<B>> for SmallVec<A>
+    where A::Item: PartialEq<B::Item> {
+    #[inline]
+    fn eq(&self, other: &SmallVec<B>) -> bool { self[..] == other[..] }
+    #[inline]
+    fn ne(&self, other: &SmallVec<B>) -> bool { self[..] != other[..] }
+}
+
+impl<A: Array> Eq for SmallVec<A> where A::Item: Eq {}
+
+impl<A: Array> PartialOrd for SmallVec<A> where A::Item: PartialOrd {
+    #[inline]
+    fn partial_cmp(&self, other: &SmallVec<A>) -> Option<cmp::Ordering> {
+        PartialOrd::partial_cmp(&**self, &**other)
+    }
+}
+
+impl<A: Array> Ord for SmallVec<A> where A::Item: Ord {
+    #[inline]
+    fn cmp(&self, other: &SmallVec<A>) -> cmp::Ordering {
+        Ord::cmp(&**self, &**other)
+    }
+}
+
 unsafe impl<A: Array> Send for SmallVec<A> where A::Item: Send {}
 
 // TODO: Remove these and its users.
@@ -605,5 +629,44 @@ pub mod tests {
 
         let mut v = SmallVec::<[_; 1]>::new();
         v.push(DropPanic);
+    }
+
+    #[test]
+    fn test_eq() {
+        let mut a: SmallVec<[u32; 2]> = SmallVec::new();
+        let mut b: SmallVec<[u32; 2]> = SmallVec::new();
+        let mut c: SmallVec<[u32; 2]> = SmallVec::new();
+        // a = [1, 2]
+        a.push(1);
+        a.push(2);
+        // b = [1, 2]
+        b.push(1);
+        b.push(2);
+        // c = [3, 4]
+        c.push(3);
+        c.push(4);
+
+        assert!(a == b);
+        assert!(a != c);
+    }
+
+    #[test]
+    fn test_ord() {
+        let mut a: SmallVec<[u32; 2]> = SmallVec::new();
+        let mut b: SmallVec<[u32; 2]> = SmallVec::new();
+        let mut c: SmallVec<[u32; 2]> = SmallVec::new();
+        // a = [1]
+        a.push(1);
+        // b = [1, 1]
+        b.push(1);
+        b.push(1);
+        // c = [1, 2]
+        c.push(1);
+        c.push(2);
+
+        assert!(a < b);
+        assert!(b > a);
+        assert!(b < c);
+        assert!(c > b);
     }
 }
