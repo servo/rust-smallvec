@@ -5,8 +5,10 @@
 //! Small vectors in various sizes. These store a certain number of elements inline and fall back
 //! to the heap for larger allocations.
 
+use std::borrow::{Borrow, BorrowMut};
 use std::cmp;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::iter::{IntoIterator, FromIterator};
 use std::mem;
 use std::ops;
@@ -315,6 +317,34 @@ impl<A: Array> ops::DerefMut for SmallVec<A> {
     }
 }
 
+impl<A: Array> AsRef<[A::Item]> for SmallVec<A> {
+    #[inline]
+    fn as_ref(&self) -> &[A::Item] {
+        self
+    }
+}
+
+impl<A: Array> AsMut<[A::Item]> for SmallVec<A> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut [A::Item] {
+        self
+    }
+}
+
+impl<A: Array> Borrow<[A::Item]> for SmallVec<A> {
+    #[inline]
+    fn borrow(&self) -> &[A::Item] {
+        self
+    }
+}
+
+impl<A: Array> BorrowMut<[A::Item]> for SmallVec<A> {
+    #[inline]
+    fn borrow_mut(&mut self) -> &mut [A::Item] {
+        self
+    }
+}
+
 macro_rules! impl_index {
     ($index_type: ty, $output_type: ty) => {
         impl<A: Array> ops::Index<$index_type> for SmallVec<A> {
@@ -443,6 +473,12 @@ impl<A: Array> Ord for SmallVec<A> where A::Item: Ord {
     }
 }
 
+impl<A: Array> Hash for SmallVec<A> where A::Item: Hash {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (**self).hash(state)
+    }
+}
+
 unsafe impl<A: Array> Send for SmallVec<A> where A::Item: Send {}
 
 pub struct IntoIter<A: Array> {
@@ -561,7 +597,6 @@ impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32,
 pub mod tests {
     use SmallVec;
     use std::borrow::ToOwned;
-    use std::cell::Cell;
 
     // We heap allocate all these strings so that double frees will show up under valgrind.
 
@@ -657,6 +692,8 @@ pub mod tests {
 
     #[test]
     fn into_iter_drop() {
+        use std::cell::Cell;
+
         struct DropCounter<'a>(&'a Cell<i32>);
 
         impl<'a> Drop for DropCounter<'a> {
@@ -785,5 +822,25 @@ pub mod tests {
         assert!(b > a);
         assert!(b < c);
         assert!(c > b);
+    }
+
+    #[test]
+    fn test_hash() {
+        use std::hash::{Hash, SipHasher};
+
+        {
+            let mut a: SmallVec<[u32; 2]> = SmallVec::new();
+            let b = [1, 2];
+            a.extend(b.iter().cloned());
+            let mut hasher = SipHasher::new();
+            assert_eq!(a.hash(&mut hasher), b.hash(&mut hasher));
+        }
+        {
+            let mut a: SmallVec<[u32; 2]> = SmallVec::new();
+            let b = [1, 2, 11, 12];
+            a.extend(b.iter().cloned());
+            let mut hasher = SipHasher::new();
+            assert_eq!(a.hash(&mut hasher), b.hash(&mut hasher));
+        }
     }
 }
