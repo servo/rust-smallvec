@@ -366,6 +366,13 @@ impl<A: Array> BorrowMut<[A::Item]> for SmallVec<A> {
     }
 }
 
+impl<'a, A: Array> From<&'a [A::Item]> for SmallVec<A> where A::Item: Clone {
+    #[inline]
+    fn from(slice: &'a [A::Item]) -> SmallVec<A> {
+        slice.into_iter().cloned().collect()
+    }
+}
+
 macro_rules! impl_index {
     ($index_type: ty, $output_type: ty) => {
         impl<A: Array> ops::Index<$index_type> for SmallVec<A> {
