@@ -51,11 +51,11 @@ unsafe fn deallocate<T>(ptr: *mut T, capacity: usize) {
     // Let it drop.
 }
 
-pub struct SmallVecMoveIterator<'a, T: 'a> {
+pub struct Drain<'a, T: 'a> {
     iter: slice::IterMut<'a,T>,
 }
 
-impl<'a, T: 'a> Iterator for SmallVecMoveIterator<'a,T> {
+impl<'a, T: 'a> Iterator for Drain<'a,T> {
     type Item = T;
 
     #[inline]
@@ -71,7 +71,7 @@ impl<'a, T: 'a> Iterator for SmallVecMoveIterator<'a,T> {
     }
 }
 
-impl<'a, T: 'a> Drop for SmallVecMoveIterator<'a,T> {
+impl<'a, T: 'a> Drop for Drain<'a,T> {
     fn drop(&mut self) {
         // Destroy the remaining elements.
         for _ in self.by_ref() {}
@@ -81,6 +81,15 @@ impl<'a, T: 'a> Drop for SmallVecMoveIterator<'a,T> {
 enum SmallVecData<A: Array> {
     Inline { array: A },
     Heap { ptr: *mut A::Item, capacity: usize },
+}
+
+impl<A: Array> SmallVecData<A> {
+    fn ptr_mut(&mut self) -> *mut A::Item {
+        match *self {
+            Inline { ref mut array } => array.ptr_mut(),
+            Heap { ptr, .. } => ptr,
+        }
+    }
 }
 
 unsafe impl<A: Array + Send> Send for SmallVecData<A> {}
@@ -137,22 +146,16 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
-    /// NB: For efficiency reasons (avoiding making a second copy of the inline elements), this
-    /// actually clears out the original array instead of moving it.
-    /// FIXME: Rename this to `drain`? It’s more like `Vec::drain` than `Vec::into_iter`.
-    pub fn into_iter<'a>(&'a mut self) -> SmallVecMoveIterator<'a, A::Item> {
+    pub fn drain(&mut self) -> Drain<A::Item> {
         unsafe {
             let current_len = self.len();
             self.set_len(0);
 
-            let ptr = match self.data {
-                Inline { ref mut array } => array.ptr_mut(),
-                Heap { ptr, .. } => ptr,
-            };
+            let ptr = self.data.ptr_mut();
 
             let slice = slice::from_raw_parts_mut(ptr, current_len);
 
-            SmallVecMoveIterator {
+            Drain {
                 iter: slice.iter_mut(),
             }
         }
@@ -305,10 +308,7 @@ impl<A: Array> ops::Deref for SmallVec<A> {
 impl<A: Array> ops::DerefMut for SmallVec<A> {
     #[inline]
     fn deref_mut(&mut self) -> &mut [A::Item] {
-        let ptr = match self.data {
-            Inline { ref mut array } => array.ptr_mut(),
-            Heap { ptr, .. } => ptr,
-        };
+        let ptr = self.data.ptr_mut();
         unsafe {
             slice::from_raw_parts_mut(ptr, self.len)
         }
@@ -445,6 +445,70 @@ impl<A: Array> Ord for SmallVec<A> where A::Item: Ord {
 
 unsafe impl<A: Array> Send for SmallVec<A> where A::Item: Send {}
 
+pub struct IntoIter<A: Array> {
+    data: SmallVecData<A>,
+    current: usize,
+    end: usize,
+}
+
+impl<A: Array> Drop for IntoIter<A> {
+    fn drop(&mut self) {
+        for _ in self { }
+    }
+}
+
+impl<A: Array> Iterator for IntoIter<A> {
+    type Item = A::Item;
+    
+    #[inline]
+    fn next(&mut self) -> Option<A::Item> {
+        if self.current == self.end {
+            None    
+        }
+        else {
+            unsafe {
+                let current = self.current as isize;
+                self.current += 1;
+                Some(ptr::read(self.data.ptr_mut().offset(current)))
+            }
+        }
+    }
+}
+
+impl<A: Array> IntoIterator for SmallVec<A> {
+    type IntoIter = IntoIter<A>;
+    type Item = A::Item;
+    fn into_iter(mut self) -> Self::IntoIter {
+        let len = self.len();
+        unsafe {
+            // Only grab the `data` field, the `IntoIter` type handles dropping of the elements
+            let data = ptr::read(&mut self.data);
+            mem::forget(self);
+            IntoIter {
+                data: data,
+                current: 0,
+                end: len,
+            }
+        }
+    }
+}
+
+impl<'a, A: Array> IntoIterator for &'a SmallVec<A> {
+    type IntoIter = slice::Iter<'a, A::Item>;
+    type Item = &'a A::Item;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, A: Array> IntoIterator for &'a mut SmallVec<A> {
+    type IntoIter = slice::IterMut<'a, A::Item>;
+    type Item = &'a mut A::Item;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
 // TODO: Remove these and its users.
 
 /// Deprecated alias to ease transition from an earlier version.
@@ -497,6 +561,7 @@ impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32,
 pub mod tests {
     use SmallVec;
     use std::borrow::ToOwned;
+    use std::cell::Cell;
 
     // We heap allocate all these strings so that double frees will show up under valgrind.
 
@@ -564,16 +629,68 @@ pub mod tests {
     }
 
     #[test]
+    fn drain() {
+        let mut v: SmallVec<[u8; 2]> = SmallVec::new();
+        v.push(3);
+        assert_eq!(v.drain().collect::<Vec<_>>(), &[3]);
+
+        // spilling the vec
+        v.push(3);
+        v.push(4);
+        v.push(5);
+        assert_eq!(v.drain().collect::<Vec<_>>(), &[3, 4, 5]);
+    }
+
+    #[test]
     fn into_iter() {
         let mut v: SmallVec<[u8; 2]> = SmallVec::new();
         v.push(3);
         assert_eq!(v.into_iter().collect::<Vec<_>>(), &[3]);
 
         // spilling the vec
+        let mut v: SmallVec<[u8; 2]> = SmallVec::new();
         v.push(3);
         v.push(4);
         v.push(5);
-        assert_eq!(v.into_iter().collect::<Vec<_>>(), &[3, 4, 5]);
+        assert_eq!(v.drain().collect::<Vec<_>>(), &[3, 4, 5]);
+    }
+
+    #[test]
+    fn into_iter_drop() {
+        struct DropCounter<'a>(&'a Cell<i32>);
+
+        impl<'a> Drop for DropCounter<'a> {
+            fn drop(&mut self) {
+                self.0.set(self.0.get() + 1);
+            }
+        }
+        
+        {
+            let cell = Cell::new(0);
+            let mut v: SmallVec<[DropCounter; 2]> = SmallVec::new();
+            v.push(DropCounter(&cell));
+            v.into_iter();
+            assert_eq!(cell.get(), 1);
+        }
+
+        {
+            let cell = Cell::new(0);
+            let mut v: SmallVec<[DropCounter; 2]> = SmallVec::new();
+            v.push(DropCounter(&cell));
+            v.push(DropCounter(&cell));
+            assert!(v.into_iter().next().is_some());
+            assert_eq!(cell.get(), 2);
+        }
+
+        {
+            let cell = Cell::new(0);
+            let mut v: SmallVec<[DropCounter; 2]> = SmallVec::new();
+            v.push(DropCounter(&cell));
+            v.push(DropCounter(&cell));
+            v.push(DropCounter(&cell));
+            assert!(v.into_iter().next().is_some());
+            assert_eq!(cell.get(), 3);
+        }
     }
 
     #[test]
