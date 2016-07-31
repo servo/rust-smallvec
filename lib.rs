@@ -73,6 +73,20 @@ impl<'a, T: 'a> Iterator for Drain<'a,T> {
     }
 }
 
+impl<'a, T: 'a> DoubleEndedIterator for Drain<'a, T> {
+    #[inline]
+    fn next_back(&mut self) -> Option<T> {
+        match self.iter.next_back() {
+            None => None,
+            Some(reference) => {
+                unsafe {
+                    Some(ptr::read(reference))
+                }
+            }
+        }
+    }
+}
+
 impl<'a, T: 'a> Drop for Drain<'a,T> {
     fn drop(&mut self) {
         // Destroy the remaining elements.
@@ -497,6 +511,7 @@ impl<A: Array> Iterator for IntoIter<A> {
     type Item = A::Item;
     
     #[inline]
+    #[inline]
     fn next(&mut self) -> Option<A::Item> {
         if self.current == self.end {
             None    
@@ -506,6 +521,21 @@ impl<A: Array> Iterator for IntoIter<A> {
                 let current = self.current as isize;
                 self.current += 1;
                 Some(ptr::read(self.data.ptr_mut().offset(current)))
+            }
+        }
+    }
+}
+
+impl<A: Array> DoubleEndedIterator for IntoIter<A> {
+    #[inline]
+    fn next_back(&mut self) -> Option<A::Item> {
+        if self.current == self.end {
+            None    
+        }
+        else {
+            unsafe {
+                self.end -= 1;
+                Some(ptr::read(self.data.ptr_mut().offset(self.end as isize)))
             }
         }
     }
@@ -677,6 +707,19 @@ pub mod tests {
     }
 
     #[test]
+    fn drain_rev() {
+        let mut v: SmallVec<[u8; 2]> = SmallVec::new();
+        v.push(3);
+        assert_eq!(v.drain().rev().collect::<Vec<_>>(), &[3]);
+
+        // spilling the vec
+        v.push(3);
+        v.push(4);
+        v.push(5);
+        assert_eq!(v.drain().rev().collect::<Vec<_>>(), &[5, 4, 3]);
+    }
+
+    #[test]
     fn into_iter() {
         let mut v: SmallVec<[u8; 2]> = SmallVec::new();
         v.push(3);
@@ -687,7 +730,21 @@ pub mod tests {
         v.push(3);
         v.push(4);
         v.push(5);
-        assert_eq!(v.drain().collect::<Vec<_>>(), &[3, 4, 5]);
+        assert_eq!(v.into_iter().collect::<Vec<_>>(), &[3, 4, 5]);
+    }
+
+    #[test]
+    fn into_iter_rev() {
+        let mut v: SmallVec<[u8; 2]> = SmallVec::new();
+        v.push(3);
+        assert_eq!(v.into_iter().rev().collect::<Vec<_>>(), &[3]);
+
+        // spilling the vec
+        let mut v: SmallVec<[u8; 2]> = SmallVec::new();
+        v.push(3);
+        v.push(4);
+        v.push(5);
+        assert_eq!(v.into_iter().rev().collect::<Vec<_>>(), &[5, 4, 3]);
     }
 
     #[test]
@@ -726,6 +783,19 @@ pub mod tests {
             v.push(DropCounter(&cell));
             v.push(DropCounter(&cell));
             assert!(v.into_iter().next().is_some());
+            assert_eq!(cell.get(), 3);
+        }
+        {
+            let cell = Cell::new(0);
+            let mut v: SmallVec<[DropCounter; 2]> = SmallVec::new();
+            v.push(DropCounter(&cell));
+            v.push(DropCounter(&cell));
+            v.push(DropCounter(&cell));
+            {
+                let mut it = v.into_iter();
+                assert!(it.next().is_some());
+                assert!(it.next_back().is_some());
+            }
             assert_eq!(cell.get(), 3);
         }
     }
