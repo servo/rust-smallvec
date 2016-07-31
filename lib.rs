@@ -361,8 +361,8 @@ impl<A: Array> FromIterator<A::Item> for SmallVec<A> {
     }
 }
 
-impl<A: Array> SmallVec<A> {
-    pub fn extend<I: IntoIterator<Item=A::Item>>(&mut self, iterable: I) {
+impl<A: Array> Extend<A::Item> for SmallVec<A> {
+    fn extend<I: IntoIterator<Item=A::Item>>(&mut self, iterable: I) {
         let iter = iterable.into_iter();
         let (lower_size_bound, _) = iter.size_hint();
 
