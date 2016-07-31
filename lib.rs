@@ -71,6 +71,11 @@ impl<'a, T: 'a> Iterator for Drain<'a,T> {
             }
         }
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
 }
 
 impl<'a, T: 'a> DoubleEndedIterator for Drain<'a, T> {
@@ -86,6 +91,8 @@ impl<'a, T: 'a> DoubleEndedIterator for Drain<'a, T> {
         }
     }
 }
+
+impl<'a, T> ExactSizeIterator for Drain<'a, T> { }
 
 impl<'a, T: 'a> Drop for Drain<'a,T> {
     fn drop(&mut self) {
@@ -524,6 +531,12 @@ impl<A: Array> Iterator for IntoIter<A> {
             }
         }
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let size = self.end - self.current;
+        (size, Some(size))
+    }
 }
 
 impl<A: Array> DoubleEndedIterator for IntoIter<A> {
@@ -540,6 +553,8 @@ impl<A: Array> DoubleEndedIterator for IntoIter<A> {
         }
     }
 }
+
+impl<A: Array> ExactSizeIterator for IntoIter<A> { }
 
 impl<A: Array> IntoIterator for SmallVec<A> {
     type IntoIter = IntoIter<A>;
