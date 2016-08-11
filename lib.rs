@@ -525,7 +525,6 @@ impl<A: Array> Iterator for IntoIter<A> {
     type Item = A::Item;
     
     #[inline]
-    #[inline]
     fn next(&mut self) -> Option<A::Item> {
         if self.current == self.end {
             None    
