@@ -5,8 +5,10 @@
 //! Small vectors in various sizes. These store a certain number of elements inline and fall back
 //! to the heap for larger allocations.
 
+use std::borrow::{Borrow, BorrowMut};
 use std::cmp;
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::iter::{IntoIterator, FromIterator};
 use std::mem;
 use std::ops;
@@ -51,11 +53,11 @@ unsafe fn deallocate<T>(ptr: *mut T, capacity: usize) {
     // Let it drop.
 }
 
-pub struct SmallVecMoveIterator<'a, T: 'a> {
+pub struct Drain<'a, T: 'a> {
     iter: slice::IterMut<'a,T>,
 }
 
-impl<'a, T: 'a> Iterator for SmallVecMoveIterator<'a,T> {
+impl<'a, T: 'a> Iterator for Drain<'a,T> {
     type Item = T;
 
     #[inline]
@@ -69,9 +71,30 @@ impl<'a, T: 'a> Iterator for SmallVecMoveIterator<'a,T> {
             }
         }
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
 }
 
-impl<'a, T: 'a> Drop for SmallVecMoveIterator<'a,T> {
+impl<'a, T: 'a> DoubleEndedIterator for Drain<'a, T> {
+    #[inline]
+    fn next_back(&mut self) -> Option<T> {
+        match self.iter.next_back() {
+            None => None,
+            Some(reference) => {
+                unsafe {
+                    Some(ptr::read(reference))
+                }
+            }
+        }
+    }
+}
+
+impl<'a, T> ExactSizeIterator for Drain<'a, T> { }
+
+impl<'a, T: 'a> Drop for Drain<'a,T> {
     fn drop(&mut self) {
         // Destroy the remaining elements.
         for _ in self.by_ref() {}
@@ -81,6 +104,15 @@ impl<'a, T: 'a> Drop for SmallVecMoveIterator<'a,T> {
 enum SmallVecData<A: Array> {
     Inline { array: A },
     Heap { ptr: *mut A::Item, capacity: usize },
+}
+
+impl<A: Array> SmallVecData<A> {
+    fn ptr_mut(&mut self) -> *mut A::Item {
+        match *self {
+            Inline { ref mut array } => array.ptr_mut(),
+            Heap { ptr, .. } => ptr,
+        }
+    }
 }
 
 unsafe impl<A: Array + Send> Send for SmallVecData<A> {}
@@ -137,22 +169,16 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
-    /// NB: For efficiency reasons (avoiding making a second copy of the inline elements), this
-    /// actually clears out the original array instead of moving it.
-    /// FIXME: Rename this to `drain`? It’s more like `Vec::drain` than `Vec::into_iter`.
-    pub fn into_iter<'a>(&'a mut self) -> SmallVecMoveIterator<'a, A::Item> {
+    pub fn drain(&mut self) -> Drain<A::Item> {
         unsafe {
             let current_len = self.len();
             self.set_len(0);
 
-            let ptr = match self.data {
-                Inline { ref mut array } => array.ptr_mut(),
-                Heap { ptr, .. } => ptr,
-            };
+            let ptr = self.data.ptr_mut();
 
             let slice = slice::from_raw_parts_mut(ptr, current_len);
 
-            SmallVecMoveIterator {
+            Drain {
                 iter: slice.iter_mut(),
             }
         }
@@ -305,13 +331,45 @@ impl<A: Array> ops::Deref for SmallVec<A> {
 impl<A: Array> ops::DerefMut for SmallVec<A> {
     #[inline]
     fn deref_mut(&mut self) -> &mut [A::Item] {
-        let ptr = match self.data {
-            Inline { ref mut array } => array.ptr_mut(),
-            Heap { ptr, .. } => ptr,
-        };
+        let ptr = self.data.ptr_mut();
         unsafe {
             slice::from_raw_parts_mut(ptr, self.len)
         }
+    }
+}
+
+impl<A: Array> AsRef<[A::Item]> for SmallVec<A> {
+    #[inline]
+    fn as_ref(&self) -> &[A::Item] {
+        self
+    }
+}
+
+impl<A: Array> AsMut<[A::Item]> for SmallVec<A> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut [A::Item] {
+        self
+    }
+}
+
+impl<A: Array> Borrow<[A::Item]> for SmallVec<A> {
+    #[inline]
+    fn borrow(&self) -> &[A::Item] {
+        self
+    }
+}
+
+impl<A: Array> BorrowMut<[A::Item]> for SmallVec<A> {
+    #[inline]
+    fn borrow_mut(&mut self) -> &mut [A::Item] {
+        self
+    }
+}
+
+impl<'a, A: Array> From<&'a [A::Item]> for SmallVec<A> where A::Item: Clone {
+    #[inline]
+    fn from(slice: &'a [A::Item]) -> SmallVec<A> {
+        slice.into_iter().cloned().collect()
     }
 }
 
@@ -361,8 +419,8 @@ impl<A: Array> FromIterator<A::Item> for SmallVec<A> {
     }
 }
 
-impl<A: Array> SmallVec<A> {
-    pub fn extend<I: IntoIterator<Item=A::Item>>(&mut self, iterable: I) {
+impl<A: Array> Extend<A::Item> for SmallVec<A> {
+    fn extend<I: IntoIterator<Item=A::Item>>(&mut self, iterable: I) {
         let iter = iterable.into_iter();
         let (lower_size_bound, _) = iter.size_hint();
 
@@ -443,7 +501,100 @@ impl<A: Array> Ord for SmallVec<A> where A::Item: Ord {
     }
 }
 
+impl<A: Array> Hash for SmallVec<A> where A::Item: Hash {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (**self).hash(state)
+    }
+}
+
 unsafe impl<A: Array> Send for SmallVec<A> where A::Item: Send {}
+
+pub struct IntoIter<A: Array> {
+    data: SmallVecData<A>,
+    current: usize,
+    end: usize,
+}
+
+impl<A: Array> Drop for IntoIter<A> {
+    fn drop(&mut self) {
+        for _ in self { }
+    }
+}
+
+impl<A: Array> Iterator for IntoIter<A> {
+    type Item = A::Item;
+    
+    #[inline]
+    fn next(&mut self) -> Option<A::Item> {
+        if self.current == self.end {
+            None    
+        }
+        else {
+            unsafe {
+                let current = self.current as isize;
+                self.current += 1;
+                Some(ptr::read(self.data.ptr_mut().offset(current)))
+            }
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let size = self.end - self.current;
+        (size, Some(size))
+    }
+}
+
+impl<A: Array> DoubleEndedIterator for IntoIter<A> {
+    #[inline]
+    fn next_back(&mut self) -> Option<A::Item> {
+        if self.current == self.end {
+            None    
+        }
+        else {
+            unsafe {
+                self.end -= 1;
+                Some(ptr::read(self.data.ptr_mut().offset(self.end as isize)))
+            }
+        }
+    }
+}
+
+impl<A: Array> ExactSizeIterator for IntoIter<A> { }
+
+impl<A: Array> IntoIterator for SmallVec<A> {
+    type IntoIter = IntoIter<A>;
+    type Item = A::Item;
+    fn into_iter(mut self) -> Self::IntoIter {
+        let len = self.len();
+        unsafe {
+            // Only grab the `data` field, the `IntoIter` type handles dropping of the elements
+            let data = ptr::read(&mut self.data);
+            mem::forget(self);
+            IntoIter {
+                data: data,
+                current: 0,
+                end: len,
+            }
+        }
+    }
+}
+
+impl<'a, A: Array> IntoIterator for &'a SmallVec<A> {
+    type IntoIter = slice::Iter<'a, A::Item>;
+    type Item = &'a A::Item;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, A: Array> IntoIterator for &'a mut SmallVec<A> {
+    type IntoIter = slice::IterMut<'a, A::Item>;
+    type Item = &'a mut A::Item;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
 
 // TODO: Remove these and its users.
 
@@ -564,16 +715,110 @@ pub mod tests {
     }
 
     #[test]
+    fn drain() {
+        let mut v: SmallVec<[u8; 2]> = SmallVec::new();
+        v.push(3);
+        assert_eq!(v.drain().collect::<Vec<_>>(), &[3]);
+
+        // spilling the vec
+        v.push(3);
+        v.push(4);
+        v.push(5);
+        assert_eq!(v.drain().collect::<Vec<_>>(), &[3, 4, 5]);
+    }
+
+    #[test]
+    fn drain_rev() {
+        let mut v: SmallVec<[u8; 2]> = SmallVec::new();
+        v.push(3);
+        assert_eq!(v.drain().rev().collect::<Vec<_>>(), &[3]);
+
+        // spilling the vec
+        v.push(3);
+        v.push(4);
+        v.push(5);
+        assert_eq!(v.drain().rev().collect::<Vec<_>>(), &[5, 4, 3]);
+    }
+
+    #[test]
     fn into_iter() {
         let mut v: SmallVec<[u8; 2]> = SmallVec::new();
         v.push(3);
         assert_eq!(v.into_iter().collect::<Vec<_>>(), &[3]);
 
         // spilling the vec
+        let mut v: SmallVec<[u8; 2]> = SmallVec::new();
         v.push(3);
         v.push(4);
         v.push(5);
         assert_eq!(v.into_iter().collect::<Vec<_>>(), &[3, 4, 5]);
+    }
+
+    #[test]
+    fn into_iter_rev() {
+        let mut v: SmallVec<[u8; 2]> = SmallVec::new();
+        v.push(3);
+        assert_eq!(v.into_iter().rev().collect::<Vec<_>>(), &[3]);
+
+        // spilling the vec
+        let mut v: SmallVec<[u8; 2]> = SmallVec::new();
+        v.push(3);
+        v.push(4);
+        v.push(5);
+        assert_eq!(v.into_iter().rev().collect::<Vec<_>>(), &[5, 4, 3]);
+    }
+
+    #[test]
+    fn into_iter_drop() {
+        use std::cell::Cell;
+
+        struct DropCounter<'a>(&'a Cell<i32>);
+
+        impl<'a> Drop for DropCounter<'a> {
+            fn drop(&mut self) {
+                self.0.set(self.0.get() + 1);
+            }
+        }
+        
+        {
+            let cell = Cell::new(0);
+            let mut v: SmallVec<[DropCounter; 2]> = SmallVec::new();
+            v.push(DropCounter(&cell));
+            v.into_iter();
+            assert_eq!(cell.get(), 1);
+        }
+
+        {
+            let cell = Cell::new(0);
+            let mut v: SmallVec<[DropCounter; 2]> = SmallVec::new();
+            v.push(DropCounter(&cell));
+            v.push(DropCounter(&cell));
+            assert!(v.into_iter().next().is_some());
+            assert_eq!(cell.get(), 2);
+        }
+
+        {
+            let cell = Cell::new(0);
+            let mut v: SmallVec<[DropCounter; 2]> = SmallVec::new();
+            v.push(DropCounter(&cell));
+            v.push(DropCounter(&cell));
+            v.push(DropCounter(&cell));
+            assert!(v.into_iter().next().is_some());
+            assert_eq!(cell.get(), 3);
+        }
+        {
+            let cell = Cell::new(0);
+            let mut v: SmallVec<[DropCounter; 2]> = SmallVec::new();
+            v.push(DropCounter(&cell));
+            v.push(DropCounter(&cell));
+            v.push(DropCounter(&cell));
+            {
+                let mut it = v.into_iter();
+                assert!(it.next().is_some());
+                assert!(it.next_back().is_some());
+            }
+            assert_eq!(cell.get(), 3);
+        }
     }
 
     #[test]
@@ -668,5 +913,90 @@ pub mod tests {
         assert!(b > a);
         assert!(b < c);
         assert!(c > b);
+    }
+
+    #[test]
+    fn test_hash() {
+        use std::hash::{Hash, SipHasher};
+
+        {
+            let mut a: SmallVec<[u32; 2]> = SmallVec::new();
+            let b = [1, 2];
+            a.extend(b.iter().cloned());
+            let mut hasher = SipHasher::new();
+            assert_eq!(a.hash(&mut hasher), b.hash(&mut hasher));
+        }
+        {
+            let mut a: SmallVec<[u32; 2]> = SmallVec::new();
+            let b = [1, 2, 11, 12];
+            a.extend(b.iter().cloned());
+            let mut hasher = SipHasher::new();
+            assert_eq!(a.hash(&mut hasher), b.hash(&mut hasher));
+        }
+    }
+
+    #[test]
+    fn test_as_ref() {
+        let mut a: SmallVec<[u32; 2]> = SmallVec::new();
+        a.push(1);
+        assert_eq!(a.as_ref(), [1]);
+        a.push(2);
+        assert_eq!(a.as_ref(), [1, 2]);
+        a.push(3);
+        assert_eq!(a.as_ref(), [1, 2, 3]);
+    }
+
+    #[test]
+    fn test_as_mut() {
+        let mut a: SmallVec<[u32; 2]> = SmallVec::new();
+        a.push(1);
+        assert_eq!(a.as_mut(), [1]);
+        a.push(2);
+        assert_eq!(a.as_mut(), [1, 2]);
+        a.push(3);
+        assert_eq!(a.as_mut(), [1, 2, 3]);
+        a.as_mut()[1] = 4;
+        assert_eq!(a.as_mut(), [1, 4, 3]);
+    }
+
+    #[test]
+    fn test_borrow() {
+        use std::borrow::Borrow;
+
+        let mut a: SmallVec<[u32; 2]> = SmallVec::new();
+        a.push(1);
+        assert_eq!(a.borrow(), [1]);
+        a.push(2);
+        assert_eq!(a.borrow(), [1, 2]);
+        a.push(3);
+        assert_eq!(a.borrow(), [1, 2, 3]);
+    }
+
+    #[test]
+    fn test_borrow_mut() {
+        use std::borrow::BorrowMut;
+
+        let mut a: SmallVec<[u32; 2]> = SmallVec::new();
+        a.push(1);
+        assert_eq!(a.borrow_mut(), [1]);
+        a.push(2);
+        assert_eq!(a.borrow_mut(), [1, 2]);
+        a.push(3);
+        assert_eq!(a.borrow_mut(), [1, 2, 3]);
+        BorrowMut::<[u32]>::borrow_mut(&mut a)[1] = 4;
+        assert_eq!(a.borrow_mut(), [1, 4, 3]);
+    }
+
+    #[test]
+    fn test_from() {
+        assert_eq!(&SmallVec::<[u32; 2]>::from(&[1][..])[..], [1]);
+        assert_eq!(&SmallVec::<[u32; 2]>::from(&[1, 2, 3][..])[..], [1, 2, 3]);
+    }
+
+    #[test]
+    fn test_exact_size_iterator() {
+        let mut vec = SmallVec::<[u32; 2]>::from(&[1, 2, 3][..]);
+        assert_eq!(vec.clone().into_iter().len(), 3);
+        assert_eq!(vec.drain().len(), 3);
     }
 }
