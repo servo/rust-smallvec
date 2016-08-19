@@ -30,7 +30,8 @@ pub trait VecLike<T>:
         ops::Index<ops::RangeFull, Output=[T]> +
         ops::IndexMut<ops::RangeFull> +
         ops::Deref +
-        ops::DerefMut {
+        ops::DerefMut +
+        Extend<T> {
 
     fn len(&self) -> usize;
     fn push(&mut self, value: T);
