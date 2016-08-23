@@ -477,6 +477,29 @@ impl<A: Array> SmallVec<A> {
     }
 }
 
+impl<A: Array> SmallVec<A> where A::Item: Copy {
+    pub fn insert_slice(&mut self, index: usize, slice: &[A::Item]) {
+        self.reserve(slice.len());
+
+        let len = self.len;
+        assert!(index <= len);
+
+        unsafe {
+            let slice_ptr = slice.as_ptr();
+            let ptr = self.as_mut_ptr().offset(index as isize);
+            ptr::copy(ptr, ptr.offset(slice.len() as isize), len - index);
+            ptr::copy(slice_ptr, ptr, slice.len());
+            self.set_len(len + slice.len());
+        }
+    }
+
+    #[inline]
+    pub fn extend_slice(&mut self, slice: &[A::Item]) {
+        let len = self.len();
+        self.insert_slice(len, slice);
+    }
+}
+
 impl<A: Array> ops::Deref for SmallVec<A> {
     type Target = [A::Item];
     #[inline]
@@ -1066,6 +1089,28 @@ pub mod tests {
         let mut v: SmallVec<[u8; 8]> = SmallVec::new();
         v.extend(0..8);
         v.grow(5);
+    }
+
+    #[test]
+    fn test_insert_slice() {
+        let mut v: SmallVec<[u8; 8]> = SmallVec::new();
+        for x in 0..4 {
+            v.push(x);
+        }
+        assert_eq!(v.len(), 4);
+        v.insert_slice(1, &[5, 6]);
+        assert_eq!(&v.iter().map(|v| *v).collect::<Vec<_>>(), &[0, 5, 6, 1, 2, 3]);
+    }
+
+    #[test]
+    fn test_extend_slice() {
+        let mut v: SmallVec<[u8; 8]> = SmallVec::new();
+        for x in 0..4 {
+            v.push(x);
+        }
+        assert_eq!(v.len(), 4);
+        v.extend_slice(&[5, 6]);
+        assert_eq!(&v.iter().map(|v| *v).collect::<Vec<_>>(), &[0, 1, 2, 3, 5, 6]);
     }
 
     #[test]
