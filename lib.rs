@@ -478,7 +478,7 @@ impl<A: Array> SmallVec<A> {
 }
 
 impl<A: Array> SmallVec<A> where A::Item: Copy {
-    pub fn insert_slice(&mut self, index: usize, slice: &[A::Item]) {
+    pub fn insert_from_slice(&mut self, index: usize, slice: &[A::Item]) {
         self.reserve(slice.len());
 
         let len = self.len;
@@ -494,9 +494,9 @@ impl<A: Array> SmallVec<A> where A::Item: Copy {
     }
 
     #[inline]
-    pub fn extend_slice(&mut self, slice: &[A::Item]) {
+    pub fn extend_from_slice(&mut self, slice: &[A::Item]) {
         let len = self.len();
-        self.insert_slice(len, slice);
+        self.insert_from_slice(len, slice);
     }
 }
 
@@ -1092,24 +1092,24 @@ pub mod tests {
     }
 
     #[test]
-    fn test_insert_slice() {
+    fn test_insert_from_slice() {
         let mut v: SmallVec<[u8; 8]> = SmallVec::new();
         for x in 0..4 {
             v.push(x);
         }
         assert_eq!(v.len(), 4);
-        v.insert_slice(1, &[5, 6]);
+        v.insert_from_slice(1, &[5, 6]);
         assert_eq!(&v.iter().map(|v| *v).collect::<Vec<_>>(), &[0, 5, 6, 1, 2, 3]);
     }
 
     #[test]
-    fn test_extend_slice() {
+    fn test_extend_from_slice() {
         let mut v: SmallVec<[u8; 8]> = SmallVec::new();
         for x in 0..4 {
             v.push(x);
         }
         assert_eq!(v.len(), 4);
-        v.extend_slice(&[5, 6]);
+        v.extend_from_slice(&[5, 6]);
         assert_eq!(&v.iter().map(|v| *v).collect::<Vec<_>>(), &[0, 1, 2, 3, 5, 6]);
     }
 
