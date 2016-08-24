@@ -455,6 +455,13 @@ impl<A: Array> SmallVec<A> {
     }
 }
 
+impl<A: Array> Default for SmallVec<A> {
+    #[inline]
+    fn default() -> SmallVec<A> {
+        SmallVec::new()
+    }
+}
+
 impl<A: Array> Drop for SmallVec<A> {
     fn drop(&mut self) {
         // Note on panic safety: dropping an element may panic,
