@@ -5,6 +5,8 @@
 //! Small vectors in various sizes. These store a certain number of elements inline and fall back
 //! to the heap for larger allocations.
 
+#![feature(test)]
+
 use std::borrow::{Borrow, BorrowMut};
 use std::cmp;
 use std::fmt;
@@ -647,8 +649,10 @@ impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32,
 
 #[cfg(test)]
 pub mod tests {
+    extern crate test;
     use SmallVec;
     use std::borrow::ToOwned;
+    use self::test::Bencher;
 
     // We heap allocate all these strings so that double frees will show up under valgrind.
 
@@ -999,5 +1003,44 @@ pub mod tests {
         let mut vec = SmallVec::<[u32; 2]>::from(&[1, 2, 3][..]);
         assert_eq!(vec.clone().into_iter().len(), 3);
         assert_eq!(vec.drain().len(), 3);
+    }
+
+    #[bench]
+    fn bench_push(b: &mut Bencher) {
+        b.iter(|| {
+            let mut vec: SmallVec<[u64; 16]> = SmallVec::new();
+            for x in 0..100 {
+                vec.push(x);
+            }
+        });
+    }
+
+    #[bench]
+    fn bench_insert(b: &mut Bencher) {
+        b.iter(|| {
+            let mut vec: SmallVec<[u64; 16]> = SmallVec::new();
+            for x in 0..100 {
+                vec.insert(0, x);
+            }
+        });
+    }
+
+    #[bench]
+    fn bench_extend(b: &mut Bencher) {
+        b.iter(|| {
+            let mut vec: SmallVec<[u64; 16]> = SmallVec::new();
+            vec.extend(0..100);
+        });
+    }
+
+    #[bench]
+    fn bench_pushpop(b: &mut Bencher) {
+        b.iter(|| {
+            let mut vec: SmallVec<[u64; 16]> = SmallVec::new();
+            for x in 0..100 {
+                vec.push(x);
+                vec.pop();
+            }
+        });
     }
 }
