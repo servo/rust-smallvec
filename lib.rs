@@ -5,6 +5,8 @@
 //! Small vectors in various sizes. These store a certain number of elements inline and fall back
 //! to the heap for larger allocations.
 
+#![cfg_attr(feature = "benchmarks", feature(test))]
+
 use std::borrow::{Borrow, BorrowMut};
 use std::cmp;
 use std::fmt;
@@ -1006,5 +1008,55 @@ pub mod tests {
         let mut vec = SmallVec::<[u32; 2]>::from(&[1, 2, 3][..]);
         assert_eq!(vec.clone().into_iter().len(), 3);
         assert_eq!(vec.drain().len(), 3);
+    }
+}
+
+#[cfg(all(feature = "benchmarks", test))]
+mod bench {
+    extern crate test;
+    use SmallVec;
+    use self::test::Bencher;
+
+    #[bench]
+    fn bench_push(b: &mut Bencher) {
+        b.iter(|| {
+            let mut vec: SmallVec<[u64; 16]> = SmallVec::new();
+            for x in 0..100 {
+                vec.push(x);
+            }
+            vec
+        });
+    }
+
+    #[bench]
+    fn bench_insert(b: &mut Bencher) {
+        b.iter(|| {
+            let mut vec: SmallVec<[u64; 16]> = SmallVec::new();
+            for x in 0..100 {
+                vec.insert(0, x);
+            }
+            vec
+        });
+    }
+
+    #[bench]
+    fn bench_extend(b: &mut Bencher) {
+        b.iter(|| {
+            let mut vec: SmallVec<[u64; 16]> = SmallVec::new();
+            vec.extend(0..100);
+            vec
+        });
+    }
+
+    #[bench]
+    fn bench_pushpop(b: &mut Bencher) {
+        b.iter(|| {
+            let mut vec: SmallVec<[u64; 16]> = SmallVec::new();
+            for x in 0..100 {
+                vec.push(x);
+                vec.pop();
+            }
+            vec
+        });
     }
 }
