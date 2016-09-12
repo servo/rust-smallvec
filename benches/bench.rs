@@ -69,6 +69,18 @@ fn bench_extend_from_slice(b: &mut Bencher) {
     b.iter(|| {
         let mut vec: SmallVec<[u64; 16]> = SmallVec::new();
         vec.extend_from_slice(&v);
+        vec
+    });
+}
+
+#[bench]
+fn bench_insert_from_slice(b: &mut Bencher) {
+    let v: Vec<u64> = (0..100).collect();
+    b.iter(|| {
+        let mut vec: SmallVec<[u64; 16]> = SmallVec::new();
+        vec.insert_from_slice(0, &v);
+        vec.insert_from_slice(0, &v);
+        vec
     });
 }
 
