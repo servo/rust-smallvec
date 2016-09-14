@@ -13,6 +13,3 @@ documentation = "http://doc.servo.org/smallvec/"
 name = "smallvec"
 path = "lib.rs"
 doctest = false
-
-[features]
-benchmarks = []
