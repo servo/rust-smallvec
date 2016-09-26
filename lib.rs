@@ -607,24 +607,31 @@ impl<'a, A: Array> IntoIterator for &'a mut SmallVec<A> {
 // TODO: Remove these and its users.
 
 /// Deprecated alias to ease transition from an earlier version.
+#[deprecated]
 pub type SmallVec1<T> = SmallVec<[T; 1]>;
 
 /// Deprecated alias to ease transition from an earlier version.
+#[deprecated]
 pub type SmallVec2<T> = SmallVec<[T; 2]>;
 
 /// Deprecated alias to ease transition from an earlier version.
+#[deprecated]
 pub type SmallVec4<T> = SmallVec<[T; 4]>;
 
 /// Deprecated alias to ease transition from an earlier version.
+#[deprecated]
 pub type SmallVec8<T> = SmallVec<[T; 8]>;
 
 /// Deprecated alias to ease transition from an earlier version.
+#[deprecated]
 pub type SmallVec16<T> = SmallVec<[T; 16]>;
 
 /// Deprecated alias to ease transition from an earlier version.
+#[deprecated]
 pub type SmallVec24<T> = SmallVec<[T; 24]>;
 
 /// Deprecated alias to ease transition from an earlier version.
+#[deprecated]
 pub type SmallVec32<T> = SmallVec<[T; 32]>;
 
 
