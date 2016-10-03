@@ -317,11 +317,14 @@ impl<A: Array> SmallVec<A> {
     pub fn insert_many<I: IntoIterator<Item=A::Item>>(&mut self, index: usize, iterable: I) {
         let iter = iterable.into_iter();
         let (lower_size_bound, _) = iter.size_hint();
+        assert!(lower_size_bound <= std::isize::MAX as usize);  // Ensure offset is indexable
+        assert!(index + lower_size_bound >= index);  // Protect against overflow
         self.reserve(lower_size_bound);
 
         unsafe {
-            let ptr = self.as_mut_ptr().offset(index as isize);
             let old_len = self.len;
+            assert!(index <= old_len);
+            let ptr = self.as_mut_ptr().offset(index as isize);
             ptr::copy(ptr, ptr.offset(lower_size_bound as isize), old_len - index);
             for (off, element) in iter.enumerate() {
                 if off < lower_size_bound {
@@ -329,12 +332,13 @@ impl<A: Array> SmallVec<A> {
                     self.len = self.len + 1;
                 } else {
                     // Iterator provided more elements than the hint.
+                    assert!(index + off >= index);  // Protect against overflow.
                     self.insert(index + off, element);
                 }
             }
             let num_added = self.len - old_len;
             if num_added < lower_size_bound {
-                // Iterator provided less elements than the hint
+                // Iterator provided fewer elements than the hint
                 ptr::copy(ptr.offset(lower_size_bound as isize), ptr.offset(num_added as isize), old_len - index);
             }
         }
