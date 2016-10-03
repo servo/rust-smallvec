@@ -18,37 +18,6 @@ use std::slice;
 use SmallVecData::{Inline, Heap};
 
 
-pub trait VecLike<T>:
-        ops::Index<usize, Output=T> +
-        ops::IndexMut<usize> +
-        ops::Index<ops::Range<usize>, Output=[T]> +
-        ops::IndexMut<ops::Range<usize>> +
-        ops::Index<ops::RangeFrom<usize>, Output=[T]> +
-        ops::IndexMut<ops::RangeFrom<usize>> +
-        ops::Index<ops::RangeTo<usize>, Output=[T]> +
-        ops::IndexMut<ops::RangeTo<usize>> +
-        ops::Index<ops::RangeFull, Output=[T]> +
-        ops::IndexMut<ops::RangeFull> +
-        ops::Deref +
-        ops::DerefMut +
-        Extend<T> {
-
-    fn len(&self) -> usize;
-    fn push(&mut self, value: T);
-}
-
-impl<T> VecLike<T> for Vec<T> {
-    #[inline]
-    fn len(&self) -> usize {
-        Vec::len(self)
-    }
-
-    #[inline]
-    fn push(&mut self, value: T) {
-        Vec::push(self, value);
-    }
-}
-
 unsafe fn deallocate<T>(ptr: *mut T, capacity: usize) {
     let _vec: Vec<T> = Vec::from_raw_parts(ptr, 0, capacity);
     // Let it drop.
@@ -149,12 +118,6 @@ impl<A: Array> SmallVec<A> {
 
     pub fn inline_size(&self) -> usize {
         A::size()
-    }
-    pub fn len(&self) -> usize {
-        self.len
-    }
-    pub fn is_empty(&self) -> bool {
-        self.len == 0
     }
     pub fn capacity(&self) -> usize {
         match self.data {
@@ -399,18 +362,6 @@ impl_index!(ops::RangeFrom<usize>, [A::Item]);
 impl_index!(ops::RangeTo<usize>, [A::Item]);
 impl_index!(ops::RangeFull, [A::Item]);
 
-
-impl<A: Array> VecLike<A::Item> for SmallVec<A> {
-    #[inline]
-    fn len(&self) -> usize {
-        SmallVec::len(self)
-    }
-
-    #[inline]
-    fn push(&mut self, value: A::Item) {
-        SmallVec::push(self, value);
-    }
-}
 
 impl<A: Array> FromIterator<A::Item> for SmallVec<A> {
     fn from_iter<I: IntoIterator<Item=A::Item>>(iterable: I) -> SmallVec<A> {
