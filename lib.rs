@@ -29,19 +29,13 @@ pub trait VecLike<T>:
         ops::IndexMut<ops::RangeTo<usize>> +
         ops::Index<ops::RangeFull, Output=[T]> +
         ops::IndexMut<ops::RangeFull> +
-        ops::Deref +
-        ops::DerefMut +
+        ops::DerefMut<Target = [T]> +
         Extend<T> {
 
-    fn len(&self) -> usize;
     fn push(&mut self, value: T);
 }
 
 impl<T> VecLike<T> for Vec<T> {
-    #[inline]
-    fn len(&self) -> usize {
-        Vec::len(self)
-    }
 
     #[inline]
     fn push(&mut self, value: T) {
@@ -150,12 +144,15 @@ impl<A: Array> SmallVec<A> {
     pub fn inline_size(&self) -> usize {
         A::size()
     }
+    
     pub fn len(&self) -> usize {
         self.len
     }
+
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
+
     pub fn capacity(&self) -> usize {
         match self.data {
             Inline { .. } => A::size(),
@@ -401,11 +398,6 @@ impl_index!(ops::RangeFull, [A::Item]);
 
 
 impl<A: Array> VecLike<A::Item> for SmallVec<A> {
-    #[inline]
-    fn len(&self) -> usize {
-        SmallVec::len(self)
-    }
-
     #[inline]
     fn push(&mut self, value: A::Item) {
         SmallVec::push(self, value);
@@ -1013,5 +1005,21 @@ pub mod tests {
         let mut vec = SmallVec::<[u32; 2]>::from(&[1, 2, 3][..]);
         assert_eq!(vec.clone().into_iter().len(), 3);
         assert_eq!(vec.drain().len(), 3);
+    }
+
+    #[test]
+    fn veclike_deref_slice() {
+        use super::VecLike;
+
+        fn test<T: VecLike<i32>>(vec: &mut T) {
+            assert!(!vec.is_empty());
+            assert_eq!(vec.len(), 3);
+
+            vec.sort();
+            assert_eq!(&vec[..], [1, 2, 3]);
+        }
+
+        let mut vec = SmallVec::<[i32; 2]>::from(&[3, 1, 2][..]);
+        test(&mut vec);
     }
 }
