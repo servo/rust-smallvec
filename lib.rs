@@ -137,6 +137,16 @@ pub struct SmallVec<A: Array> {
 }
 
 impl<A: Array> SmallVec<A> {
+    #[inline]
+    pub fn new() -> SmallVec<A> {
+        unsafe {
+            SmallVec {
+                len: 0,
+                data: Inline { array: mem::zeroed() },
+            }
+        }
+    }
+
     pub unsafe fn set_len(&mut self, new_len: usize) {
         self.len = new_len
     }
@@ -432,18 +442,6 @@ impl<A: Array> Extend<A::Item> for SmallVec<A> {
 impl<A: Array> fmt::Debug for SmallVec<A> where A::Item: fmt::Debug {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", &**self)
-    }
-}
-
-impl<A: Array> SmallVec<A> {
-    #[inline]
-    pub fn new() -> SmallVec<A> {
-        unsafe {
-            SmallVec {
-                len: 0,
-                data: Inline { array: mem::zeroed() },
-            }
-        }
     }
 }
 
