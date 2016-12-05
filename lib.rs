@@ -209,21 +209,25 @@ impl<A: Array> SmallVec<A> {
     }
 
     /// The maximum number of elements this vector can hold inline
+    #[inline]
     pub fn inline_size(&self) -> usize {
         A::size()
     }
 
     /// The number of elements stored in the vector
+    #[inline]
     pub fn len(&self) -> usize {
         self.len
     }
 
     /// Returns `true` if the vector is empty
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
     /// The number of items the vector can hold without reallocating
+    #[inline]
     pub fn capacity(&self) -> usize {
         match self.data {
             Inline { .. } => A::size(),
@@ -232,6 +236,7 @@ impl<A: Array> SmallVec<A> {
     }
 
     /// Returns `true` if the data has spilled into a separate heap-allocated buffer.
+    #[inline]
     pub fn spilled(&self) -> bool {
         match self.data {
             Inline { .. } => false,
@@ -256,6 +261,7 @@ impl<A: Array> SmallVec<A> {
     }
 
     /// Append an item to the vector.
+    #[inline]
     pub fn push(&mut self, value: A::Item) {
         let cap = self.capacity();
         if self.len == cap {
@@ -276,6 +282,7 @@ impl<A: Array> SmallVec<A> {
     }
 
     /// Remove an item from the end of the vector and return it, or None if empty.
+    #[inline]
     pub fn pop(&mut self) -> Option<A::Item> {
         if self.len == 0 {
             return None
@@ -367,6 +374,7 @@ impl<A: Array> SmallVec<A> {
     /// This does not preserve ordering, but is O(1).
     ///
     /// Panics if `index` is out of bounds.
+    #[inline]
     pub fn swap_remove(&mut self, index: usize) -> A::Item {
         let len = self.len;
         self.swap(len - 1, index);
@@ -374,6 +382,7 @@ impl<A: Array> SmallVec<A> {
     }
 
     /// Remove all elements from the vector
+    #[inline]
     pub fn clear(&mut self) {
         self.truncate(0);
     }
