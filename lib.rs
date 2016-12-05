@@ -276,10 +276,12 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
+    /// Append elements from an iterator.
+    ///
+    /// This function is deprecated; it has been replaced by `Extend::extend`.
+    #[deprecated(note = "Use `extend` instead")]
     pub fn push_all_move<V: IntoIterator<Item=A::Item>>(&mut self, other: V) {
-        for value in other {
-            self.push(value)
-        }
+        self.extend(other)
     }
 
     /// Remove an item from the end of the vector and return it, or None if empty.
