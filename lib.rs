@@ -355,9 +355,22 @@ impl<A: Array> SmallVec<A> {
     }
 
     /// Shrink the capacity of the vector as much as possible.
+    ///
+    /// When possible, this will move data from an external heap buffer to the vector's inline
+    /// storage.
     pub fn shrink_to_fit(&mut self) {
         let len = self.len;
-        if self.spilled() && self.capacity() > len {
+        if self.inline_size() >= len {
+            unsafe {
+                let (ptr, capacity) = match self.data {
+                    Inline { .. } => return,
+                    Heap { ptr, capacity } => (ptr, capacity),
+                };
+                ptr::write(&mut self.data, Inline { array: mem::uninitialized() });
+                ptr::copy_nonoverlapping(ptr, self.as_mut_ptr(), len);
+                deallocate(ptr, capacity);
+            }
+        } else if self.capacity() > len {
             self.grow(len);
         }
     }
@@ -765,6 +778,7 @@ impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32,
 pub mod tests {
     use SmallVec;
     use std::borrow::ToOwned;
+    use std::iter::FromIterator;
 
     // We heap allocate all these strings so that double frees will show up under valgrind.
 
@@ -1139,5 +1153,14 @@ pub mod tests {
 
         let mut vec = SmallVec::<[i32; 2]>::from(&[3, 1, 2][..]);
         test(&mut vec);
+    }
+
+    #[test]
+    fn shrink_to_fit_unspill() {
+        let mut vec = SmallVec::<[u8; 2]>::from_iter(0..3);
+        vec.pop();
+        assert!(vec.spilled());
+        vec.shrink_to_fit();
+        assert!(!vec.spilled(), "shrink_to_fit will un-spill if possible");
     }
 }
