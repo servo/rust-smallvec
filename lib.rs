@@ -301,7 +301,11 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
+    /// Re-allocate to set the capacity to `new_cap`.
+    ///
+    /// Panics if `new_cap` is less than the vector's length.
     pub fn grow(&mut self, new_cap: usize) {
+        assert!(new_cap >= self.len);
         let mut vec: Vec<A::Item> = Vec::with_capacity(new_cap);
         let new_alloc = vec.as_mut_ptr();
         unsafe {
@@ -965,6 +969,14 @@ pub mod tests {
         v.insert(1, Box::new(3));
 
         assert_eq!(&v.iter().map(|v| **v).collect::<Vec<_>>(), &[0, 3, 2]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_invalid_grow() {
+        let mut v: SmallVec<[u8; 8]> = SmallVec::new();
+        v.extend(0..8);
+        v.grow(5);
     }
 
     #[test]
