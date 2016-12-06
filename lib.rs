@@ -1056,20 +1056,21 @@ pub mod tests {
 
     #[test]
     fn test_hash() {
-        use std::hash::{Hash, SipHasher};
+        use std::hash::Hash;
+        use std::collections::hash_map::DefaultHasher;
 
         {
             let mut a: SmallVec<[u32; 2]> = SmallVec::new();
             let b = [1, 2];
             a.extend(b.iter().cloned());
-            let mut hasher = SipHasher::new();
+            let mut hasher = DefaultHasher::new();
             assert_eq!(a.hash(&mut hasher), b.hash(&mut hasher));
         }
         {
             let mut a: SmallVec<[u32; 2]> = SmallVec::new();
             let b = [1, 2, 11, 12];
             a.extend(b.iter().cloned());
-            let mut hasher = SipHasher::new();
+            let mut hasher = DefaultHasher::new();
             assert_eq!(a.hash(&mut hasher), b.hash(&mut hasher));
         }
     }
