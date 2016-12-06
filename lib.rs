@@ -646,11 +646,11 @@ impl<A: Array> Drop for IntoIter<A> {
 
 impl<A: Array> Iterator for IntoIter<A> {
     type Item = A::Item;
-    
+
     #[inline]
     fn next(&mut self) -> Option<A::Item> {
         if self.current == self.end {
-            None    
+            None
         }
         else {
             unsafe {
@@ -672,7 +672,7 @@ impl<A: Array> DoubleEndedIterator for IntoIter<A> {
     #[inline]
     fn next_back(&mut self) -> Option<A::Item> {
         if self.current == self.end {
-            None    
+            None
         }
         else {
             unsafe {
@@ -910,7 +910,7 @@ pub mod tests {
                 self.0.set(self.0.get() + 1);
             }
         }
-        
+
         {
             let cell = Cell::new(0);
             let mut v: SmallVec<[DropCounter; 2]> = SmallVec::new();
