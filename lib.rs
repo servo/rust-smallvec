@@ -445,6 +445,36 @@ impl<A: Array> SmallVec<A> {
             self.set_len(len + 1);
         }
     }
+
+    pub fn insert_many<I: IntoIterator<Item=A::Item>>(&mut self, index: usize, iterable: I) {
+        let iter = iterable.into_iter();
+        let (lower_size_bound, _) = iter.size_hint();
+        assert!(lower_size_bound <= std::isize::MAX as usize);  // Ensure offset is indexable
+        assert!(index + lower_size_bound >= index);  // Protect against overflow
+        self.reserve(lower_size_bound);
+
+        unsafe {
+            let old_len = self.len;
+            assert!(index <= old_len);
+            let ptr = self.as_mut_ptr().offset(index as isize);
+            ptr::copy(ptr, ptr.offset(lower_size_bound as isize), old_len - index);
+            for (off, element) in iter.enumerate() {
+                if off < lower_size_bound {
+                    ptr::write(ptr.offset(off as isize), element);
+                    self.len = self.len + 1;
+                } else {
+                    // Iterator provided more elements than the hint.
+                    assert!(index + off >= index);  // Protect against overflow.
+                    self.insert(index + off, element);
+                }
+            }
+            let num_added = self.len - old_len;
+            if num_added < lower_size_bound {
+                // Iterator provided fewer elements than the hint
+                ptr::copy(ptr.offset(lower_size_bound as isize), ptr.offset(num_added as isize), old_len - index);
+            }
+        }
+    }
 }
 
 impl<A: Array> ops::Deref for SmallVec<A> {
@@ -988,6 +1018,46 @@ pub mod tests {
         v.insert(1, Box::new(3));
 
         assert_eq!(&v.iter().map(|v| **v).collect::<Vec<_>>(), &[0, 3, 2]);
+    }
+
+    #[test]
+    fn test_insert_many() {
+        let mut v: SmallVec<[u8; 8]> = SmallVec::new();
+        for x in 0..4 {
+            v.push(x);
+        }
+        assert_eq!(v.len(), 4);
+        v.insert_many(1, [5, 6].iter().cloned());
+        assert_eq!(&v.iter().map(|v| *v).collect::<Vec<_>>(), &[0, 5, 6, 1, 2, 3]);
+    }
+
+    struct MockHintIter<T: Iterator>{x: T, hint: usize}
+    impl<T: Iterator> Iterator for MockHintIter<T> {
+        type Item = T::Item;
+        fn next(&mut self) -> Option<Self::Item> {self.x.next()}
+        fn size_hint(&self) -> (usize, Option<usize>) {(self.hint, None)}
+    }
+
+    #[test]
+    fn test_insert_many_short_hint() {
+        let mut v: SmallVec<[u8; 8]> = SmallVec::new();
+        for x in 0..4 {
+            v.push(x);
+        }
+        assert_eq!(v.len(), 4);
+        v.insert_many(1, MockHintIter{x: [5, 6].iter().cloned(), hint: 5});
+        assert_eq!(&v.iter().map(|v| *v).collect::<Vec<_>>(), &[0, 5, 6, 1, 2, 3]);
+    }
+
+    #[test]
+    fn test_insert_many_long_hint() {
+        let mut v: SmallVec<[u8; 8]> = SmallVec::new();
+        for x in 0..4 {
+            v.push(x);
+        }
+        assert_eq!(v.len(), 4);
+        v.insert_many(1, MockHintIter{x: [5, 6].iter().cloned(), hint: 1});
+        assert_eq!(&v.iter().map(|v| *v).collect::<Vec<_>>(), &[0, 5, 6, 1, 2, 3]);
     }
 
     #[test]
