@@ -6,16 +6,20 @@
 //! to the heap for larger allocations.  This can be a useful optimization for improving cache
 //! locality and reducing allocator traffic for workloads that fit within the inline buffer.
 
+extern crate heapsize;
+
 use std::borrow::{Borrow, BorrowMut};
 use std::cmp;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::iter::{IntoIterator, FromIterator};
 use std::mem;
+use std::os::raw::c_void;
 use std::ops;
 use std::ptr;
 use std::slice;
 
+use heapsize::{HeapSizeOf, heap_size_of};
 use SmallVecData::{Inline, Heap};
 
 /// Common operations implemented by both `Vec` and `SmallVec`.
@@ -478,6 +482,12 @@ impl<A: Array> SmallVec<A> {
 }
 
 impl<A: Array> SmallVec<A> where A::Item: Copy {
+    pub fn from_slice(slice: &[A::Item]) -> Self {
+        let mut vec = Self::new();
+        vec.extend_from_slice(slice);
+        vec
+    }
+
     pub fn insert_from_slice(&mut self, index: usize, slice: &[A::Item]) {
         self.reserve(slice.len());
 
@@ -497,6 +507,19 @@ impl<A: Array> SmallVec<A> where A::Item: Copy {
     pub fn extend_from_slice(&mut self, slice: &[A::Item]) {
         let len = self.len();
         self.insert_from_slice(len, slice);
+    }
+}
+
+impl<A: Array> HeapSizeOf for SmallVec<A> where A::Item: HeapSizeOf {
+    fn heap_size_of_children(&self) -> usize {
+        match self.data {
+            Inline { .. } => 0,
+            Heap { ptr, .. } => {
+                self.iter().fold(
+                    unsafe { heap_size_of(ptr as *const c_void) },
+                    |n, elem| n + elem.heap_size_of_children())
+            },
+        }
     }
 }
 
@@ -823,15 +846,17 @@ macro_rules! impl_array(
     }
 );
 
-impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32,
+impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 36,
             0x40, 0x80, 0x100, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000,
             0x10000, 0x20000, 0x40000, 0x80000, 0x100000);
 
 #[cfg(test)]
 pub mod tests {
     use SmallVec;
+    use heapsize::HeapSizeOf;
     use std::borrow::ToOwned;
     use std::iter::FromIterator;
+    use std::mem::size_of;
 
     // We heap allocate all these strings so that double frees will show up under valgrind.
 
@@ -1246,6 +1271,35 @@ pub mod tests {
     fn test_from() {
         assert_eq!(&SmallVec::<[u32; 2]>::from(&[1][..])[..], [1]);
         assert_eq!(&SmallVec::<[u32; 2]>::from(&[1, 2, 3][..])[..], [1, 2, 3]);
+    }
+
+    #[test]
+    fn test_from_slice() {
+        assert_eq!(&SmallVec::<[u32; 2]>::from_slice(&[1][..])[..], [1]);
+        assert_eq!(&SmallVec::<[u32; 2]>::from_slice(&[1, 2, 3][..])[..], [1, 2, 3]);
+    }
+
+    #[test]
+    fn test_heap_size_of_children() {
+        let mut vec = SmallVec::<[u32; 2]>::new();
+        assert_eq!(vec.heap_size_of_children(), 0);
+        vec.push(1);
+        vec.push(2);
+        assert_eq!(vec.heap_size_of_children(), 0);
+        vec.push(3);
+        assert_eq!(vec.heap_size_of_children(), 16);
+
+        // Now check with reserved space
+        let mut vec = SmallVec::<[u32; 2]>::new();
+        vec.reserve(10);  // Rounds up to 16
+        assert_eq!(vec.heap_size_of_children(), 64);
+
+        // Check with nested heap structures
+        let mut vec = SmallVec::<[Vec<u32>; 2]>::new();
+        vec.reserve(10);
+        vec.push(vec![2, 3, 4]);
+        assert_eq!(vec.heap_size_of_children(),
+                   vec![2, 3, 4].heap_size_of_children() + 16 * size_of::<Vec<u32>>());
     }
 
     #[test]

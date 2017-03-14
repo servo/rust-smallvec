@@ -12,3 +12,6 @@ documentation = "http://doc.servo.org/smallvec/"
 [lib]
 name = "smallvec"
 path = "lib.rs"
+
+[dependencies]
+heapsize =  "0.3"
