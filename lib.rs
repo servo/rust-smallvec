@@ -6,6 +6,9 @@
 //! to the heap for larger allocations.  This can be a useful optimization for improving cache
 //! locality and reducing allocator traffic for workloads that fit within the inline buffer.
 
+#![feature(specialization)]
+
+#[cfg(feature="heapsizeof")]
 extern crate heapsize;
 
 use std::borrow::{Borrow, BorrowMut};
@@ -14,11 +17,13 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::iter::{IntoIterator, FromIterator};
 use std::mem;
-use std::os::raw::c_void;
 use std::ops;
 use std::ptr;
 use std::slice;
+#[cfg(feature="heapsizeof")]
+use std::os::raw::c_void;
 
+#[cfg(feature="heapsizeof")]
 use heapsize::{HeapSizeOf, heap_size_of};
 use SmallVecData::{Inline, Heap};
 
@@ -510,6 +515,7 @@ impl<A: Array> SmallVec<A> where A::Item: Copy {
     }
 }
 
+#[cfg(feature="heapsizeof")]
 impl<A: Array> HeapSizeOf for SmallVec<A> where A::Item: HeapSizeOf {
     fn heap_size_of_children(&self) -> usize {
         match self.data {
@@ -853,9 +859,12 @@ impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 3
 #[cfg(test)]
 pub mod tests {
     use SmallVec;
-    use heapsize::HeapSizeOf;
     use std::borrow::ToOwned;
     use std::iter::FromIterator;
+
+    #[cfg(feature="heapsizeof")]
+    use heapsize::HeapSizeOf;
+    #[cfg(feature="heapsizeof")]
     use std::mem::size_of;
 
     // We heap allocate all these strings so that double frees will show up under valgrind.
@@ -1279,6 +1288,7 @@ pub mod tests {
         assert_eq!(&SmallVec::<[u32; 2]>::from_slice(&[1, 2, 3][..])[..], [1, 2, 3]);
     }
 
+    #[cfg(feature="heapsizeof")]
     #[test]
     fn test_heap_size_of_children() {
         let mut vec = SmallVec::<[u32; 2]>::new();

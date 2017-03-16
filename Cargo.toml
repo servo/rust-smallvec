@@ -9,9 +9,12 @@ keywords = ["small", "vec", "vector", "stack"]
 readme = "README.md"
 documentation = "http://doc.servo.org/smallvec/"
 
+[features]
+heapsizeof = ["heapsize"]
+
 [lib]
 name = "smallvec"
 path = "lib.rs"
 
 [dependencies]
-heapsize =  "0.3"
+heapsize = { version = "0.3", optional = true }
