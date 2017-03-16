@@ -6,8 +6,6 @@
 //! to the heap for larger allocations.  This can be a useful optimization for improving cache
 //! locality and reducing allocator traffic for workloads that fit within the inline buffer.
 
-#![feature(specialization)]
-
 #[cfg(feature="heapsizeof")]
 extern crate heapsize;
 
