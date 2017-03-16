@@ -64,6 +64,15 @@ fn bench_extend(b: &mut Bencher) {
 }
 
 #[bench]
+fn bench_from_slice(b: &mut Bencher) {
+    let v: Vec<u64> = (0..100).collect();
+    b.iter(|| {
+        let vec: SmallVec<[u64; 16]> = SmallVec::from_slice(&v);
+        vec
+    });
+}
+
+#[bench]
 fn bench_extend_from_slice(b: &mut Bencher) {
     let v: Vec<u64> = (0..100).collect();
     b.iter(|| {
