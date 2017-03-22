@@ -482,6 +482,19 @@ impl<A: Array> SmallVec<A> {
             }
         }
     }
+
+    /// Convert a SmallVec to a Vec, without reallocating if the SmallVec has already spilled onto
+    /// the heap.
+    pub fn into_vec(self) -> Vec<A::Item> {
+        match self.data {
+            Inline { .. } => self.into_iter().collect(),
+            Heap { ptr, capacity } => unsafe {
+                let v = Vec::from_raw_parts(ptr, self.len, capacity);
+                mem::forget(self);
+                v
+            }
+        }
+    }
 }
 
 impl<A: Array> SmallVec<A> where A::Item: Copy {
@@ -1340,5 +1353,14 @@ pub mod tests {
         assert!(vec.spilled());
         vec.shrink_to_fit();
         assert!(!vec.spilled(), "shrink_to_fit will un-spill if possible");
+    }
+
+    #[test]
+    fn test_into_vec() {
+        let vec = SmallVec::<[u8; 2]>::from_iter(0..2);
+        assert_eq!(vec.into_vec(), vec![0, 1]);
+
+        let vec = SmallVec::<[u8; 2]>::from_iter(0..3);
+        assert_eq!(vec.into_vec(), vec![0, 1, 2]);
     }
 }
