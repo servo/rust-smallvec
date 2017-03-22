@@ -202,7 +202,7 @@ impl<A: Array> SmallVec<A> {
         unsafe {
             SmallVec {
                 len: 0,
-                data: Inline { array: mem::zeroed() },
+                data: Inline { array: mem::uninitialized() },
             }
         }
     }
