@@ -1388,4 +1388,37 @@ pub mod tests {
         let vec = SmallVec::<[u8; 2]>::from_iter(0..3);
         assert_eq!(vec.into_vec(), vec![0, 1, 2]);
     }
+
+    #[test]
+    fn test_from_vec() {
+        let vec = vec![];
+        let small_vec: SmallVec<[u8; 3]> = SmallVec::from_vec(vec);
+        assert_eq!(&*small_vec, &[]);
+        drop(small_vec);
+
+        let vec = vec![];
+        let small_vec: SmallVec<[u8; 1]> = SmallVec::from_vec(vec);
+        assert_eq!(&*small_vec, &[]);
+        drop(small_vec);
+
+        let vec = vec![1];
+        let small_vec: SmallVec<[u8; 3]> = SmallVec::from_vec(vec);
+        assert_eq!(&*small_vec, &[1]);
+        drop(small_vec);
+
+        let vec = vec![1, 2, 3];
+        let small_vec: SmallVec<[u8; 3]> = SmallVec::from_vec(vec);
+        assert_eq!(&*small_vec, &[1, 2, 3]);
+        drop(small_vec);
+
+        let vec = vec![1, 2, 3, 4, 5];
+        let small_vec: SmallVec<[u8; 3]> = SmallVec::from_vec(vec);
+        assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
+        drop(small_vec);
+
+        let vec = vec![1, 2, 3, 4, 5];
+        let small_vec: SmallVec<[u8; 1]> = SmallVec::from_vec(vec);
+        assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
+        drop(small_vec);
+    }
 }
