@@ -207,6 +207,31 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
+    /// Construct a new `SmallVec` from a `Vec<A::Item>` without copying
+    /// elements.
+    ///
+    /// ```rust
+    /// use smallvec::SmallVec;
+    ///
+    /// let vec = vec![1, 2, 3, 4, 5];
+    /// let small_vec: SmallVec<[_; 3]> = SmallVec::from_vec(vec);
+    ///
+    /// assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
+    /// ```
+    #[inline]
+    pub fn from_vec(mut vec: Vec<A::Item>) -> SmallVec<A> {
+        let (ptr, cap, len) = (vec.as_mut_ptr(), vec.capacity(), vec.len());
+        mem::forget(vec);
+
+        SmallVec {
+            len: len,
+            data: SmallVecData::Heap {
+                ptr: ptr,
+                capacity: cap
+            }
+        }
+    }
+
     /// Sets the length of a vector.
     ///
     /// This will explicitly set the size of the vector, without actually
