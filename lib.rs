@@ -6,8 +6,23 @@
 //! to the heap for larger allocations.  This can be a useful optimization for improving cache
 //! locality and reducing allocator traffic for workloads that fit within the inline buffer.
 
+#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), feature(collections))]
+
+
+#[cfg(not(feature = "std"))]
+extern crate collections;
+
+#[cfg(not(feature = "std"))]
+use collections::Vec;
+
 #[cfg(feature="heapsizeof")]
 extern crate heapsize;
+
+#[cfg(not(feature = "std"))]
+mod std {
+    pub use core::*;
+}
 
 use std::borrow::{Borrow, BorrowMut};
 use std::cmp;
