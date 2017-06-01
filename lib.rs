@@ -33,6 +33,8 @@ use std::mem;
 use std::ops;
 use std::ptr;
 use std::slice;
+#[cfg(feature = "std")]
+use std::io;
 #[cfg(feature="heapsizeof")]
 use std::os::raw::c_void;
 
@@ -629,6 +631,26 @@ impl<A: Array> BorrowMut<[A::Item]> for SmallVec<A> {
     #[inline]
     fn borrow_mut(&mut self) -> &mut [A::Item] {
         self
+    }
+}
+
+#[cfg(feature = "std")]
+impl<A: Array<Item = u8>> io::Write for SmallVec<A> {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    #[inline]
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        self.extend_from_slice(buf);
+        Ok(())
+    }
+
+    #[inline]
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
     }
 }
 
@@ -1435,5 +1457,22 @@ pub mod tests {
         let small_vec: SmallVec<[u8; 1]> = SmallVec::from_vec(vec);
         assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
         drop(small_vec);
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_write() {
+        use io::Write;
+
+        let data = [1, 2, 3, 4, 5];
+
+        let mut small_vec: SmallVec<[u8; 2]> = SmallVec::new();
+        let len = small_vec.write(&data[..]).unwrap();
+        assert_eq!(len, 5);
+        assert_eq!(small_vec.as_ref(), data.as_ref());
+
+        let mut small_vec: SmallVec<[u8; 2]> = SmallVec::new();
+        small_vec.write_all(&data[..]).unwrap();
+        assert_eq!(small_vec.as_ref(), data.as_ref());
     }
 }
