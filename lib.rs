@@ -7,14 +7,14 @@
 //! locality and reducing allocator traffic for workloads that fit within the inline buffer.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(collections))]
+#![cfg_attr(not(feature = "std"), feature(alloc))]
 
 
 #[cfg(not(feature = "std"))]
-extern crate collections;
+extern crate alloc;
 
 #[cfg(not(feature = "std"))]
-use collections::Vec;
+use alloc::Vec;
 
 #[cfg(feature="heapsizeof")]
 extern crate heapsize;
