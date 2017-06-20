@@ -11,6 +11,7 @@
 
 
 #[cfg(not(feature = "std"))]
+#[cfg_attr(test, macro_use)]
 extern crate alloc;
 
 #[cfg(not(feature = "std"))]
@@ -967,8 +968,17 @@ impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 3
 #[cfg(test)]
 pub mod tests {
     use SmallVec;
-    use std::borrow::ToOwned;
+
     use std::iter::FromIterator;
+
+    #[cfg(feature = "std")]
+    use std::borrow::ToOwned;
+    #[cfg(not(feature = "std"))]
+    use alloc::borrow::ToOwned;
+    #[cfg(not(feature = "std"))]
+    use alloc::boxed::Box;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec::Vec;
 
     #[cfg(feature="heapsizeof")]
     use heapsize::HeapSizeOf;
@@ -1311,6 +1321,7 @@ pub mod tests {
         assert!(c > b);
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn test_hash() {
         use std::hash::Hash;
