@@ -5,6 +5,15 @@
 //! Small vectors in various sizes. These store a certain number of elements inline, and fall back
 //! to the heap for larger allocations.  This can be a useful optimization for improving cache
 //! locality and reducing allocator traffic for workloads that fit within the inline buffer.
+//!
+//! ## no_std support
+//!
+//! By default, `smallvec` depends on `libstd`. However, it can be configured to use the unstable
+//! `liballoc` API instead, for use on platforms that have `liballoc` but not `libstd`.  This
+//! configuration is currently unstable and is not guaranteed to work on all versions of Rust.
+//!
+//! To depend on `smallvec` without `libstd`, use `default-features = false` in the `smallvec`
+//! section of Cargo.toml to disable its `"std"` feature.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc))]
