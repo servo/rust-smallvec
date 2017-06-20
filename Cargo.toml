@@ -10,7 +10,10 @@ readme = "README.md"
 documentation = "http://doc.servo.org/smallvec/"
 
 [features]
-heapsizeof = ["heapsize"]
+heapsizeof = ["heapsize", "std"]
+collections = []
+std = []
+default = ["std"]
 
 [lib]
 name = "smallvec"
