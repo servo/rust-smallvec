@@ -88,6 +88,36 @@ impl<T> VecLike<T> for Vec<T> {
     }
 }
 
+/// Trait to be implemented by a collection that can be extended from a slice
+///
+/// ## Example
+///
+/// ```rust
+/// use smallvec::{ExtendFromSlice, SmallVec8};
+///
+/// fn initialize<V: ExtendFromSlice<u8>>(v: &mut V) {
+///     v.extend_from_slice(b"Test!");
+/// }
+///
+/// let mut vec = Vec::new();
+/// initialize(&mut vec);
+/// assert_eq!(&vec, b"Test!");
+///
+/// let mut small_vec = SmallVec8::new();
+/// initialize(&mut small_vec);
+/// assert_eq!(&small_vec as &[_], b"Test!");
+/// ```
+pub trait ExtendFromSlice<T>: VecLike<T> {
+    /// Extends a collection from a slice of its element type
+    fn extend_from_slice(&mut self, other: &[T]);
+}
+
+impl<T: Clone> ExtendFromSlice<T> for Vec<T> {
+    fn extend_from_slice(&mut self, other: &[T]) {
+        Vec::extend_from_slice(self, other)
+    }
+}
+
 unsafe fn deallocate<T>(ptr: *mut T, capacity: usize) {
     let _vec: Vec<T> = Vec::from_raw_parts(ptr, 0, capacity);
     // Let it drop.
@@ -686,6 +716,11 @@ impl_index!(ops::RangeFrom<usize>, [A::Item]);
 impl_index!(ops::RangeTo<usize>, [A::Item]);
 impl_index!(ops::RangeFull, [A::Item]);
 
+impl<A: Array> ExtendFromSlice<A::Item> for SmallVec<A> where A::Item: Copy {
+    fn extend_from_slice(&mut self, other: &[A::Item]) {
+        SmallVec::extend_from_slice(self, other)
+    }
+}
 
 impl<A: Array> VecLike<A::Item> for SmallVec<A> {
     #[inline]
