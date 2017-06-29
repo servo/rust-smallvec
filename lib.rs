@@ -5,16 +5,26 @@
 //! Small vectors in various sizes. These store a certain number of elements inline, and fall back
 //! to the heap for larger allocations.  This can be a useful optimization for improving cache
 //! locality and reducing allocator traffic for workloads that fit within the inline buffer.
+//!
+//! ## no_std support
+//!
+//! By default, `smallvec` depends on `libstd`. However, it can be configured to use the unstable
+//! `liballoc` API instead, for use on platforms that have `liballoc` but not `libstd`.  This
+//! configuration is currently unstable and is not guaranteed to work on all versions of Rust.
+//!
+//! To depend on `smallvec` without `libstd`, use `default-features = false` in the `smallvec`
+//! section of Cargo.toml to disable its `"std"` feature.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(collections))]
+#![cfg_attr(not(feature = "std"), feature(alloc))]
 
 
 #[cfg(not(feature = "std"))]
-extern crate collections;
+#[cfg_attr(test, macro_use)]
+extern crate alloc;
 
 #[cfg(not(feature = "std"))]
-use collections::Vec;
+use alloc::Vec;
 
 #[cfg(feature="heapsizeof")]
 extern crate heapsize;
@@ -967,8 +977,17 @@ impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 3
 #[cfg(test)]
 pub mod tests {
     use SmallVec;
-    use std::borrow::ToOwned;
+
     use std::iter::FromIterator;
+
+    #[cfg(feature = "std")]
+    use std::borrow::ToOwned;
+    #[cfg(not(feature = "std"))]
+    use alloc::borrow::ToOwned;
+    #[cfg(not(feature = "std"))]
+    use alloc::boxed::Box;
+    #[cfg(not(feature = "std"))]
+    use alloc::vec::Vec;
 
     #[cfg(feature="heapsizeof")]
     use heapsize::HeapSizeOf;
@@ -1311,6 +1330,7 @@ pub mod tests {
         assert!(c > b);
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn test_hash() {
         use std::hash::Hash;
