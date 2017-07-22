@@ -289,6 +289,25 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
+    /// Constructs a new `SmallVec` on the stack from an `A` without
+    /// copying elements.
+    ///
+    /// ```rust
+    /// use smallvec::SmallVec;
+    ///
+    /// let buf = [1, 2, 3, 4, 5];
+    /// let small_vec: SmallVec<_> = SmallVec::from_buf(buf);
+    ///
+    /// assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
+    /// ```
+    #[inline]
+    pub fn from_buf(buf: A) -> SmallVec<A> {
+        SmallVec {
+            len: A::size(),
+            data: SmallVecData::Inline { array: buf },
+        }
+    }
+
     /// Sets the length of a vector.
     ///
     /// This will explicitly set the size of the vector, without actually
