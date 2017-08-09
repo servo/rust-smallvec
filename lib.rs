@@ -29,7 +29,7 @@ use alloc::Vec;
 #[cfg(feature="heapsizeof")]
 extern crate heapsize;
 
-#[cfg(feature = "serde_support")]
+#[cfg(feature = "serde")]
 extern crate serde;
 
 #[cfg(not(feature = "std"))]
@@ -50,11 +50,11 @@ use std::slice;
 use std::io;
 #[cfg(feature="heapsizeof")]
 use std::os::raw::c_void;
-#[cfg(feature = "serde_support")]
+#[cfg(feature = "serde")]
 use serde::ser::{Serialize, Serializer, SerializeSeq};
-#[cfg(feature = "serde_support")]
+#[cfg(feature = "serde")]
 use serde::de::{Deserialize, Deserializer, SeqAccess, Visitor};
-#[cfg(feature = "serde_support")]
+#[cfg(feature = "serde")]
 use std::marker::PhantomData;
 
 #[cfg(feature="heapsizeof")]
@@ -722,7 +722,7 @@ impl<A: Array<Item = u8>> io::Write for SmallVec<A> {
     }
 }
 
-#[cfg(feature = "serde_support")]
+#[cfg(feature = "serde")]
 impl<A: Array> Serialize for SmallVec<A> where A::Item: Serialize {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut state = serializer.serialize_seq(Some(self.len()))?;
@@ -733,19 +733,19 @@ impl<A: Array> Serialize for SmallVec<A> where A::Item: Serialize {
     }
 }
 
-#[cfg(feature = "serde_support")]
+#[cfg(feature = "serde")]
 impl<'de, A: Array> Deserialize<'de> for SmallVec<A> where A::Item: Deserialize<'de> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_seq(SmallVecVisitor{phantom: PhantomData})
     }
 }
 
-#[cfg(feature = "serde_support")]
+#[cfg(feature = "serde")]
 struct SmallVecVisitor<A> {
     phantom: PhantomData<A>
 }
 
-#[cfg(feature = "serde_support")]
+#[cfg(feature = "serde")]
 impl<'de, A: Array> Visitor<'de> for SmallVecVisitor<A>
 where A::Item: Deserialize<'de>,
 {
@@ -1608,7 +1608,7 @@ pub mod tests {
 
     extern crate bincode;
 
-    #[cfg(feature = "serde_support")]
+    #[cfg(feature = "serde")]
     #[test]
     fn test_serde() {
         use self::bincode::{serialize, deserialize, Bounded};
