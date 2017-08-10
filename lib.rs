@@ -29,6 +29,9 @@ use alloc::Vec;
 #[cfg(feature="heapsizeof")]
 extern crate heapsize;
 
+#[cfg(feature = "serde")]
+extern crate serde;
+
 #[cfg(not(feature = "std"))]
 mod std {
     pub use core::*;
@@ -47,6 +50,12 @@ use std::slice;
 use std::io;
 #[cfg(feature="heapsizeof")]
 use std::os::raw::c_void;
+#[cfg(feature = "serde")]
+use serde::ser::{Serialize, Serializer, SerializeSeq};
+#[cfg(feature = "serde")]
+use serde::de::{Deserialize, Deserializer, SeqAccess, Visitor};
+#[cfg(feature = "serde")]
+use std::marker::PhantomData;
 
 #[cfg(feature="heapsizeof")]
 use heapsize::{HeapSizeOf, heap_size_of};
@@ -710,6 +719,53 @@ impl<A: Array<Item = u8>> io::Write for SmallVec<A> {
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<A: Array> Serialize for SmallVec<A> where A::Item: Serialize {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut state = serializer.serialize_seq(Some(self.len()))?;
+        for item in self {
+            state.serialize_element(&item)?;
+        }
+        state.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, A: Array> Deserialize<'de> for SmallVec<A> where A::Item: Deserialize<'de> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_seq(SmallVecVisitor{phantom: PhantomData})
+    }
+}
+
+#[cfg(feature = "serde")]
+struct SmallVecVisitor<A> {
+    phantom: PhantomData<A>
+}
+
+#[cfg(feature = "serde")]
+impl<'de, A: Array> Visitor<'de> for SmallVecVisitor<A>
+where A::Item: Deserialize<'de>,
+{
+    type Value = SmallVec<A>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a sequence")
+    }
+
+    fn visit_seq<B>(self, mut seq: B) -> Result<Self::Value, B::Error>
+        where
+            B: SeqAccess<'de>,
+    {
+        let mut values = SmallVec::new();
+
+        while let Some(value) = seq.next_element()? {
+            values.push(value);
+        }
+
+        Ok(values)
     }
 }
 
@@ -1548,5 +1604,26 @@ pub mod tests {
         let mut small_vec: SmallVec<[u8; 2]> = SmallVec::new();
         small_vec.write_all(&data[..]).unwrap();
         assert_eq!(small_vec.as_ref(), data.as_ref());
+    }
+
+    extern crate bincode;
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde() {
+        use self::bincode::{serialize, deserialize, Bounded};
+        let mut small_vec: SmallVec<[i32; 2]> = SmallVec::new();
+        small_vec.push(1);
+        let encoded = serialize(&small_vec, Bounded(100)).unwrap();
+        let decoded: SmallVec<[i32; 2]> = deserialize(&encoded).unwrap();
+        assert_eq!(small_vec, decoded);
+        small_vec.push(2);
+        // Spill the vec
+        small_vec.push(3);
+        small_vec.push(4);
+        // Check again after spilling.
+        let encoded = serialize(&small_vec, Bounded(100)).unwrap();
+        let decoded: SmallVec<[i32; 2]> = deserialize(&encoded).unwrap();
+        assert_eq!(small_vec, decoded);
     }
 }
