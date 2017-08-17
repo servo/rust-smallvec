@@ -605,6 +605,24 @@ impl<A: Array> SmallVec<A> {
             }
         }
     }
+
+    /// Retains only the elements specified by the predicate.
+    ///
+    /// In other words, remove all elements `e` such that `f(&e)` returns `false`.
+    /// This method operates in place and preserves the order of the retained
+    /// elements.
+    pub fn retain<F: FnMut(&A::Item) -> bool>(&mut self, mut f: F) {
+        let mut del = 0;
+        let len = self.len;
+        for i in 0..len {
+            if !f(&self[i]) {
+                del += 1;
+            } else if del > 0 {
+                self.swap(i - del, i);
+            }
+        }
+        self.truncate(len - del);
+    }
 }
 
 impl<A: Array> SmallVec<A> where A::Item: Copy {
@@ -1059,6 +1077,10 @@ pub mod tests {
     use std::borrow::ToOwned;
     #[cfg(not(feature = "std"))]
     use alloc::borrow::ToOwned;
+    #[cfg(feature = "std")]
+    use std::rc::Rc;
+    #[cfg(not(feature = "std"))]
+    use alloc::rc::Rc;
     #[cfg(not(feature = "std"))]
     use alloc::boxed::Box;
     #[cfg(not(feature = "std"))]
@@ -1587,6 +1609,41 @@ pub mod tests {
         let small_vec: SmallVec<[u8; 1]> = SmallVec::from_vec(vec);
         assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
         drop(small_vec);
+    }
+
+    #[test]
+    fn test_retain() {
+        // Test inline data storate
+        let mut sv: SmallVec<[i32; 5]> = SmallVec::from_slice(&[1, 2, 3, 3, 4]);
+        sv.retain(|&i| i != 3);
+        assert_eq!(sv.pop(), Some(4));
+        assert_eq!(sv.pop(), Some(2));
+        assert_eq!(sv.pop(), Some(1));
+        assert_eq!(sv.pop(), None);
+
+        // Test spilled data storage
+        let mut sv: SmallVec<[i32; 3]> = SmallVec::from_slice(&[1, 2, 3, 3, 4]);
+        sv.retain(|&i| i != 3);
+        assert_eq!(sv.pop(), Some(4));
+        assert_eq!(sv.pop(), Some(2));
+        assert_eq!(sv.pop(), Some(1));
+        assert_eq!(sv.pop(), None);
+
+        // Test that drop implementations are called for inline.
+        let one = Rc::new(1);
+        let mut sv: SmallVec<[Rc<i32>; 3]> = SmallVec::new();
+        sv.push(Rc::clone(&one));
+        assert_eq!(Rc::strong_count(&one), 2);
+        sv.retain(|_| false);
+        assert_eq!(Rc::strong_count(&one), 1);
+
+        // Test that drop implementations are called for spilled data.
+        let mut sv: SmallVec<[Rc<i32>; 1]> = SmallVec::new();
+        sv.push(Rc::clone(&one));
+        sv.push(Rc::new(2));
+        assert_eq!(Rc::strong_count(&one), 2);
+        sv.retain(|_| false);
+        assert_eq!(Rc::strong_count(&one), 1);
     }
 
     #[cfg(feature = "std")]
