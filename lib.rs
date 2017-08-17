@@ -605,6 +605,43 @@ impl<A: Array> SmallVec<A> {
             }
         }
     }
+
+    /// Retains only the elements specified by the predicate.
+    ///
+    /// In other words, remove all elements `e` such that `f(&e)` returns `false`.
+    /// This method operates in place and preserves the order of the retained
+    /// elements.
+    pub fn retain<F: FnMut(&A::Item) -> bool>(&mut self, mut f: F) {
+        use std::mem::{forget, swap};
+        let len = self.len;
+        match self.data {
+            Inline { ref mut array } => {
+                use std::ptr::read;
+                let mut del = 0;
+                unsafe {
+                    for i in 0..len {
+                        if !f(&*array.ptr().offset(i as isize)) {
+                            read(array.ptr().offset(i as isize));
+                            del += 1;
+                        } else if del > 0 {
+                            swap((array.ptr().offset((i - del) as isize) as *mut  A::Item).as_mut().unwrap(), (array.ptr().offset(i as isize) as *mut  A::Item).as_mut().unwrap());
+                        }
+                    }
+                }
+                if del > 0 {
+                    self.len = len - del;
+                }
+            }
+            Heap { ref mut ptr, ref mut capacity } => unsafe {
+                let mut v = Vec::from_raw_parts(*ptr, len, *capacity);
+                v.retain(f);
+                *ptr = v.as_mut_ptr();
+                *capacity = v.capacity();
+                self.len = v.len();
+                forget(v);
+            }
+        }
+    }
 }
 
 impl<A: Array> SmallVec<A> where A::Item: Copy {
@@ -1587,6 +1624,26 @@ pub mod tests {
         let small_vec: SmallVec<[u8; 1]> = SmallVec::from_vec(vec);
         assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
         drop(small_vec);
+    }
+
+    #[test]
+    fn test_retain() {
+
+        // Test inline data storate
+        let mut sv: SmallVec<[i32; 5]> = SmallVec::from_slice(&[1, 2, 3, 3, 4]);
+        sv.retain(|&i| i != 3);
+        assert_eq!(sv.pop(), Some(4));
+        assert_eq!(sv.pop(), Some(2));
+        assert_eq!(sv.pop(), Some(1));
+        assert_eq!(sv.pop(), None);
+
+        // Test spilled data storage
+        let mut sv: SmallVec<[i32; 3]> = SmallVec::from_slice(&[1, 2, 3, 3, 4]);
+        sv.retain(|&i| i != 3);
+        assert_eq!(sv.pop(), Some(4));
+        assert_eq!(sv.pop(), Some(2));
+        assert_eq!(sv.pop(), Some(1));
+        assert_eq!(sv.pop(), None);
     }
 
     #[cfg(feature = "std")]
