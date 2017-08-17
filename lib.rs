@@ -605,6 +605,36 @@ impl<A: Array> SmallVec<A> {
             }
         }
     }
+
+    /// Retains only the elements specified by the predicate.
+    ///
+    /// In other words, remove all elements `e` such that `f(&e)` returns `false`.
+    /// This method operates in place and preserves the order of the retained
+    /// elements.
+    pub fn retain<F: FnMut(&A::Item) -> bool>(&mut self, mut f: F) {
+        let len = self.len;
+        match self.data {
+            Inline { ref mut array } => {
+                use std::mem::swap;
+                let mut del = 0;
+                unsafe {
+                    for i in 0..len {
+                        if !f(&*array.ptr().offset(i as isize)) {
+                            del += 1;
+                        } else if del > 0 {
+                            swap(&mut array.ptr().offset((i - del) as isize), &mut array.ptr().offset(i as isize));
+                        }
+                    }
+                }
+                if del > 0 {
+                    self.len = len - del;
+                }
+            }
+            Heap { ptr, capacity } => unsafe {
+                Vec::from_raw_parts(ptr, len, capacity).retain(f);
+            }
+        }
+    }
 }
 
 impl<A: Array> SmallVec<A> where A::Item: Copy {
