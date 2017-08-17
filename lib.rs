@@ -1628,7 +1628,6 @@ pub mod tests {
 
     #[test]
     fn test_retain() {
-
         // Test inline data storate
         let mut sv: SmallVec<[i32; 5]> = SmallVec::from_slice(&[1, 2, 3, 3, 4]);
         sv.retain(|&i| i != 3);
@@ -1644,6 +1643,23 @@ pub mod tests {
         assert_eq!(sv.pop(), Some(2));
         assert_eq!(sv.pop(), Some(1));
         assert_eq!(sv.pop(), None);
+
+        use std::rc::Rc;
+        // Test that drop implementations are called for inline.
+        let one = Rc::new(1);
+        let mut sv: SmallVec<[Rc<i32>; 3]> = SmallVec::new();
+        sv.push(Rc::clone(&one));
+        assert_eq!(Rc::strong_count(&one), 2);
+        sv.retain(|_| false);
+        assert_eq!(Rc::strong_count(&one), 1);
+
+        // Test that drop implementations are called for spilled data.
+        let mut sv: SmallVec<[Rc<i32>; 1]> = SmallVec::new();
+        sv.push(Rc::clone(&one));
+        sv.push(Rc::new(2));
+        assert_eq!(Rc::strong_count(&one), 2);
+        sv.retain(|_| false);
+        assert_eq!(Rc::strong_count(&one), 1);
     }
 
     #[cfg(feature = "std")]
