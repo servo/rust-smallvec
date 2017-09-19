@@ -1696,6 +1696,7 @@ pub mod tests {
         assert_eq!(small_vec.as_ref(), data.as_ref());
     }
 
+    #[cfg(feature = "serde")]
     extern crate bincode;
 
     #[cfg(feature = "serde")]
