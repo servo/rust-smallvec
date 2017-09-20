@@ -273,6 +273,26 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
+    /// Construct an empty vector with enough capacity pre-allocated to store at least `n`
+    /// elements.
+    ///
+    /// Will create a heap allocation only if `n` is larger than the inline capacity.
+    ///
+    /// ```
+    /// # use smallvec::SmallVec;
+    ///
+    /// let v: SmallVec<[u8; 3]> = SmallVec::with_capacity(100);
+    ///
+    /// assert!(v.is_empty());
+    /// assert!(v.capacity() >= 100);
+    /// ```
+    #[inline]
+    pub fn with_capacity(n: usize) -> Self {
+        let mut v = SmallVec::new();
+        v.reserve_exact(n);
+        v
+    }
+
     /// Construct a new `SmallVec` from a `Vec<A::Item>` without copying
     /// elements.
     ///
@@ -1157,6 +1177,19 @@ pub mod tests {
     }
 
     #[test]
+    fn test_with_capacity() {
+        let v: SmallVec<[u8; 3]> = SmallVec::with_capacity(1);
+        assert!(v.is_empty());
+        assert!(!v.spilled());
+        assert_eq!(v.capacity(), 3);
+
+        let v: SmallVec<[u8; 3]> = SmallVec::with_capacity(10);
+        assert!(v.is_empty());
+        assert!(v.spilled());
+        assert_eq!(v.capacity(), 10);
+    }
+
+    #[test]
     fn drain() {
         let mut v: SmallVec<[u8; 2]> = SmallVec::new();
         v.push(3);
@@ -1663,6 +1696,7 @@ pub mod tests {
         assert_eq!(small_vec.as_ref(), data.as_ref());
     }
 
+    #[cfg(feature = "serde")]
     extern crate bincode;
 
     #[cfg(feature = "serde")]
