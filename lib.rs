@@ -432,8 +432,8 @@ impl<A: Array> SmallVec<A> {
             panic!("overflow")
         }
         unsafe {
-            let end_ptr = self.as_mut_ptr().offset(last_index as isize);
-            let value = ptr::replace(end_ptr, mem::uninitialized());
+            let end_ptr = self.as_ptr().offset(last_index as isize);
+            let value = ptr::read(end_ptr);
             self.set_len(last_index);
             Some(value)
         }
