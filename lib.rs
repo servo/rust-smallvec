@@ -530,6 +530,20 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
+    /// Extracts a slice containing the entire vector.
+    ///
+    /// Equivalent to `&mut s[..]`.
+    pub fn as_slice(&self) -> &[A::Item] {
+        self
+    }
+
+    /// Extracts a mutable slice of the entire vector.
+    ///
+    /// Equivalent to `&mut s[..]`.
+    pub fn as_mut_slice(&mut self) -> &mut [A::Item] {
+        self
+    }
+
     /// Remove the element at position `index`, replacing it with the last element.
     ///
     /// This does not preserve ordering, but is O(1).
