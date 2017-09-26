@@ -828,6 +828,20 @@ impl<'a, A: Array> From<&'a [A::Item]> for SmallVec<A> where A::Item: Clone {
     }
 }
 
+impl<A: Array> From<Vec<A::Item>> for SmallVec<A> {
+    #[inline]
+    fn from(vec: Vec<A::Item>) -> SmallVec<A> {
+        SmallVec::from_vec(vec)
+    }
+}
+
+impl<A: Array> From<A> for SmallVec<A> {
+    #[inline]
+    fn from(array: A) -> SmallVec<A> {
+        SmallVec::from_buf(array)
+    }
+}
+
 macro_rules! impl_index {
     ($index_type: ty, $output_type: ty) => {
         impl<A: Array> ops::Index<$index_type> for SmallVec<A> {
@@ -1552,6 +1566,31 @@ pub mod tests {
     fn test_from() {
         assert_eq!(&SmallVec::<[u32; 2]>::from(&[1][..])[..], [1]);
         assert_eq!(&SmallVec::<[u32; 2]>::from(&[1, 2, 3][..])[..], [1, 2, 3]);
+
+        let vec = vec![];
+        let small_vec: SmallVec<[u8; 3]> = SmallVec::from(vec);
+        assert_eq!(&*small_vec, &[]);
+        drop(small_vec);
+
+        let vec = vec![1, 2, 3, 4, 5];
+        let small_vec: SmallVec<[u8; 3]> = SmallVec::from(vec);
+        assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
+        drop(small_vec);
+
+        let vec = vec![1, 2, 3, 4, 5];
+        let small_vec: SmallVec<[u8; 1]> = SmallVec::from(vec);
+        assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
+        drop(small_vec);
+
+        let array = [1];
+        let small_vec: SmallVec<[u8; 1]> = SmallVec::from(array);
+        assert_eq!(&*small_vec, &[1]);
+        drop(small_vec);
+
+        let array = [99; 128];
+        let small_vec: SmallVec<[u8; 128]> = SmallVec::from(array);
+        assert_eq!(&*small_vec, vec![99u8; 128].as_slice());
+        drop(small_vec);
     }
 
     #[test]
