@@ -828,6 +828,20 @@ impl<'a, A: Array> From<&'a [A::Item]> for SmallVec<A> where A::Item: Clone {
     }
 }
 
+impl<A: Array> From<Vec<A::Item>> for SmallVec<A> {
+    #[inline]
+    fn from(vec: Vec<A::Item>) -> SmallVec<A> {
+        SmallVec::from_vec(vec)
+    }
+}
+
+impl<A: Array> From<A> for SmallVec<A> {
+    #[inline]
+    fn from(array: A) -> SmallVec<A> {
+        SmallVec::from_buf(array)
+    }
+}
+
 macro_rules! impl_index {
     ($index_type: ty, $output_type: ty) => {
         impl<A: Array> ops::Index<$index_type> for SmallVec<A> {
