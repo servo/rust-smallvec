@@ -26,9 +26,6 @@ extern crate alloc;
 #[cfg(not(feature = "std"))]
 use alloc::Vec;
 
-#[cfg(feature="heapsizeof")]
-extern crate heapsize;
-
 #[cfg(feature = "serde")]
 extern crate serde;
 
@@ -48,8 +45,6 @@ use std::ptr;
 use std::slice;
 #[cfg(feature = "std")]
 use std::io;
-#[cfg(feature="heapsizeof")]
-use std::os::raw::c_void;
 #[cfg(feature = "serde")]
 use serde::ser::{Serialize, Serializer, SerializeSeq};
 #[cfg(feature = "serde")]
@@ -57,8 +52,6 @@ use serde::de::{Deserialize, Deserializer, SeqAccess, Visitor};
 #[cfg(feature = "serde")]
 use std::marker::PhantomData;
 
-#[cfg(feature="heapsizeof")]
-use heapsize::{HeapSizeOf, heap_size_of};
 use SmallVecData::{Inline, Heap};
 
 /// Common operations implemented by both `Vec` and `SmallVec`.
@@ -688,20 +681,6 @@ impl<A: Array> SmallVec<A> where A::Item: Copy {
     }
 }
 
-#[cfg(feature="heapsizeof")]
-impl<A: Array> HeapSizeOf for SmallVec<A> where A::Item: HeapSizeOf {
-    fn heap_size_of_children(&self) -> usize {
-        match self.data {
-            Inline { .. } => 0,
-            Heap { ptr, .. } => {
-                self.iter().fold(
-                    unsafe { heap_size_of(ptr as *const c_void) },
-                    |n, elem| n + elem.heap_size_of_children())
-            },
-        }
-    }
-}
-
 impl<A: Array> ops::Deref for SmallVec<A> {
     type Target = [A::Item];
     #[inline]
@@ -1133,11 +1112,6 @@ pub mod tests {
     use alloc::boxed::Box;
     #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
-
-    #[cfg(feature="heapsizeof")]
-    use heapsize::HeapSizeOf;
-    #[cfg(feature="heapsizeof")]
-    use std::mem::size_of;
 
     // We heap allocate all these strings so that double frees will show up under valgrind.
 
@@ -1597,30 +1571,6 @@ pub mod tests {
     fn test_from_slice() {
         assert_eq!(&SmallVec::<[u32; 2]>::from_slice(&[1][..])[..], [1]);
         assert_eq!(&SmallVec::<[u32; 2]>::from_slice(&[1, 2, 3][..])[..], [1, 2, 3]);
-    }
-
-    #[cfg(feature="heapsizeof")]
-    #[test]
-    fn test_heap_size_of_children() {
-        let mut vec = SmallVec::<[u32; 2]>::new();
-        assert_eq!(vec.heap_size_of_children(), 0);
-        vec.push(1);
-        vec.push(2);
-        assert_eq!(vec.heap_size_of_children(), 0);
-        vec.push(3);
-        assert_eq!(vec.heap_size_of_children(), 16);
-
-        // Now check with reserved space
-        let mut vec = SmallVec::<[u32; 2]>::new();
-        vec.reserve(10);  // Rounds up to 16
-        assert_eq!(vec.heap_size_of_children(), 64);
-
-        // Check with nested heap structures
-        let mut vec = SmallVec::<[Vec<u32>; 2]>::new();
-        vec.reserve(10);
-        vec.push(vec![2, 3, 4]);
-        assert_eq!(vec.heap_size_of_children(),
-                   vec![2, 3, 4].heap_size_of_children() + 16 * size_of::<Vec<u32>>());
     }
 
     #[test]
