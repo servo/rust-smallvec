@@ -790,7 +790,8 @@ where A::Item: Deserialize<'de>,
         where
             B: SeqAccess<'de>,
     {
-        let mut values = SmallVec::new();
+        let len = seq.size_hint().unwrap_or(0);
+        let mut values = SmallVec::with_capacity(len);
 
         while let Some(value) = seq.next_element()? {
             values.push(value);
@@ -912,7 +913,7 @@ impl<A: Array> Drop for SmallVec<A> {
 
 impl<A: Array> Clone for SmallVec<A> where A::Item: Clone {
     fn clone(&self) -> SmallVec<A> {
-        let mut new_vector = SmallVec::new();
+        let mut new_vector = SmallVec::with_capacity(self.len());
         for element in self.iter() {
             new_vector.push((*element).clone())
         }
