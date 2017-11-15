@@ -638,11 +638,11 @@ impl<A: Array> SmallVec<A> {
     /// In other words, remove all elements `e` such that `f(&e)` returns `false`.
     /// This method operates in place and preserves the order of the retained
     /// elements.
-    pub fn retain<F: FnMut(&A::Item) -> bool>(&mut self, mut f: F) {
+    pub fn retain<F: FnMut(&mut A::Item) -> bool>(&mut self, mut f: F) {
         let mut del = 0;
         let len = self.len;
         for i in 0..len {
-            if !f(&self[i]) {
+            if !f(&mut self[i]) {
                 del += 1;
             } else if del > 0 {
                 self.swap(i - del, i);
@@ -1652,7 +1652,7 @@ pub mod tests {
     fn test_retain() {
         // Test inline data storate
         let mut sv: SmallVec<[i32; 5]> = SmallVec::from_slice(&[1, 2, 3, 3, 4]);
-        sv.retain(|&i| i != 3);
+        sv.retain(|&mut i| i != 3);
         assert_eq!(sv.pop(), Some(4));
         assert_eq!(sv.pop(), Some(2));
         assert_eq!(sv.pop(), Some(1));
@@ -1660,7 +1660,7 @@ pub mod tests {
 
         // Test spilled data storage
         let mut sv: SmallVec<[i32; 3]> = SmallVec::from_slice(&[1, 2, 3, 3, 4]);
-        sv.retain(|&i| i != 3);
+        sv.retain(|&mut i| i != 3);
         assert_eq!(sv.pop(), Some(4));
         assert_eq!(sv.pop(), Some(2));
         assert_eq!(sv.pop(), Some(1));
