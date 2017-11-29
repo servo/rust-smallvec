@@ -91,12 +91,36 @@ pub trait VecLike<T>:
 
     /// Append an element to the vector.
     fn push(&mut self, value: T);
+    /// Removes consecutive repeated elements.
+    fn dedup(&mut self) where T: PartialEq<T>;
+    /// Removes consecutive repeated elements with a given equality relation.
+    fn dedup_by<F>(&mut self, same_bucket: F) where F: FnMut(&mut T, &mut T) -> bool;
+    /// Removes consecutive elements that resolve to the same key.
+    fn dedup_by_key<F, K>(&mut self, key: F) where F: FnMut(&mut T) -> K, 
+                                                   K: PartialEq<K>;
 }
 
 impl<T> VecLike<T> for Vec<T> {
     #[inline]
     fn push(&mut self, value: T) {
         Vec::push(self, value);
+    }
+
+    fn dedup(&mut self) where T: PartialEq<T> {
+        Vec::dedup(self);
+    }
+
+    fn dedup_by<F>(&mut self, same_bucket: F) 
+        where F: FnMut(&mut T, &mut T) -> bool
+    {
+        Vec::dedup_by(self, same_bucket);
+    }
+
+    fn dedup_by_key<F, K>(&mut self, key: F) 
+        where F: FnMut(&mut T) -> K, 
+              K: PartialEq<K> 
+    {
+        Vec::dedup_by_key(self, key);
     }
 }
 
@@ -650,6 +674,50 @@ impl<A: Array> SmallVec<A> {
         }
         self.truncate(len - del);
     }
+
+    /// Removes consecutive duplicate elements.
+    pub fn dedup(&mut self) where A::Item: PartialEq<A::Item> {
+        self.dedup_by(|a, b| a == b);
+    }
+
+    /// Removes consecutive duplicate elements using the given equality relation.
+    pub fn dedup_by<F>(&mut self, mut same_bucket: F) 
+        where F: FnMut(&mut A::Item, &mut A::Item) -> bool
+    {
+        // See the implementation of Vec::dedup_by in the
+        // standard library for an explanation of this algorithm.
+        let len = self.len;
+        if len <= 1 {
+            return;
+        }
+
+        let ptr = self.as_mut_ptr();
+        let mut w: usize = 1;
+
+        unsafe {
+            for r in 1..len {
+                let p_r = ptr.offset(r as isize);
+                let p_wm1 = ptr.offset((w - 1) as isize);
+                if !same_bucket(&mut *p_r, &mut *p_wm1) {
+                    if r != w {
+                        let p_w = p_wm1.offset(1);
+                        mem::swap(&mut *p_r, &mut *p_w);
+                    }
+                    w += 1;
+                }
+            }
+        }
+
+        self.truncate(w);
+    }
+
+    /// Removes consecutive elements that map to the same key.
+    pub fn dedup_by_key<F, K>(&mut self, mut key: F) 
+        where F: FnMut(&mut A::Item) -> K, 
+              K: PartialEq<K> 
+    {
+        self.dedup_by(|a, b| key(a) == key(b));
+    }
 }
 
 impl<A: Array> SmallVec<A> where A::Item: Copy {
@@ -858,6 +926,23 @@ impl<A: Array> VecLike<A::Item> for SmallVec<A> {
     fn push(&mut self, value: A::Item) {
         SmallVec::push(self, value);
     }
+
+    fn dedup(&mut self) where A::Item: PartialEq<A::Item> {
+        SmallVec::dedup(self);
+    }
+
+    fn dedup_by<F>(&mut self, same_bucket: F) 
+        where F: FnMut(&mut A::Item, &mut A::Item) -> bool
+    {
+        SmallVec::dedup_by(self, same_bucket);
+    }
+
+    fn dedup_by_key<F, K>(&mut self, key: F) 
+        where F: FnMut(&mut A::Item) -> K, 
+              K: PartialEq<K> 
+    {
+        SmallVec::dedup_by_key(self, key);
+    }   
 }
 
 impl<A: Array> FromIterator<A::Item> for SmallVec<A> {
@@ -1681,6 +1766,25 @@ pub mod tests {
         assert_eq!(Rc::strong_count(&one), 2);
         sv.retain(|_| false);
         assert_eq!(Rc::strong_count(&one), 1);
+    }
+
+    #[test]
+    fn test_dedup() {
+        let mut dupes: SmallVec<[i32; 5]> = SmallVec::from_slice(&[1, 1, 2, 3, 3]);
+        dupes.dedup();
+        assert_eq!(&*dupes, &[1, 2, 3]);
+
+        let mut empty: SmallVec<[i32; 5]> = SmallVec::new();
+        empty.dedup();
+        assert!(empty.is_empty());
+
+        let mut all_ones: SmallVec<[i32; 5]> = SmallVec::from_slice(&[1, 1, 1, 1, 1]);
+        all_ones.dedup();
+        assert_eq!(all_ones.len(), 1);
+
+        let mut no_dupes: SmallVec<[i32; 5]> = SmallVec::from_slice(&[1, 2, 3, 4, 5]);
+        no_dupes.dedup();
+        assert_eq!(no_dupes.len(), 5);
     }
 
     #[cfg(feature = "std")]
