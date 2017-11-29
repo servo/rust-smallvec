@@ -669,7 +669,7 @@ impl<A: Array> SmallVec<A> where A::Item: Copy {
             let slice_ptr = slice.as_ptr();
             let ptr = self.as_mut_ptr().offset(index as isize);
             ptr::copy(ptr, ptr.offset(slice.len() as isize), len - index);
-            ptr::copy(slice_ptr, ptr, slice.len());
+            ptr::copy_nonoverlapping(slice_ptr, ptr, slice.len());
             self.set_len(len + slice.len());
         }
     }
