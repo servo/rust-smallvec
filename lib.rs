@@ -91,36 +91,12 @@ pub trait VecLike<T>:
 
     /// Append an element to the vector.
     fn push(&mut self, value: T);
-    /// Removes consecutive repeated elements.
-    fn dedup(&mut self) where T: PartialEq<T>;
-    /// Removes consecutive repeated elements with a given equality relation.
-    fn dedup_by<F>(&mut self, same_bucket: F) where F: FnMut(&mut T, &mut T) -> bool;
-    /// Removes consecutive elements that resolve to the same key.
-    fn dedup_by_key<F, K>(&mut self, key: F) where F: FnMut(&mut T) -> K, 
-                                                   K: PartialEq<K>;
 }
 
 impl<T> VecLike<T> for Vec<T> {
     #[inline]
     fn push(&mut self, value: T) {
         Vec::push(self, value);
-    }
-
-    fn dedup(&mut self) where T: PartialEq<T> {
-        Vec::dedup(self);
-    }
-
-    fn dedup_by<F>(&mut self, same_bucket: F) 
-        where F: FnMut(&mut T, &mut T) -> bool
-    {
-        Vec::dedup_by(self, same_bucket);
-    }
-
-    fn dedup_by_key<F, K>(&mut self, key: F) 
-        where F: FnMut(&mut T) -> K, 
-              K: PartialEq<K> 
-    {
-        Vec::dedup_by_key(self, key);
     }
 }
 
@@ -926,23 +902,6 @@ impl<A: Array> VecLike<A::Item> for SmallVec<A> {
     fn push(&mut self, value: A::Item) {
         SmallVec::push(self, value);
     }
-
-    fn dedup(&mut self) where A::Item: PartialEq<A::Item> {
-        SmallVec::dedup(self);
-    }
-
-    fn dedup_by<F>(&mut self, same_bucket: F) 
-        where F: FnMut(&mut A::Item, &mut A::Item) -> bool
-    {
-        SmallVec::dedup_by(self, same_bucket);
-    }
-
-    fn dedup_by_key<F, K>(&mut self, key: F) 
-        where F: FnMut(&mut A::Item) -> K, 
-              K: PartialEq<K> 
-    {
-        SmallVec::dedup_by_key(self, key);
-    }   
 }
 
 impl<A: Array> FromIterator<A::Item> for SmallVec<A> {
