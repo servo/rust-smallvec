@@ -17,6 +17,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc))]
+#![deny(missing_docs)]
 
 
 #[cfg(not(feature = "std"))]
@@ -135,6 +136,11 @@ unsafe fn deallocate<T>(ptr: *mut T, capacity: usize) {
     // Let it drop.
 }
 
+/// An iterator that removes the items from a `SmallVec` and yields them by value.
+///
+/// Returned from [`SmallVec::drain`][1].
+///
+/// [1]: struct.SmallVec.html#method.drain
 pub struct Drain<'a, T: 'a> {
     iter: slice::IterMut<'a,T>,
 }
@@ -590,6 +596,8 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
+    /// Insert multiple elements at position `index`, shifting all following elements toward the
+    /// back.
     pub fn insert_many<I: IntoIterator<Item=A::Item>>(&mut self, index: usize, iterable: I) {
         let iter = iterable.into_iter();
         let (lower_size_bound, _) = iter.size_hint();
@@ -697,12 +705,19 @@ impl<A: Array> SmallVec<A> {
 }
 
 impl<A: Array> SmallVec<A> where A::Item: Copy {
+    /// Copy the elements from a slice into a new `SmallVec`.
+    ///
+    /// For slices of `Copy` types, this is more efficient than `SmallVec::from(slice)`.
     pub fn from_slice(slice: &[A::Item]) -> Self {
         let mut vec = Self::new();
         vec.extend_from_slice(slice);
         vec
     }
 
+    /// Copy elements from a slice into the vector at position `index`, shifting any following
+    /// elements toward the back.
+    ///
+    /// For slices of `Copy` types, this is more efficient than `insert`.
     pub fn insert_from_slice(&mut self, index: usize, slice: &[A::Item]) {
         self.reserve(slice.len());
 
@@ -718,6 +733,9 @@ impl<A: Array> SmallVec<A> where A::Item: Copy {
         }
     }
 
+    /// Copy elements from a slice and append them to the vector.
+    ///
+    /// For slices of `Copy` types, this is more efficient than `extend`.
     #[inline]
     pub fn extend_from_slice(&mut self, slice: &[A::Item]) {
         let len = self.len();
@@ -997,6 +1015,11 @@ impl<A: Array> Hash for SmallVec<A> where A::Item: Hash {
 
 unsafe impl<A: Array> Send for SmallVec<A> where A::Item: Send {}
 
+/// An iterator that consumes a `SmallVec` and yields its items by value.
+///
+/// Returned from [`SmallVec::into_iter`][1].
+///
+/// [1]: struct.SmallVec.html#method.into_iter
 pub struct IntoIter<A: Array> {
     data: SmallVecData<A>,
     current: usize,
@@ -1116,9 +1139,13 @@ pub type SmallVec32<T> = SmallVec<[T; 32]>;
 
 /// Types that can be used as the backing store for a SmallVec
 pub unsafe trait Array {
+    /// The type of the array's elements.
     type Item;
+    /// Returns the number of items the array can hold.
     fn size() -> usize;
+    /// Returns a pointer to the first element of the array.
     fn ptr(&self) -> *const Self::Item;
+    /// Returns a mutable pointer to the first element of the array.
     fn ptr_mut(&mut self) -> *mut Self::Item;
 }
 
@@ -1140,7 +1167,7 @@ impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 3
             0x10000, 0x20000, 0x40000, 0x80000, 0x100000);
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use SmallVec;
 
     use std::iter::FromIterator;
