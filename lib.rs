@@ -75,6 +75,7 @@ use SmallVecData::{Inline, Heap};
 /// let mut small_vec = SmallVec8::new();
 /// initialize(&mut small_vec);
 /// ```
+#[deprecated(note = "Use `Extend` and `Deref<[T]>` instead")]
 pub trait VecLike<T>:
         ops::Index<usize, Output=T> +
         ops::IndexMut<usize> +
@@ -93,6 +94,7 @@ pub trait VecLike<T>:
     fn push(&mut self, value: T);
 }
 
+#[allow(deprecated)]
 impl<T> VecLike<T> for Vec<T> {
     #[inline]
     fn push(&mut self, value: T) {
@@ -119,7 +121,7 @@ impl<T> VecLike<T> for Vec<T> {
 /// initialize(&mut small_vec);
 /// assert_eq!(&small_vec as &[_], b"Test!");
 /// ```
-pub trait ExtendFromSlice<T>: VecLike<T> {
+pub trait ExtendFromSlice<T> {
     /// Extends a collection from a slice of its element type
     fn extend_from_slice(&mut self, other: &[T]);
 }
@@ -853,6 +855,7 @@ impl<A: Array> ExtendFromSlice<A::Item> for SmallVec<A> where A::Item: Copy {
     }
 }
 
+#[allow(deprecated)]
 impl<A: Array> VecLike<A::Item> for SmallVec<A> {
     #[inline]
     fn push(&mut self, value: A::Item) {
@@ -1582,6 +1585,7 @@ pub mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn veclike_deref_slice() {
         use super::VecLike;
 
