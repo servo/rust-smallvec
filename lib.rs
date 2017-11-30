@@ -62,7 +62,7 @@ use SmallVecData::{Inline, Heap};
 /// ## Example
 ///
 /// ```rust
-/// use smallvec::{VecLike, SmallVec8};
+/// use smallvec::{VecLike, SmallVec};
 ///
 /// fn initialize<V: VecLike<u8>>(v: &mut V) {
 ///     for i in 0..5 {
@@ -73,7 +73,7 @@ use SmallVecData::{Inline, Heap};
 /// let mut vec = Vec::new();
 /// initialize(&mut vec);
 ///
-/// let mut small_vec = SmallVec8::new();
+/// let mut small_vec = SmallVec::<[u8; 8]>::new();
 /// initialize(&mut small_vec);
 /// ```
 #[deprecated(note = "Use `Extend` and `Deref<[T]>` instead")]
@@ -108,7 +108,7 @@ impl<T> VecLike<T> for Vec<T> {
 /// ## Example
 ///
 /// ```rust
-/// use smallvec::{ExtendFromSlice, SmallVec8};
+/// use smallvec::{ExtendFromSlice, SmallVec};
 ///
 /// fn initialize<V: ExtendFromSlice<u8>>(v: &mut V) {
 ///     v.extend_from_slice(b"Test!");
@@ -118,7 +118,7 @@ impl<T> VecLike<T> for Vec<T> {
 /// initialize(&mut vec);
 /// assert_eq!(&vec, b"Test!");
 ///
-/// let mut small_vec = SmallVec8::new();
+/// let mut small_vec = SmallVec::<[u8; 8]>::new();
 /// initialize(&mut small_vec);
 /// assert_eq!(&small_vec as &[_], b"Test!");
 /// ```
@@ -235,19 +235,13 @@ impl<A: Array> Drop for SmallVecData<A> {
 /// store can be any type that implements the `Array` trait; usually it is a small fixed-sized
 /// array.  For example a `SmallVec<[u64; 8]>` can hold up to eight 64-bit integers inline.
 ///
-/// Type aliases like `SmallVec8<T>` are provided as convenient shorthand for types like
-/// `SmallVec<[T; 8]>`.
-///
 /// ## Example
 ///
 /// ```rust
 /// use smallvec::SmallVec;
 /// let mut v = SmallVec::<[u8; 4]>::new(); // initialize an empty vector
 ///
-/// use smallvec::SmallVec4;
-/// let mut v: SmallVec4<u8> = SmallVec::new(); // alternate way to write the above
-///
-/// // SmallVec4 can hold up to 4 items without spilling onto the heap.
+/// // The vector can hold up to 4 items without spilling onto the heap.
 /// v.extend(0..4);
 /// assert_eq!(v.len(), 4);
 /// assert!(!v.spilled());
@@ -412,14 +406,6 @@ impl<A: Array> SmallVec<A> {
             let len = self.len;
             self.set_len(len + 1)
         }
-    }
-
-    /// Append elements from an iterator.
-    ///
-    /// This function is deprecated; it has been replaced by `Extend::extend`.
-    #[deprecated(note = "Use `extend` instead")]
-    pub fn push_all_move<V: IntoIterator<Item=A::Item>>(&mut self, other: V) {
-        self.extend(other)
     }
 
     /// Remove an item from the end of the vector and return it, or None if empty.
@@ -1109,36 +1095,6 @@ impl<'a, A: Array> IntoIterator for &'a mut SmallVec<A> {
         self.iter_mut()
     }
 }
-
-// TODO: Remove these and its users.
-
-/// Deprecated alias to ease transition from an earlier version.
-#[deprecated]
-pub type SmallVec1<T> = SmallVec<[T; 1]>;
-
-/// Deprecated alias to ease transition from an earlier version.
-#[deprecated]
-pub type SmallVec2<T> = SmallVec<[T; 2]>;
-
-/// Deprecated alias to ease transition from an earlier version.
-#[deprecated]
-pub type SmallVec4<T> = SmallVec<[T; 4]>;
-
-/// Deprecated alias to ease transition from an earlier version.
-#[deprecated]
-pub type SmallVec8<T> = SmallVec<[T; 8]>;
-
-/// Deprecated alias to ease transition from an earlier version.
-#[deprecated]
-pub type SmallVec16<T> = SmallVec<[T; 16]>;
-
-/// Deprecated alias to ease transition from an earlier version.
-#[deprecated]
-pub type SmallVec24<T> = SmallVec<[T; 24]>;
-
-/// Deprecated alias to ease transition from an earlier version.
-#[deprecated]
-pub type SmallVec32<T> = SmallVec<[T; 32]>;
 
 /// Types that can be used as the backing store for a SmallVec
 pub unsafe trait Array {
