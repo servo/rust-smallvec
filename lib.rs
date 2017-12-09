@@ -519,7 +519,7 @@ impl<A: Array> SmallVec<A> {
 
     /// Extracts a slice containing the entire vector.
     ///
-    /// Equivalent to `&mut s[..]`.
+    /// Equivalent to `&s[..]`.
     pub fn as_slice(&self) -> &[A::Item] {
         self
     }
