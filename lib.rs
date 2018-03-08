@@ -39,7 +39,7 @@ use std::borrow::{Borrow, BorrowMut};
 use std::cmp;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::iter::{IntoIterator, FromIterator};
+use std::iter::{IntoIterator, FromIterator, repeat};
 use std::mem;
 use std::ops;
 use std::ptr;
@@ -728,6 +728,24 @@ impl<A: Array> SmallVec<A> where A::Item: Copy {
     pub fn extend_from_slice(&mut self, slice: &[A::Item]) {
         let len = self.len();
         self.insert_from_slice(len, slice);
+    }
+}
+
+impl<A: Array> SmallVec<A> where A::Item: Clone {
+    /// Resizes the vector so that its length is equal to `len`.
+    ///
+    /// If `len` is less than the current length, the vector simply truncated.
+    ///
+    /// If `len` is greater than the current length, `value` is appended to the
+    /// vector until its length equals `len`.
+    pub fn resize(&mut self, len: usize, value: A::Item) {
+        let old_len = self.len();
+
+        if len > old_len {
+            self.extend(repeat(value).take(len - old_len));
+        } else {
+            self.truncate(len);
+        }
     }
 }
 
@@ -1731,6 +1749,17 @@ mod tests {
         let mut no_dupes: SmallVec<[i32; 5]> = SmallVec::from_slice(&[1, 2, 3, 4, 5]);
         no_dupes.dedup();
         assert_eq!(no_dupes.len(), 5);
+    }
+
+    #[test]
+    fn test_resize() {
+        let mut v: SmallVec<[i32; 8]> = SmallVec::new();
+        v.push(1);
+        v.resize(5, 0);
+        assert_eq!(v[..], [1, 0, 0, 0, 0][..]);
+
+        v.resize(2, -1);
+        assert_eq!(v[..], [1, 0][..]);
     }
 
     #[cfg(feature = "std")]
