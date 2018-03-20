@@ -1132,14 +1132,14 @@ macro_rules! impl_array(
             unsafe impl<T> Array for [T; $size] {
                 type Item = T;
                 fn size() -> usize { $size }
-                fn ptr(&self) -> *const T { &self[0] }
-                fn ptr_mut(&mut self) -> *mut T { &mut self[0] }
+                fn ptr(&self) -> *const T { self.as_ptr() }
+                fn ptr_mut(&mut self) -> *mut T { self.as_mut_ptr() }
             }
         )+
     }
 );
 
-impl_array!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 36,
+impl_array!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 36,
             0x40, 0x80, 0x100, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000,
             0x10000, 0x20000, 0x40000, 0x80000, 0x100000);
 
@@ -1161,6 +1161,15 @@ mod tests {
     use alloc::boxed::Box;
     #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
+
+    #[test]
+    pub fn test_zero() {
+        let mut v = SmallVec::<[_; 0]>::new();
+        assert!(!v.spilled());
+        v.push(0usize);
+        assert!(v.spilled());
+        assert_eq!(&*v, &[0]);
+    }
 
     // We heap allocate all these strings so that double frees will show up under valgrind.
 
