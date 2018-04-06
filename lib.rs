@@ -55,6 +55,55 @@ use std::marker::PhantomData;
 
 use SmallVecData::{Inline, Heap};
 
+/// Creates a [`SmallVec`] containing the arguments.
+///
+/// `smallvec!` allows `SmallVec`s to be defined with the same syntax as array expressions.
+/// There are two forms of this macro:
+///
+/// - Create a [`SmallVec`] containing a given list of elements:
+///
+/// ```
+/// # #[macro_use] extern crate smallvec;
+/// # use smallvec::SmallVec;
+/// # fn main() {
+/// let v: SmallVec<[_; 128]> = smallvec![1, 2, 3];
+/// assert_eq!(v[0], 1);
+/// assert_eq!(v[1], 2);
+/// assert_eq!(v[2], 3);
+/// # }
+/// ```
+///
+/// - Create a [`SmallVec`] from a given element and size:
+///
+/// ```
+/// # #[macro_use] extern crate smallvec;
+/// # use smallvec::SmallVec;
+/// # fn main() {
+/// let v: SmallVec<[_; 0x8000]> = smallvec![1; 3];
+/// assert_eq!(v, SmallVec::from_buf([1, 1, 1]));
+/// # }
+/// ```
+///
+/// Note that unlike array expressions this syntax supports all elements
+/// which implement [`Clone`] and the number of elements doesn't have to be
+/// a constant.
+///
+/// This will use `clone` to duplicate an expression, so one should be careful
+/// using this with types having a nonstandard `Clone` implementation. For
+/// example, `smallvec![Rc::new(1); 5]` will create a vector of five references
+/// to the same boxed integer value, not five references pointing to independently
+/// boxed integers.
+
+#[macro_export]
+macro_rules! smallvec {
+    ($elem:expr; $n:expr) => ({
+        SmallVec::from_elem($elem, $n)
+    });
+    ($($x:expr),*) => ({
+        SmallVec::from_slice(&[$($x),*])
+    });
+}
+
 /// Common operations implemented by both `Vec` and `SmallVec`.
 ///
 /// This can be used to write generic code that works with both `Vec` and `SmallVec`.
