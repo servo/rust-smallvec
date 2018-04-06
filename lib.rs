@@ -747,6 +747,19 @@ impl<A: Array> SmallVec<A> where A::Item: Clone {
             self.truncate(len);
         }
     }
+
+    /// Creates a `SmallVec` with `n` copies of `elem`.
+    /// ```
+    /// use smallvec::SmallVec;
+    /// 
+    /// let v = SmallVec::<[char; 128]>::from_elem('d', 2);
+    /// assert_eq!(v, SmallVec::from_buf(['d', 'd']));
+    /// ```
+    pub fn from_elem(elem: A::Item, n: usize) -> Self {
+        let mut v = SmallVec::with_capacity(n);
+        v.insert_many(0, (0..n).map(|_| elem.clone()));
+        v
+    }
 }
 
 impl<A: Array> ops::Deref for SmallVec<A> {
