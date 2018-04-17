@@ -12,6 +12,7 @@ documentation = "http://doc.servo.org/smallvec/"
 
 [features]
 std = []
+union = []
 default = ["std"]
 
 [lib]
