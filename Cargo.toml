@@ -12,6 +12,7 @@ documentation = "http://doc.servo.org/smallvec/"
 
 [features]
 std = []
+union = []
 default = ["std"]
 
 [lib]
@@ -19,6 +20,8 @@ name = "smallvec"
 path = "lib.rs"
 
 [dependencies]
+unreachable = "1.0.0"
+debug_unreachable = "0.1"
 serde = { version = "1", optional = true }
 
 [dev_dependencies]
