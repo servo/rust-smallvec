@@ -4,8 +4,8 @@
 extern crate smallvec;
 extern crate test;
 
-use smallvec::SmallVec;
 use self::test::Bencher;
+use smallvec::SmallVec;
 
 #[bench]
 fn bench_push(b: &mut Bencher) {
@@ -42,8 +42,11 @@ fn bench_insert(b: &mut Bencher) {
 #[bench]
 fn bench_insert_many(b: &mut Bencher) {
     #[inline(never)]
-    fn insert_many_noinline<I: IntoIterator<Item=u64>>(
-        vec: &mut SmallVec<[u64; 16]>, index: usize, iterable: I) {
+    fn insert_many_noinline<I: IntoIterator<Item = u64>>(
+        vec: &mut SmallVec<[u64; 16]>,
+        index: usize,
+        iterable: I,
+    ) {
         vec.insert_many(index, iterable)
     }
 
