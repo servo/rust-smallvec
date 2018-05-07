@@ -637,6 +637,10 @@ impl<A: Array> SmallVec<A> {
     /// back.
     pub fn insert_many<I: IntoIterator<Item=A::Item>>(&mut self, index: usize, iterable: I) {
         let iter = iterable.into_iter();
+        if index == self.len() {
+            return self.extend(iter);
+        }
+
         let (lower_size_bound, _) = iter.size_hint();
         assert!(lower_size_bound <= std::isize::MAX as usize);  // Ensure offset is indexable
         assert!(index + lower_size_bound >= index);  // Protect against overflow
@@ -805,9 +809,23 @@ impl<A: Array> SmallVec<A> where A::Item: Clone {
     /// assert_eq!(v, SmallVec::from_buf(['d', 'd']));
     /// ```
     pub fn from_elem(elem: A::Item, n: usize) -> Self {
-        let mut v = SmallVec::with_capacity(n);
-        v.insert_many(0, (0..n).map(|_| elem.clone()));
-        v
+        if n > A::size() {
+            ::std::vec::from_elem(elem, n).into()
+        } else {
+            unsafe {
+                let mut arr: A = ::std::mem::uninitialized();
+                let ptr = arr.ptr_mut();
+
+                for i in 0..n as isize {
+                    ::std::ptr::write(ptr.offset(i), elem.clone());
+                }
+
+                SmallVec {
+                    data: Inline { array: arr },
+                    len: n,
+                }
+            }
+        }
     }
 }
 
@@ -1001,13 +1019,30 @@ impl<A: Array> FromIterator<A::Item> for SmallVec<A> {
 
 impl<A: Array> Extend<A::Item> for SmallVec<A> {
     fn extend<I: IntoIterator<Item=A::Item>>(&mut self, iterable: I) {
-        let iter = iterable.into_iter();
+        let mut iter = iterable.into_iter();
         let (lower_size_bound, _) = iter.size_hint();
 
         let target_len = self.len + lower_size_bound;
 
         if target_len > self.capacity() {
-           self.grow(target_len);
+            self.grow(target_len);
+        }
+
+        unsafe {
+            let ptr = self.as_mut_ptr().offset(self.len() as isize);
+
+            let len = self.len();
+            let mut count = 0;
+            for p in 0..lower_size_bound as isize {
+                if let Some(out) = iter.next() {
+                    ::std::ptr::write(ptr.offset(p), out);
+                    count += 1;
+                } else {
+                    break;
+                }
+            }
+
+            self.set_len(len + count);
         }
 
         for elem in iter {
