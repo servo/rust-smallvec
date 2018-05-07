@@ -21,7 +21,7 @@
 
 
 #[cfg(not(feature = "std"))]
-#[cfg_attr(test, macro_use)]
+#[macro_use]
 extern crate alloc;
 
 #[cfg(not(feature = "std"))]
