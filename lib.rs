@@ -810,7 +810,7 @@ impl<A: Array> SmallVec<A> where A::Item: Clone {
     /// ```
     pub fn from_elem(elem: A::Item, n: usize) -> Self {
         if n > A::size() {
-            ::std::vec::from_elem(elem, n).into()
+            vec![elem; n].into()
         } else {
             unsafe {
                 let mut arr: A = ::std::mem::uninitialized();
