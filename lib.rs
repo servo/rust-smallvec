@@ -99,7 +99,7 @@ macro_rules! smallvec {
     ($elem:expr; $n:expr) => ({
         SmallVec::from_elem($elem, $n)
     });
-    ($($x:expr),*) => ({
+    ($($x:expr),*$(,)*) => ({
         SmallVec::from_slice(&[$($x),*])
     });
 }
