@@ -8,11 +8,13 @@ use self::test::Bencher;
 use smallvec::{ExtendFromSlice, SmallVec};
 
 const VEC_SIZE: usize = 16;
+const SPILLED_SIZE: usize = 100;
 
 trait Vector<T>: for<'a> From<&'a [T]> + Extend<T> + ExtendFromSlice<T> {
     fn new() -> Self;
     fn push(&mut self, val: T);
     fn pop(&mut self) -> Option<T>;
+    fn remove(&mut self, p: usize) -> T;
     fn insert(&mut self, n: usize, val: T);
     fn from_elem(val: T, n: usize) -> Self;
 }
@@ -21,15 +23,23 @@ impl<T: Copy> Vector<T> for Vec<T> {
     fn new() -> Self {
         Self::with_capacity(VEC_SIZE)
     }
+
     fn push(&mut self, val: T) {
         self.push(val)
     }
+
     fn pop(&mut self) -> Option<T> {
         self.pop()
     }
+
+    fn remove(&mut self, p: usize) -> T {
+        self.remove(p)
+    }
+
     fn insert(&mut self, n: usize, val: T) {
         self.insert(n, val)
     }
+
     fn from_elem(val: T, n: usize) -> Self {
         vec![val; n]
     }
@@ -39,15 +49,23 @@ impl<T: Copy> Vector<T> for SmallVec<[T; VEC_SIZE]> {
     fn new() -> Self {
         Self::new()
     }
+
     fn push(&mut self, val: T) {
         self.push(val)
     }
+
     fn pop(&mut self) -> Option<T> {
         self.pop()
     }
+
+    fn remove(&mut self, p: usize) -> T {
+        self.remove(p)
+    }
+
     fn insert(&mut self, n: usize, val: T) {
         self.insert(n, val)
     }
+
     fn from_elem(val: T, n: usize) -> Self {
         smallvec![val; n]
     }
@@ -66,17 +84,19 @@ macro_rules! make_benches {
 
 make_benches! {
     SmallVec<[u64; VEC_SIZE]> {
-        bench_push => gen_push(100),
+        bench_push => gen_push(SPILLED_SIZE as _),
         bench_push_small => gen_push(VEC_SIZE as _),
-        bench_insert => gen_insert(100),
+        bench_insert => gen_insert(SPILLED_SIZE as _),
         bench_insert_small => gen_insert(VEC_SIZE as _),
-        bench_extend => gen_extend(100),
+        bench_remove => gen_remove(SPILLED_SIZE as _),
+        bench_remove_small => gen_remove(VEC_SIZE as _),
+        bench_extend => gen_extend(SPILLED_SIZE as _),
         bench_extend_small => gen_extend(VEC_SIZE as _),
-        bench_from_slice => gen_from_slice(100),
+        bench_from_slice => gen_from_slice(SPILLED_SIZE as _),
         bench_from_slice_small => gen_from_slice(VEC_SIZE as _),
-        bench_extend_from_slice => gen_extend_from_slice(100),
+        bench_extend_from_slice => gen_extend_from_slice(SPILLED_SIZE as _),
         bench_extend_from_slice_small => gen_extend_from_slice(VEC_SIZE as _),
-        bench_macro_from_elem => gen_from_elem(100),
+        bench_macro_from_elem => gen_from_elem(SPILLED_SIZE as _),
         bench_macro_from_elem_small => gen_from_elem(VEC_SIZE as _),
         bench_pushpop => gen_pushpop(),
     }
@@ -84,17 +104,19 @@ make_benches! {
 
 make_benches! {
     Vec<u64> {
-        bench_push_vec => gen_push(100),
+        bench_push_vec => gen_push(SPILLED_SIZE as _),
         bench_push_vec_small => gen_push(VEC_SIZE as _),
-        bench_insert_vec => gen_insert(100),
+        bench_insert_vec => gen_insert(SPILLED_SIZE as _),
         bench_insert_vec_small => gen_insert(VEC_SIZE as _),
-        bench_extend_vec => gen_extend(100),
+        bench_remove_vec => gen_remove(SPILLED_SIZE as _),
+        bench_remove_vec_small => gen_remove(VEC_SIZE as _),
+        bench_extend_vec => gen_extend(SPILLED_SIZE as _),
         bench_extend_vec_small => gen_extend(VEC_SIZE as _),
-        bench_from_slice_vec => gen_from_slice(100),
+        bench_from_slice_vec => gen_from_slice(SPILLED_SIZE as _),
         bench_from_slice_vec_small => gen_from_slice(VEC_SIZE as _),
-        bench_extend_from_slice_vec => gen_extend_from_slice(100),
+        bench_extend_from_slice_vec => gen_extend_from_slice(SPILLED_SIZE as _),
         bench_extend_from_slice_vec_small => gen_extend_from_slice(VEC_SIZE as _),
-        bench_macro_from_elem_vec => gen_from_elem(100),
+        bench_macro_from_elem_vec => gen_from_elem(SPILLED_SIZE as _),
         bench_macro_from_elem_vec_small => gen_from_elem(VEC_SIZE as _),
         bench_pushpop_vec => gen_pushpop(),
     }
@@ -117,16 +139,35 @@ fn gen_push<V: Vector<u64>>(n: u64, b: &mut Bencher) {
 
 fn gen_insert<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     #[inline(never)]
-    fn insert_noinline<V: Vector<u64>>(vec: &mut V, x: u64) {
-        vec.insert(0, x)
+    fn insert_noinline<V: Vector<u64>>(vec: &mut V, p: usize, x: u64) {
+        vec.insert(p, x)
     }
 
     b.iter(|| {
         let mut vec = V::new();
+        // Add one element, with each iteration we insert one before the end.
+        // This means that we benchmark the insertion operation and not the
+        // time it takes to `ptr::copy` the data.
+        vec.push(0);
         for x in 0..n {
-            insert_noinline(&mut vec, x);
+            insert_noinline(&mut vec, x as _, x);
         }
         vec
+    });
+}
+
+fn gen_remove<V: Vector<u64>>(n: usize, b: &mut Bencher) {
+    #[inline(never)]
+    fn remove_noinline<V: Vector<u64>>(vec: &mut V, p: usize) {
+        vec.remove(p);
+    }
+
+    b.iter(|| {
+        let mut vec = V::from_elem(0, n as _);
+
+        for x in (0..n - 1).rev() {
+            remove_noinline(&mut vec, x)
+        }
     });
 }
 
@@ -157,14 +198,14 @@ fn gen_extend_from_slice<V: Vector<u64>>(n: u64, b: &mut Bencher) {
 
 fn gen_pushpop<V: Vector<u64>>(b: &mut Bencher) {
     #[inline(never)]
-    fn pushpop_noinline<V: Vector<u64>>(vec: &mut V, x: u64) {
+    fn pushpop_noinline<V: Vector<u64>>(vec: &mut V, x: u64) -> Option<u64> {
         vec.push(x);
-        vec.pop();
+        vec.pop()
     }
 
     b.iter(|| {
         let mut vec = V::new();
-        for x in 0..100 {
+        for x in 0..SPILLED_SIZE as _ {
             pushpop_noinline(&mut vec, x);
         }
         vec
@@ -191,15 +232,15 @@ fn bench_insert_many(b: &mut Bencher) {
 
     b.iter(|| {
         let mut vec = SmallVec::<[u64; VEC_SIZE]>::new();
-        insert_many_noinline(&mut vec, 0, 0..100);
-        insert_many_noinline(&mut vec, 0, 0..100);
+        insert_many_noinline(&mut vec, 0, 0..SPILLED_SIZE as _);
+        insert_many_noinline(&mut vec, 0, 0..SPILLED_SIZE as _);
         vec
     });
 }
 
 #[bench]
 fn bench_insert_from_slice(b: &mut Bencher) {
-    let v: Vec<u64> = (0..100).collect();
+    let v: Vec<u64> = (0..SPILLED_SIZE as _).collect();
     b.iter(|| {
         let mut vec = SmallVec::<[u64; VEC_SIZE]>::new();
         vec.insert_from_slice(0, &v);
