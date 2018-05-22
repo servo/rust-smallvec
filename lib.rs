@@ -14,6 +14,17 @@
 //!
 //! To depend on `smallvec` without `libstd`, use `default-features = false` in the `smallvec`
 //! section of Cargo.toml to disable its `"std"` feature.
+//!
+//! ## `union` feature
+//!
+//! When the `union` feature is enabled `smallvec` will track its state (inline or spilled)
+//! without the use of an enum tag, reducing the size of the `smallvec` by one machine word.
+//! This means that there is potentially no space overhead compared to `Vec`.
+//! Note that `smallvec` can still be larger than `Vec` if the inline buffer is larger than two
+//! machine words.
+//!
+//! To use this feature add `features = ["uuid"]` in the `smallvec` section of Cargo.toml.
+//! Note that this feature requires a nightly compiler (for now).
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc))]
