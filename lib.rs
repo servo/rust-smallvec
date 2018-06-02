@@ -45,10 +45,6 @@ extern crate serde;
 extern crate unreachable;
 use unreachable::UncheckedOptionExt;
 
-#[cfg(not(feature = "union"))]
-#[macro_use]
-extern crate debug_unreachable;
-
 #[cfg(not(feature = "std"))]
 mod std {
     pub use core::*;
@@ -121,6 +117,19 @@ macro_rules! smallvec {
     ($($x:expr),*$(,)*) => ({
         SmallVec::from_slice(&[$($x),*])
     });
+}
+
+/// `panic!()` in debug builds, optimization hint in release.
+#[cfg(not(feature = "union"))]
+macro_rules! debug_unreachable {
+    () => { debug_unreachable!("entered unreachable code") };
+    ($e:expr) => {
+        if cfg!(not(debug_assertions)) {
+            unreachable::unreachable();
+        } else {
+            panic!($e);
+        }
+    }
 }
 
 /// Common operations implemented by both `Vec` and `SmallVec`.
@@ -370,6 +379,9 @@ unsafe impl<A: Array + Sync> Sync for SmallVecData<A> {}
 /// assert!(v.spilled());
 /// ```
 pub struct SmallVec<A: Array> {
+    // The capacity field is used to determine which of the storage variants is active:
+    // If capacity <= A::size() then the inline variant is used and capacity holds the current length of the vector (number of elements actually in use).
+    // If capacity > A::size() then the heap variant is used and capacity holds the size of the memory allocation.
     capacity: usize,
     data: SmallVecData<A>,
 }
@@ -406,8 +418,9 @@ impl<A: Array> SmallVec<A> {
         v
     }
 
-    /// Construct a new `SmallVec` from a `Vec<A::Item>` without copying
-    /// elements.
+    /// Construct a new `SmallVec` from a `Vec<A::Item>`.
+    ///
+    /// Elements will be copied to the inline buffer if vec.capacity() <= A::size().
     ///
     /// ```rust
     /// use smallvec::SmallVec;
@@ -495,6 +508,8 @@ impl<A: Array> SmallVec<A> {
         self.triple().2
     }
 
+    /// Returns a tuple with (data ptr, len, capacity)
+    /// Useful to get all SmallVec properties with a single check of the current storage variant.
     #[inline]
     fn triple(&self) -> (*const A::Item, usize, usize) {
         unsafe {
@@ -507,6 +522,7 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
+    /// Returns a tuple with (data ptr, len ptr, capacity)
     #[inline]
     fn triple_mut(&mut self) -> (*mut A::Item, &mut usize, usize) {
         unsafe {
@@ -666,7 +682,7 @@ impl<A: Array> SmallVec<A> {
             while len < *len_ptr {
                 let last_index = *len_ptr - 1;
                 *len_ptr = last_index;
-                ptr::read(ptr.offset(last_index as isize));
+                ptr::drop_in_place(ptr.offset(last_index as isize));
             }
         }
     }
@@ -1168,9 +1184,9 @@ impl<A: Array> Drop for SmallVec<A> {
                 let (ptr, len) = self.data.heap();
                 Vec::from_raw_parts(ptr, len, self.capacity);
             } else {
-                let ptr = self.as_ptr();
+                let ptr = self.as_mut_ptr();
                 for i in 0..self.len() {
-                    ptr::read(ptr.offset(i as isize));
+                    ptr::drop_in_place(ptr.offset(i as isize));
                 }
             }
         }
