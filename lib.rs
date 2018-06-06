@@ -1186,10 +1186,7 @@ impl<A: Array> Drop for SmallVec<A> {
                 let (ptr, len) = self.data.heap();
                 Vec::from_raw_parts(ptr, len, self.capacity);
             } else {
-                let ptr = self.as_mut_ptr();
-                for i in 0..self.len() {
-                    ptr::drop_in_place(ptr.offset(i as isize));
-                }
+                ptr::drop_in_place(&mut self[..]);
             }
         }
     }
