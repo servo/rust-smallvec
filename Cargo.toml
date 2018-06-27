@@ -24,4 +24,4 @@ unreachable = "1.0.0"
 serde = { version = "1", optional = true }
 
 [dev_dependencies]
-bincode = "0.8"
+bincode = "1.0.1"
