@@ -771,24 +771,33 @@ impl<A: Array> SmallVec<A> {
         unsafe {
             let old_len = self.len();
             assert!(index <= old_len);
-            let ptr = self.as_mut_ptr().offset(index as isize);
+            let mut ptr = self.as_mut_ptr().offset(index as isize);
+
+            // Move the trailing elements.
             ptr::copy(ptr, ptr.offset(lower_size_bound as isize), old_len - index);
-            for (off, element) in iter.enumerate() {
-                if off < lower_size_bound {
-                    ptr::write(ptr.offset(off as isize), element);
-                    let len = self.len() + 1;
-                    self.set_len(len);
-                } else {
-                    // Iterator provided more elements than the hint.
-                    assert!(index + off >= index);  // Protect against overflow.
-                    self.insert(index + off, element);
+
+            // In case the iterator panics, don't double-drop the items we just copied above.
+            self.set_len(index);
+
+            let mut num_added = 0;
+            for element in iter {
+                let mut cur = ptr.offset(num_added as isize);
+                if num_added >= lower_size_bound {
+                    // Iterator provided more elements than the hint.  Move trailing items again.
+                    self.reserve(1);
+                    ptr = self.as_mut_ptr().offset(index as isize);
+                    cur = ptr.offset(num_added as isize);
+                    ptr::copy(cur, cur.offset(1), old_len - index);
                 }
+                ptr::write(cur, element);
+                num_added += 1;
             }
-            let num_added = self.len() - old_len;
             if num_added < lower_size_bound {
                 // Iterator provided fewer elements than the hint
                 ptr::copy(ptr.offset(lower_size_bound as isize), ptr.offset(num_added as isize), old_len - index);
             }
+
+            self.set_len(old_len + num_added);
         }
     }
 
@@ -1643,6 +1652,37 @@ mod tests {
         assert_eq!(v.len(), 4);
         v.insert_many(1, MockHintIter{x: [5, 6].iter().cloned(), hint: 1});
         assert_eq!(&v.iter().map(|v| *v).collect::<Vec<_>>(), &[0, 5, 6, 1, 2, 3]);
+    }
+
+    #[test]
+    // https://github.com/servo/rust-smallvec/issues/96
+    fn test_insert_many_panic() {
+        struct PanicOnDoubleDrop {
+            dropped: Box<bool>
+        }
+
+        impl Drop for PanicOnDoubleDrop {
+            fn drop(&mut self) {
+                assert!(!*self.dropped, "already dropped");
+                *self.dropped = true;
+            }
+        }
+
+        struct BadIter;
+        impl Iterator for BadIter {
+            type Item = PanicOnDoubleDrop;
+            fn size_hint(&self) -> (usize, Option<usize>) { (1, None) }
+            fn next(&mut self) -> Option<Self::Item> { panic!() }
+        }
+
+        let mut vec: SmallVec<[PanicOnDoubleDrop; 0]> = vec![
+            PanicOnDoubleDrop { dropped: Box::new(false) },
+            PanicOnDoubleDrop { dropped: Box::new(false) },
+        ].into();
+        let result = ::std::panic::catch_unwind(move || {
+            vec.insert_many(0, BadIter);
+        });
+        assert!(result.is_err());
     }
 
     #[test]
