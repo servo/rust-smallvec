@@ -946,19 +946,17 @@ impl<A: Array> SmallVec<A> where A::Item: Clone {
         if n > A::size() {
             vec![elem; n].into()
         } else {
+            let mut v = SmallVec::<A>::new();
             unsafe {
-                let mut arr: A = ::std::mem::uninitialized();
-                let ptr = arr.ptr_mut();
+                let (ptr, len_ptr, _) = v.triple_mut();
+                let mut local_len = SetLenOnDrop::new(len_ptr);
 
                 for i in 0..n as isize {
                     ::std::ptr::write(ptr.offset(i), elem.clone());
-                }
-
-                SmallVec {
-                    capacity: n,
-                    data: SmallVecData::from_inline(arr),
+                    local_len.increment_len(1);
                 }
             }
+            v
         }
     }
 }
@@ -1344,6 +1342,33 @@ pub unsafe trait Array {
     fn ptr(&self) -> *const Self::Item;
     /// Returns a mutable pointer to the first element of the array.
     fn ptr_mut(&mut self) -> *mut Self::Item;
+}
+
+/// Set the length of the vec when the `SetLenOnDrop` value goes out of scope.
+///
+/// Copied from https://github.com/rust-lang/rust/pull/36355
+struct SetLenOnDrop<'a> {
+    len: &'a mut usize,
+    local_len: usize,
+}
+
+impl<'a> SetLenOnDrop<'a> {
+    #[inline]
+    fn new(len: &'a mut usize) -> Self {
+        SetLenOnDrop { local_len: *len, len: len }
+    }
+
+    #[inline]
+    fn increment_len(&mut self, increment: usize) {
+        self.local_len += increment;
+    }
+}
+
+impl<'a> Drop for SetLenOnDrop<'a> {
+    #[inline]
+    fn drop(&mut self) {
+        *self.len = self.local_len;
+    }
 }
 
 macro_rules! impl_array(
