@@ -113,11 +113,20 @@ use std::marker::PhantomData;
 
 #[macro_export]
 macro_rules! smallvec {
+    // count helper: transform any expression into 1
+    (@one $x:expr) => (1usize);
     ($elem:expr; $n:expr) => ({
-        SmallVec::from_elem($elem, $n)
+        $crate::SmallVec::from_elem($elem, $n)
     });
     ($($x:expr),*$(,)*) => ({
-        SmallVec::from_slice(&[$($x),*])
+        let count = 0usize $(+ smallvec!(@one $x))*;
+        let mut vec = $crate::SmallVec::new();
+        if count <= vec.inline_size() {
+            $(vec.push($x);)*
+            vec
+        } else {
+            $crate::SmallVec::from_vec(vec![$($x,)*])
+        }
     });
 }
 
