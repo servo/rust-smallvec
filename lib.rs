@@ -1184,7 +1184,7 @@ impl<A: Array> Extend<A::Item> for SmallVec<A> {
 
 impl<A: Array> fmt::Debug for SmallVec<A> where A::Item: fmt::Debug {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", &**self)
+        f.debug_list().entries(self.iter()).finish()
     }
 }
 
