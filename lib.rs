@@ -240,14 +240,7 @@ impl<'a, T: 'a> Iterator for Drain<'a,T> {
 
     #[inline]
     fn next(&mut self) -> Option<T> {
-        match self.iter.next() {
-            None => None,
-            Some(reference) => {
-                unsafe {
-                    Some(ptr::read(reference))
-                }
-            }
-        }
+        self.iter.next().map(|reference| unsafe { ptr::read(reference) })
     }
 
     #[inline]
@@ -259,14 +252,7 @@ impl<'a, T: 'a> Iterator for Drain<'a,T> {
 impl<'a, T: 'a> DoubleEndedIterator for Drain<'a, T> {
     #[inline]
     fn next_back(&mut self) -> Option<T> {
-        match self.iter.next_back() {
-            None => None,
-            Some(reference) => {
-                unsafe {
-                    Some(ptr::read(reference))
-                }
-            }
-        }
+        self.iter.next_back().map(|reference| unsafe { ptr::read(reference) })
     }
 }
 
@@ -602,15 +588,14 @@ impl<A: Array> SmallVec<A> {
     pub fn grow(&mut self, new_cap: usize) {
         unsafe {
             let (ptr, &mut len, cap) = self.triple_mut();
-            let spilled = self.spilled();
+            let unspilled = !self.spilled();
             assert!(new_cap >= len);
             if new_cap <= self.inline_size() {
-                if !spilled {
+                if unspilled {
                     return;
                 }
                 self.data = SmallVecData::from_inline(mem::uninitialized());
                 ptr::copy_nonoverlapping(ptr, self.data.inline_mut().ptr_mut(), len);
-                deallocate(ptr, cap);
             } else if new_cap != cap {
                 let mut vec = Vec::with_capacity(new_cap);
                 let new_alloc = vec.as_mut_ptr();
@@ -618,10 +603,11 @@ impl<A: Array> SmallVec<A> {
                 ptr::copy_nonoverlapping(ptr, new_alloc, len);
                 self.data = SmallVecData::from_heap(new_alloc, len);
                 self.capacity = new_cap;
-                if spilled {
-                    deallocate(ptr, cap);
+                if unspilled {
+                    return;
                 }
             }
+            deallocate(ptr, cap);
         }
     }
 
