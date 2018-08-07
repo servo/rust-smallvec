@@ -560,7 +560,7 @@ impl<A: Array> SmallVec<A> {
         unsafe {
             let (_, &mut len, cap) = self.triple_mut();
             if len == cap {
-                self.grow(cmp::max(cap * 2, 1))
+                self.reserve(1);
             }
             let (ptr, len_ptr, _) = self.triple_mut();
             *len_ptr = len + 1;
@@ -618,6 +618,7 @@ impl<A: Array> SmallVec<A> {
     /// If the new capacity would overflow `usize` then it will be set to `usize::max_value()`
     /// instead. (This means that inserting `additional` new elements is not guaranteed to be
     /// possible after calling this function.)
+    #[inline]
     pub fn reserve(&mut self, additional: usize) {
         // prefer triple_mut() even if triple() would work
         // so that the optimizer removes duplicated calls to it
