@@ -287,6 +287,8 @@ impl<A: Array> SmallVecData<A> {
         SmallVecData { inline }
     }
     #[inline]
+    unsafe fn into_inline(self) -> A { self.inline }
+    #[inline]
     unsafe fn heap(&self) -> (*mut A::Item, usize) {
         self.heap
     }
@@ -325,6 +327,13 @@ impl<A: Array> SmallVecData<A> {
     #[inline]
     fn from_inline(inline: A) -> SmallVecData<A> {
         SmallVecData::Inline(ManuallyDrop::new(inline))
+    }
+    #[inline]
+    unsafe fn into_inline(self) -> A {
+        match self {
+            SmallVecData::Inline(a) => ManuallyDrop::into_inner(a),
+            _ => debug_unreachable!(),
+        }
     }
     #[inline]
     unsafe fn heap(&self) -> (*mut A::Item, usize) {
@@ -809,6 +818,19 @@ impl<A: Array> SmallVec<A> {
             }
         } else {
             self.into_iter().collect()
+        }
+    }
+
+    /// If the SmallVec has not spilled onto the heap, convert it into an `A`. Otherwise return `Err(Self)`.
+    pub fn into_inner(mut self) -> Result<A, Self> {
+        if self.spilled() {
+            Err(self)
+        } else {
+            unsafe {
+                let data = mem::replace(&mut self.data, SmallVecData::from_inline(mem::uninitialized()));
+                mem::forget(self);
+                Ok(data.into_inline())
+            }
         }
     }
 
@@ -1943,6 +1965,15 @@ mod tests {
 
         let vec = SmallVec::<[u8; 2]>::from_iter(0..3);
         assert_eq!(vec.into_vec(), vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn test_into_inner() {
+        let vec = SmallVec::<[u8; 2]>::from_iter(0..2);
+        assert_eq!(vec.into_inner(), Ok([0, 1]));
+
+        let vec = SmallVec::<[u8; 2]>::from_iter(0..3);
+        assert_eq!(vec.clone().into_inner(), Err(vec));
     }
 
     #[test]
