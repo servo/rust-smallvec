@@ -821,16 +821,16 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
-    pub fn into_inner(mut self) -> Result<A, Self> {
     /// Convert the SmallVec into an `A` if possible. Otherwise return `Err(Self)`.
     ///
     /// This method returns `Err(Self)` if the SmallVec is too short (and the `A` contains uninitialized elements),
     /// or if the SmallVec is too long (and all the elements were spilled to the heap).
+    pub fn into_inner(self) -> Result<A, Self> {
         if self.spilled() || self.len() != A::size() {
             Err(self)
         } else {
             unsafe {
-                let data = mem::replace(&mut self.data, SmallVecData::from_inline(mem::uninitialized()));
+                let data = ptr::read(&self.data);
                 mem::forget(self);
                 Ok(data.into_inline())
             }
