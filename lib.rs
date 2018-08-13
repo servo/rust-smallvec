@@ -821,9 +821,12 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
-    /// If the SmallVec has not spilled onto the heap, convert it into an `A`. Otherwise return `Err(Self)`.
     pub fn into_inner(mut self) -> Result<A, Self> {
-        if self.spilled() {
+    /// Convert the SmallVec into an `A` if possible. Otherwise return `Err(Self)`.
+    ///
+    /// This method returns `Err(Self)` if the SmallVec is too short (and the `A` contains uninitialized elements),
+    /// or if the SmallVec is too long (and all the elements were spilled to the heap).
+        if self.spilled() || self.len() != A::size() {
             Err(self)
         } else {
             unsafe {
@@ -1971,6 +1974,9 @@ mod tests {
     fn test_into_inner() {
         let vec = SmallVec::<[u8; 2]>::from_iter(0..2);
         assert_eq!(vec.into_inner(), Ok([0, 1]));
+
+        let vec = SmallVec::<[u8; 2]>::from_iter(0..1);
+        assert_eq!(vec.clone().into_inner(), Err(vec));
 
         let vec = SmallVec::<[u8; 2]>::from_iter(0..3);
         assert_eq!(vec.clone().into_inner(), Err(vec));
