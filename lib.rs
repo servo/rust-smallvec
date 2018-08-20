@@ -480,6 +480,47 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
+    /// Constructs a new `SmallVec` on the stack from an `A` without
+    /// copying elements. Also sets the length, which must be less or
+    /// equal to the size of `buf`.
+    ///
+    /// ```rust
+    /// use smallvec::SmallVec;
+    ///
+    /// let buf = [1, 2, 3, 4, 5, 0, 0, 0];
+    /// let small_vec: SmallVec<_> = SmallVec::from_buf_and_len(buf, 5);
+    ///
+    /// assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
+    /// ```
+    #[inline]
+    pub fn from_buf_and_len(buf: A, len: usize) -> SmallVec<A> {
+        assert!(len <= A::size());
+        unsafe { SmallVec::from_buf_and_len_unchecked(buf, len) }
+    }
+
+    /// Constructs a new `SmallVec` on the stack from an `A` without
+    /// copying elements. Also sets the length. The user is responsible
+    /// for ensuring that `len <= A::size()`.
+    ///
+    /// ```rust
+    /// use smallvec::SmallVec;
+    ///
+    /// let buf = [1, 2, 3, 4, 5, 0, 0, 0];
+    /// let small_vec: SmallVec<_> = unsafe {
+    ///     SmallVec::from_buf_and_len_unchecked(buf, 5)
+    /// };
+    ///
+    /// assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
+    /// ```
+    #[inline]
+    pub unsafe fn from_buf_and_len_unchecked(buf: A, len: usize) -> SmallVec<A> {
+        SmallVec {
+            capacity: len,
+            data: SmallVecData::from_inline(buf),
+        }
+    }
+
+
     /// Sets the length of a vector.
     ///
     /// This will explicitly set the size of the vector, without actually
