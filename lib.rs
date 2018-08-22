@@ -946,9 +946,25 @@ impl<A: Array> SmallVec<A> where A::Item: Copy {
     ///
     /// For slices of `Copy` types, this is more efficient than `SmallVec::from(slice)`.
     pub fn from_slice(slice: &[A::Item]) -> Self {
-        let mut vec = Self::new();
-        vec.extend_from_slice(slice);
-        vec
+        let len = slice.len();
+        if len <= A::size() {
+            SmallVec {
+                capacity: len,
+                data: SmallVecData::from_inline(unsafe {
+                    let mut data: A = mem::uninitialized();
+                    ptr::copy_nonoverlapping(slice.as_ptr(), data.ptr_mut(), len);
+                    data
+                })
+            }
+        } else {
+            let mut b = slice.to_vec();
+            let ptr = b.as_mut_ptr();
+            mem::forget(b);
+            SmallVec {
+                capacity: len,
+                data: SmallVecData::from_heap(ptr, len),
+            }
+        }
     }
 
     /// Copy elements from a slice into the vector at position `index`, shifting any following
