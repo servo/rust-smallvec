@@ -1700,6 +1700,7 @@ mod tests {
         assert_eq!(&v.iter().map(|v| *v).collect::<Vec<_>>(), &[0, 5, 6, 1, 2, 3]);
     }
 
+    #[cfg(feature = "std")]
     #[test]
     // https://github.com/servo/rust-smallvec/issues/96
     fn test_insert_many_panic() {
