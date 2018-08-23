@@ -958,10 +958,10 @@ impl<A: Array> SmallVec<A> where A::Item: Copy {
             }
         } else {
             let mut b = slice.to_vec();
-            let ptr = b.as_mut_ptr();
+            let (ptr, cap) = (b.as_mut_ptr(), b.capacity());
             mem::forget(b);
             SmallVec {
-                capacity: len,
+                capacity: cap,
                 data: SmallVecData::from_heap(ptr, len),
             }
         }
