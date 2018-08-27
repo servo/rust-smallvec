@@ -31,6 +31,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(not(feature = "std"), feature(alloc))]
 #![cfg_attr(feature = "union", feature(untagged_unions))]
+#![cfg_attr(feature = "specialization", feature(specialization))]
 #![deny(missing_docs)]
 
 
@@ -1157,9 +1158,24 @@ where A::Item: Deserialize<'de>,
 }
 
 impl<'a, A: Array> From<&'a [A::Item]> for SmallVec<A> where A::Item: Clone {
+    #[cfg(not(feature = "specialization"))]
     #[inline]
     fn from(slice: &'a [A::Item]) -> SmallVec<A> {
         slice.into_iter().cloned().collect()
+    }
+
+    #[cfg(feature = "specialization")]
+    #[inline]
+    default fn from(slice: &'a [A::Item]) -> SmallVec<A> {
+        slice.into_iter().cloned().collect()
+    }
+}
+
+#[cfg(feature = "specialization")]
+impl<'a, A: Array> From<&'a [A::Item]> for SmallVec<A> where A::Item: Copy {
+    #[inline]
+    fn from(slice: &'a [A::Item]) -> SmallVec<A> {
+        SmallVec::from_slice(slice)
     }
 }
 
