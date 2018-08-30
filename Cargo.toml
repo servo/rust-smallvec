@@ -14,6 +14,7 @@ documentation = "http://doc.servo.org/smallvec/"
 std = []
 union = []
 default = ["std"]
+specialization = []
 
 [lib]
 name = "smallvec"
