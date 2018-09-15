@@ -683,7 +683,7 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
-    /// Reserve the minumum capacity for `additional` more elements to be inserted.
+    /// Reserve the minimum capacity for `additional` more elements to be inserted.
     ///
     /// Panics if the new capacity overflows `usize`.
     pub fn reserve_exact(&mut self, additional: usize) {
