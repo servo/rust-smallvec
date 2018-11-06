@@ -12,5 +12,3 @@ script: |
   ([ $TRAVIS_RUST_VERSION != nightly ] || cargo test --verbose --features union) &&
   ([ $TRAVIS_RUST_VERSION != nightly ] || cargo test --verbose --all-features) &&
   ([ $TRAVIS_RUST_VERSION != nightly ] || cargo bench --verbose bench)
-notifications:
-  webhooks: http://build.servo.org:54856/travis
