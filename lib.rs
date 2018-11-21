@@ -32,6 +32,7 @@
 #![cfg_attr(not(feature = "std"), feature(alloc))]
 #![cfg_attr(feature = "union", feature(untagged_unions))]
 #![cfg_attr(feature = "specialization", feature(specialization))]
+#![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 #![deny(missing_docs)]
 
 
@@ -1374,6 +1375,21 @@ impl<A: Array> Default for SmallVec<A> {
     }
 }
 
+#[cfg(feature = "may_dangle")]
+unsafe impl<#[may_dangle] A: Array> Drop for SmallVec<A> {
+    fn drop(&mut self) {
+        unsafe {
+            if self.spilled() {
+                let (ptr, len) = self.data.heap();
+                Vec::from_raw_parts(ptr, len, self.capacity);
+            } else {
+                ptr::drop_in_place(&mut self[..]);
+            }
+        }
+    }
+}
+
+#[cfg(not(feature = "may_dangle"))]
 impl<A: Array> Drop for SmallVec<A> {
     fn drop(&mut self) {
         unsafe {

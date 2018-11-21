@@ -15,6 +15,7 @@ std = []
 union = []
 default = ["std"]
 specialization = []
+may_dangle = []
 
 [lib]
 name = "smallvec"
