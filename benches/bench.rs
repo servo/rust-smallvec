@@ -9,10 +9,12 @@ use smallvec::{ExtendFromSlice, SmallVec};
 
 const VEC_SIZE: usize = 16;
 const SPILLED_SIZE: usize = 100;
+const LARGE_SIZE: usize = 10000;
 
 trait Vector<T>: for<'a> From<&'a [T]> + Extend<T> + ExtendFromSlice<T> {
     fn new() -> Self;
     fn push(&mut self, val: T);
+    fn push_light(&mut self, val: T);
     fn pop(&mut self) -> Option<T>;
     fn remove(&mut self, p: usize) -> T;
     fn insert(&mut self, n: usize, val: T);
@@ -28,6 +30,8 @@ impl<T: Copy> Vector<T> for Vec<T> {
     fn push(&mut self, val: T) {
         self.push(val)
     }
+
+    fn push_light(&mut self, val: T) {}
 
     fn pop(&mut self) -> Option<T> {
         self.pop()
@@ -58,6 +62,14 @@ impl<T: Copy> Vector<T> for SmallVec<[T; VEC_SIZE]> {
     fn push(&mut self, val: T) {
         self.push(val)
     }
+
+    #[cfg(feature = "push_light")]
+    fn push_light(&mut self, val: T) {
+        self.push_light(val)
+    }
+
+    #[cfg(not(feature = "push_light"))]
+    fn push_light(&mut self, _: T) {}
 
     fn pop(&mut self) -> Option<T> {
         self.pop()
@@ -93,8 +105,12 @@ macro_rules! make_benches {
 
 make_benches! {
     SmallVec<[u64; VEC_SIZE]> {
-        bench_push => gen_push(SPILLED_SIZE as _),
+        bench_push_light_small => gen_push_light(VEC_SIZE as _),
+        bench_push_light => gen_push_light(SPILLED_SIZE as _),
+        bench_push_light_large => gen_push_light(LARGE_SIZE as _),
         bench_push_small => gen_push(VEC_SIZE as _),
+        bench_push => gen_push(SPILLED_SIZE as _),
+        bench_push_large => gen_push(LARGE_SIZE as _),
         bench_insert => gen_insert(SPILLED_SIZE as _),
         bench_insert_small => gen_insert(VEC_SIZE as _),
         bench_remove => gen_remove(SPILLED_SIZE as _),
@@ -145,6 +161,21 @@ fn gen_push<V: Vector<u64>>(n: u64, b: &mut Bencher) {
         let mut vec = V::new();
         for x in 0..n {
             push_noinline(&mut vec, x);
+        }
+        vec
+    });
+}
+
+fn gen_push_light<V: Vector<u64>>(n: u64, b: &mut Bencher) {
+    #[inline(never)]
+    fn push_light_noinline<V: Vector<u64>>(vec: &mut V, x: u64) {
+        vec.push_light(x);
+    }
+
+    b.iter(|| {
+        let mut vec = V::new();
+        for x in 0..n {
+            push_light_noinline(&mut vec, x);
         }
         vec
     });
