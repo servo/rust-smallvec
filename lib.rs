@@ -60,7 +60,6 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::iter::{IntoIterator, FromIterator, repeat};
 use std::mem;
-#[cfg(not(feature = "union"))]
 use std::mem::ManuallyDrop;
 use std::ops;
 use std::ptr;
@@ -268,9 +267,8 @@ impl<'a, T: 'a> Drop for Drain<'a,T> {
 }
 
 #[cfg(feature = "union")]
-#[allow(unions_with_drop_fields)]
 union SmallVecData<A: Array> {
-    inline: A,
+    inline: ManuallyDrop<A>,
     heap: (*mut A::Item, usize),
 }
 
@@ -286,10 +284,10 @@ impl<A: Array> SmallVecData<A> {
     }
     #[inline]
     fn from_inline(inline: A) -> SmallVecData<A> {
-        SmallVecData { inline }
+        SmallVecData { inline: ManuallyDrop::new(inline) }
     }
     #[inline]
-    unsafe fn into_inline(self) -> A { self.inline }
+    unsafe fn into_inline(self) -> A { ManuallyDrop::into_inner(self.inline) }
     #[inline]
     unsafe fn heap(&self) -> (*mut A::Item, usize) {
         self.heap
