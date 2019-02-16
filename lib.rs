@@ -46,9 +46,6 @@ use alloc::vec::Vec;
 #[cfg(feature = "serde")]
 extern crate serde;
 
-extern crate unreachable;
-use unreachable::UncheckedOptionExt;
-
 #[cfg(not(feature = "std"))]
 mod std {
     pub use core::*;
@@ -131,13 +128,24 @@ macro_rules! smallvec {
     });
 }
 
+/// Hint to the optimizer that any code path which calls this function is
+/// statically unreachable and can be removed.
+///
+/// Equivalent to `std::hint::unreachable_unchecked` but works in older versions of Rust.
+#[inline]
+pub unsafe fn unreachable() -> ! {
+    enum Void {}
+    let x: &Void = mem::transmute(1usize);
+    match *x {}
+}
+
 /// `panic!()` in debug builds, optimization hint in release.
 #[cfg(not(feature = "union"))]
 macro_rules! debug_unreachable {
     () => { debug_unreachable!("entered unreachable code") };
     ($e:expr) => {
         if cfg!(not(debug_assertions)) {
-            unreachable::unreachable();
+            unreachable();
         } else {
             panic!($e);
         }
@@ -758,7 +766,7 @@ impl<A: Array> SmallVec<A> {
     pub fn swap_remove(&mut self, index: usize) -> A::Item {
         let len = self.len();
         self.swap(len - 1, index);
-        unsafe { self.pop().unchecked_unwrap() }
+        self.pop().unwrap_or_else(|| unsafe { unreachable() })
     }
 
     /// Remove all elements from the vector.

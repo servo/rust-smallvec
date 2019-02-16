@@ -22,7 +22,6 @@ name = "smallvec"
 path = "lib.rs"
 
 [dependencies]
-unreachable = "1.0.0"
 serde = { version = "1", optional = true }
 
 [dev_dependencies]
