@@ -55,7 +55,7 @@ use std::borrow::{Borrow, BorrowMut};
 use std::cmp;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::iter::{IntoIterator, FromIterator, repeat};
+use std::iter::{IntoIterator, FromIterator, FusedIterator, repeat};
 use std::mem;
 use std::mem::ManuallyDrop;
 use std::ops;
@@ -266,6 +266,7 @@ impl<'a, T: 'a> DoubleEndedIterator for Drain<'a, T> {
 }
 
 impl<'a, T> ExactSizeIterator for Drain<'a, T> { }
+impl<'a, T> FusedIterator for Drain<'a, T> { }
 
 impl<'a, T: 'a> Drop for Drain<'a,T> {
     fn drop(&mut self) {
@@ -1506,6 +1507,7 @@ impl<A: Array> DoubleEndedIterator for IntoIter<A> {
 }
 
 impl<A: Array> ExactSizeIterator for IntoIter<A> { }
+impl<A: Array> FusedIterator for IntoIter<A> { }
 
 impl<A: Array> IntoIterator for SmallVec<A> {
     type IntoIter = IntoIter<A>;
