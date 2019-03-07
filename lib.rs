@@ -369,7 +369,7 @@ unsafe impl<A: Array + Sync> Sync for SmallVecData<A> {}
 /// A `Vec`-like container that can store a small number of elements inline.
 ///
 /// `SmallVec` acts like a vector, but can store a limited amount of data inline within the
-/// `Smallvec` struct rather than in a separate allocation.  If the data exceeds this limit, the
+/// `SmallVec` struct rather than in a separate allocation.  If the data exceeds this limit, the
 /// `SmallVec` will "spill" its data onto the heap, allocating a new buffer to hold it.
 ///
 /// The amount of data that a `SmallVec` can store inline depends on its backing store. The backing
