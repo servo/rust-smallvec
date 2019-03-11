@@ -55,12 +55,15 @@ use std::borrow::{Borrow, BorrowMut};
 use std::cmp;
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::iter::{IntoIterator, FromIterator, repeat};
+use std::iter::{IntoIterator, FromIterator, FusedIterator, repeat};
 use std::mem;
 use std::mem::ManuallyDrop;
 use std::ops;
 use std::ptr;
+use std::fmt::Debug;
 use std::slice;
+use std::ops::{RangeBounds, Bound};
+use std::ptr::NonNull;
 #[cfg(feature = "std")]
 use std::io;
 #[cfg(feature = "serde")]
@@ -240,15 +243,32 @@ unsafe fn deallocate<T>(ptr: *mut T, capacity: usize) {
 /// Returned from [`SmallVec::drain`][1].
 ///
 /// [1]: struct.SmallVec.html#method.drain
-pub struct Drain<'a, T: 'a> {
-    iter: slice::IterMut<'a,T>,
+pub struct Drain<'a, T: 'a + Array> {
+    tail_start: usize,
+    tail_len: usize,
+    iter: slice::Iter<'a, T::Item>,
+    vec: NonNull<SmallVec<T>>
 }
 
-impl<'a, T: 'a> Iterator for Drain<'a,T> {
-    type Item = T;
+impl<'a, T: 'a + Array> fmt::Debug for Drain<'a, T> 
+where T::Item: Debug
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_tuple("Drain")
+         .field(&self.iter.as_slice())
+         .finish()
+    }
+}
+
+unsafe impl<'a, T: Sync + Array> Sync for Drain<'a, T> {}
+unsafe impl<'a, T: Send + Array> Send for Drain<'a, T> {}
+
+
+impl<'a, T: 'a + Array> Iterator for Drain<'a,T> {
+    type Item = T::Item;
 
     #[inline]
-    fn next(&mut self) -> Option<T> {
+    fn next(&mut self) -> Option<T::Item> {
         self.iter.next().map(|reference| unsafe { ptr::read(reference) })
     }
 
@@ -258,19 +278,41 @@ impl<'a, T: 'a> Iterator for Drain<'a,T> {
     }
 }
 
-impl<'a, T: 'a> DoubleEndedIterator for Drain<'a, T> {
+impl<'a, T: 'a + Array> DoubleEndedIterator for Drain<'a, T> {
     #[inline]
-    fn next_back(&mut self) -> Option<T> {
+    fn next_back(&mut self) -> Option<T::Item> {
         self.iter.next_back().map(|reference| unsafe { ptr::read(reference) })
     }
 }
 
-impl<'a, T> ExactSizeIterator for Drain<'a, T> { }
+impl<'a, T: Array> ExactSizeIterator for Drain<'a, T> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.iter.len()
+    }
+ }
 
-impl<'a, T: 'a> Drop for Drain<'a,T> {
+ impl<'a, T: Array> FusedIterator for Drain<'a, T> {}
+
+impl<'a, T: 'a + Array> Drop for Drain<'a,T> {
     fn drop(&mut self) {
-        // Destroy the remaining elements.
-        for _ in self.by_ref() {}
+        self.for_each(drop);
+
+        if self.tail_len > 0 {
+            unsafe {
+                let source_vec = self.vec.as_mut();
+                
+                // memmove back untouched tail, update to new length
+                let start = source_vec.len();
+                let tail = self.tail_start;
+                if tail != start {
+                    let src = source_vec.as_ptr().add(tail);
+                    let dst = source_vec.as_mut_ptr().add(start);
+                    ptr::copy(src, dst, self.tail_len);
+                }
+                source_vec.set_len(start + self.tail_len);
+            }
+        }
     }
 }
 
@@ -596,18 +638,50 @@ impl<A: Array> SmallVec<A> {
         self.capacity > A::size()
     }
 
-    /// Empty the vector and return an iterator over its former contents.
-    pub fn drain(&mut self) -> Drain<A::Item> {
+    /// Creates a draining iterator that removes the specified range in the vector
+    /// and yields the removed items.
+    ///
+    /// Note 1: The element range is removed even if the iterator is only
+    /// partially consumed or not consumed at all.
+    ///
+    /// Note 2: It is unspecified how many elements are removed from the vector
+    /// if the `Drain` value is leaked.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the starting point is greater than the end point or if
+    /// the end point is greater than the length of the vector.
+    pub fn drain<R>(&mut self, range: R) -> Drain<A>
+        where R: RangeBounds<usize> 
+    {   
+        use Bound::*;
+
+        let len = self.len();
+        let start = match range.start_bound() {
+            Included(&n) => n,
+            Excluded(&n) => n + 1,
+            Unbounded    => 0,
+        };
+        let end = match range.end_bound() {
+            Included(&n) => n + 1,
+            Excluded(&n) => n,
+            Unbounded    => len,
+        };
+
+        assert!(start <= end);
+        assert!(end <= len);
+
         unsafe {
-            let ptr = self.as_mut_ptr();
+            self.set_len(start);
 
-            let current_len = self.len();
-            self.set_len(0);
-
-            let slice = slice::from_raw_parts_mut(ptr, current_len);
+            let range_slice = slice::from_raw_parts_mut(self.as_mut_ptr().add(start),
+                                                        end - start);
 
             Drain {
-                iter: slice.iter_mut(),
+                tail_start: end,
+                tail_len: len - end,
+                iter: range_slice.iter(),
+                vec: NonNull::from(self),
             }
         }
     }
@@ -1711,26 +1785,36 @@ mod tests {
     fn drain() {
         let mut v: SmallVec<[u8; 2]> = SmallVec::new();
         v.push(3);
-        assert_eq!(v.drain().collect::<Vec<_>>(), &[3]);
+        assert_eq!(v.drain(..).collect::<Vec<_>>(), &[3]);
 
         // spilling the vec
         v.push(3);
         v.push(4);
         v.push(5);
-        assert_eq!(v.drain().collect::<Vec<_>>(), &[3, 4, 5]);
+        let old_capacity = v.capacity();
+        assert_eq!(v.drain(1..).collect::<Vec<_>>(), &[4, 5]);
+        // drain should not change the capacity
+        assert_eq!(v.capacity(), old_capacity);
     }
 
     #[test]
     fn drain_rev() {
         let mut v: SmallVec<[u8; 2]> = SmallVec::new();
         v.push(3);
-        assert_eq!(v.drain().rev().collect::<Vec<_>>(), &[3]);
+        assert_eq!(v.drain(..).rev().collect::<Vec<_>>(), &[3]);
 
         // spilling the vec
         v.push(3);
         v.push(4);
         v.push(5);
-        assert_eq!(v.drain().rev().collect::<Vec<_>>(), &[5, 4, 3]);
+        assert_eq!(v.drain(..).rev().collect::<Vec<_>>(), &[5, 4, 3]);
+    }
+
+    #[test]
+    fn drain_forget() {
+        let mut v: SmallVec<[u8; 1]> = smallvec![0, 1, 2, 3, 4, 5, 6, 7];
+        std::mem::forget(v.drain(2..5));
+        assert_eq!(v.len(), 2);
     }
 
     #[test]
@@ -2125,7 +2209,8 @@ mod tests {
     fn test_exact_size_iterator() {
         let mut vec = SmallVec::<[u32; 2]>::from(&[1, 2, 3][..]);
         assert_eq!(vec.clone().into_iter().len(), 3);
-        assert_eq!(vec.drain().len(), 3);
+        assert_eq!(vec.drain(..2).len(), 2);
+        assert_eq!(vec.into_iter().len(), 1);
     }
 
     #[test]
