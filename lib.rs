@@ -1356,7 +1356,7 @@ impl<A: Array> Extend<A::Item> for SmallVec<A> {
                     ptr::write(ptr.offset(len.get() as isize), out);
                     len.increment_len(1);
                 } else {
-                    break;
+                    return;
                 }
             }
         }
@@ -2328,5 +2328,17 @@ mod tests {
         assert_eq!(v.len(), 0);
         v.push(4);
         assert_eq!(v[..], [4]);
+    }
+
+    #[test]
+    fn resumable_extend() {
+        let s = "a b c";
+        // This iterator yields: (Some('a'), None, Some('b'), None, Some('c')), None
+        let it = s
+            .chars()
+            .scan(0, |_, ch| if ch.is_whitespace() { None } else { Some(ch) });
+        let mut v: SmallVec<[char; 4]> = SmallVec::new();
+        v.extend(it);
+        assert_eq!(v[..], ['a']);
     }
 }
