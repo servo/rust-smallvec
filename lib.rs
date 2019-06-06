@@ -654,6 +654,7 @@ impl<A: Array> SmallVec<A> {
                 }
                 self.data = SmallVecData::from_inline(mem::uninitialized());
                 ptr::copy_nonoverlapping(ptr, self.data.inline_mut().ptr_mut(), len);
+                self.capacity = len;
             } else if new_cap != cap {
                 let mut vec = Vec::with_capacity(new_cap);
                 let new_alloc = vec.as_mut_ptr();
@@ -2310,5 +2311,22 @@ mod tests {
         let encoded = config().limit(100).serialize(&small_vec).unwrap();
         let decoded: SmallVec<[i32; 2]> = deserialize(&encoded).unwrap();
         assert_eq!(small_vec, decoded);
+    }
+
+    #[test]
+    fn grow_to_shrink() {
+        let mut v: SmallVec<[u8; 2]> = SmallVec::new();
+        v.push(1);
+        v.push(2);
+        v.push(3);
+        assert!(v.spilled());
+        v.clear();
+        // Shrink to inline.
+        v.grow(2);
+        assert!(!v.spilled());
+        assert_eq!(v.capacity(), 2);
+        assert_eq!(v.len(), 0);
+        v.push(4);
+        assert_eq!(v[..], [4]);
     }
 }
