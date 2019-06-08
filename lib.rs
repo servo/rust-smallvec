@@ -665,6 +665,8 @@ impl<A: Array> SmallVec<A> {
                 if unspilled {
                     return;
                 }
+            } else {
+                return;
             }
             deallocate(ptr, cap);
         }
@@ -2340,5 +2342,19 @@ mod tests {
         let mut v: SmallVec<[char; 4]> = SmallVec::new();
         v.extend(it);
         assert_eq!(v[..], ['a']);
+    }
+
+    #[test]
+    fn grow_spilled_same_size() {
+        let mut v: SmallVec<[u8; 2]> = SmallVec::new();
+        v.push(0);
+        v.push(1);
+        v.push(2);
+        assert!(v.spilled());
+        assert_eq!(v.capacity(), 4);
+        // grow with the same capacity
+        v.grow(4);
+        assert_eq!(v.capacity(), 4);
+        assert_eq!(v[..], [0, 1, 2]);
     }
 }
