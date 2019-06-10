@@ -1,6 +1,6 @@
 [package]
 name = "smallvec"
-version = "0.6.9"
+version = "0.6.10"
 authors = ["Simon Sapin <simon.sapin@exyr.org>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/servo/rust-smallvec"
