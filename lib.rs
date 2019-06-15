@@ -395,7 +395,7 @@ impl<A: Array> SmallVec<A> {
                 let mut data = SmallVecData::<A>::from_inline(mem::uninitialized());
                 let len = vec.len();
                 vec.set_len(0);
-                ptr::copy_nonoverlapping(vec.as_ptr(), data.inline_mut().ptr_mut(), len);
+                ptr::copy_nonoverlapping(vec.as_ptr(), data.inline_mut().as_mut_ptr(), len);
 
                 SmallVec {
                     capacity: len,
@@ -516,7 +516,7 @@ impl<A: Array> SmallVec<A> {
                 let (ptr, len) = self.data.heap();
                 (ptr, len, self.capacity)
             } else {
-                (self.data.inline().ptr(), self.capacity, A::size())
+                (self.data.inline().as_ptr(), self.capacity, A::size())
             }
         }
     }
@@ -529,7 +529,7 @@ impl<A: Array> SmallVec<A> {
                 let &mut (ptr, ref mut len_ptr) = self.data.heap_mut();
                 (ptr, len_ptr, self.capacity)
             } else {
-                (self.data.inline_mut().ptr_mut(), &mut self.capacity, A::size())
+                (self.data.inline_mut().as_mut_ptr(), &mut self.capacity, A::size())
             }
         }
     }
@@ -597,7 +597,7 @@ impl<A: Array> SmallVec<A> {
                     return;
                 }
                 self.data = SmallVecData::from_inline(mem::uninitialized());
-                ptr::copy_nonoverlapping(ptr, self.data.inline_mut().ptr_mut(), len);
+                ptr::copy_nonoverlapping(ptr, self.data.inline_mut().as_mut_ptr(), len);
                 self.capacity = len;
             } else if new_cap != cap {
                 let mut vec = Vec::with_capacity(new_cap);
@@ -663,7 +663,7 @@ impl<A: Array> SmallVec<A> {
             unsafe {
                 let (ptr, len) = self.data.heap();
                 self.data = SmallVecData::from_inline(mem::uninitialized());
-                ptr::copy_nonoverlapping(ptr, self.data.inline_mut().ptr_mut(), len);
+                ptr::copy_nonoverlapping(ptr, self.data.inline_mut().as_mut_ptr(), len);
                 deallocate(ptr, self.capacity);
                 self.capacity = len;
             }
@@ -987,7 +987,7 @@ impl<A: Array> SmallVec<A> where A::Item: Copy {
                 capacity: len,
                 data: SmallVecData::from_inline(unsafe {
                     let mut data: A = mem::uninitialized();
-                    ptr::copy_nonoverlapping(slice.as_ptr(), data.ptr_mut(), len);
+                    ptr::copy_nonoverlapping(slice.as_ptr(), data.as_mut_ptr(), len);
                     data
                 })
             }
@@ -1484,12 +1484,12 @@ impl<'a, A: Array> IntoIterator for &'a mut SmallVec<A> {
 pub unsafe trait Array {
     /// The type of the array's elements.
     type Item;
+    /// Returns a mutable pointer to the first element of the array.
+    fn as_mut_ptr(&mut self) -> *mut Self::Item;
+    /// Returns a pointer to the first element of the array.
+    fn as_ptr(&self) -> *const Self::Item;
     /// Returns the number of items the array can hold.
     fn size() -> usize;
-    /// Returns a pointer to the first element of the array.
-    fn ptr(&self) -> *const Self::Item;
-    /// Returns a mutable pointer to the first element of the array.
-    fn ptr_mut(&mut self) -> *mut Self::Item;
 }
 
 /// Set the length of the vec when the `SetLenOnDrop` value goes out of scope.
@@ -1529,9 +1529,9 @@ macro_rules! impl_array(
         $(
             unsafe impl<T> Array for [T; $size] {
                 type Item = T;
+                fn as_mut_ptr(&mut self) -> *mut T { self.as_mut().as_mut_ptr() }
+                fn as_ptr(&self) -> *const T { self.as_ref().as_ptr() }
                 fn size() -> usize { $size }
-                fn ptr(&self) -> *const T { self.as_ptr() }
-                fn ptr_mut(&mut self) -> *mut T { self.as_mut_ptr() }
             }
         )+
     }
