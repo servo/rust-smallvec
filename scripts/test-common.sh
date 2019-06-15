@@ -1,5 +1,4 @@
 STABLE_FEATURES=(
-    alloc
     serde
     std
 )

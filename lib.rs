@@ -31,14 +31,7 @@
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 #![cfg_attr(feature = "specialization", feature(specialization))]
 #![cfg_attr(feature = "union", feature(untagged_unions))]
-#![cfg_attr(not(feature = "alloc"), no_std)]
 #![deny(missing_docs)]
-
-#[cfg(feature = "alloc")]
-extern crate alloc;
-
-#[cfg(feature = "serde")]
-extern crate serde;
 
 use core::{
     borrow::{Borrow, BorrowMut},
@@ -1543,22 +1536,14 @@ impl_array!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32
 
 #[cfg(test)]
 mod tests {
+    extern crate alloc;
+
     use crate::SmallVec;
-
+    use alloc::{
+        rc::Rc,
+        boxed::Box,
+    };
     use core::iter::FromIterator;
-
-    #[cfg(feature = "std")]
-    use std::borrow::ToOwned;
-    #[cfg(not(feature = "std"))]
-    use alloc::borrow::ToOwned;
-    #[cfg(feature = "std")]
-    use std::rc::Rc;
-    #[cfg(not(feature = "std"))]
-    use alloc::rc::Rc;
-    #[cfg(not(feature = "std"))]
-    use alloc::boxed::Box;
-    #[cfg(not(feature = "std"))]
-    use alloc::vec::Vec;
 
     #[test]
     pub fn test_zero() {
@@ -1574,51 +1559,51 @@ mod tests {
     #[test]
     pub fn test_inline() {
         let mut v = SmallVec::<[_; 16]>::new();
-        v.push("hello".to_owned());
-        v.push("there".to_owned());
+        v.push("hello");
+        v.push("there");
         assert_eq!(&*v, &[
-            "hello".to_owned(),
-            "there".to_owned(),
+            "hello",
+            "there",
         ][..]);
     }
 
     #[test]
     pub fn test_spill() {
         let mut v = SmallVec::<[_; 2]>::new();
-        v.push("hello".to_owned());
+        v.push("hello");
         assert_eq!(v[0], "hello");
-        v.push("there".to_owned());
-        v.push("burma".to_owned());
+        v.push("there");
+        v.push("burma");
         assert_eq!(v[0], "hello");
-        v.push("shave".to_owned());
+        v.push("shave");
         assert_eq!(&*v, &[
-            "hello".to_owned(),
-            "there".to_owned(),
-            "burma".to_owned(),
-            "shave".to_owned(),
+            "hello",
+            "there",
+            "burma",
+            "shave",
         ][..]);
     }
 
     #[test]
     pub fn test_double_spill() {
         let mut v = SmallVec::<[_; 2]>::new();
-        v.push("hello".to_owned());
-        v.push("there".to_owned());
-        v.push("burma".to_owned());
-        v.push("shave".to_owned());
-        v.push("hello".to_owned());
-        v.push("there".to_owned());
-        v.push("burma".to_owned());
-        v.push("shave".to_owned());
+        v.push("hello");
+        v.push("there");
+        v.push("burma");
+        v.push("shave");
+        v.push("hello");
+        v.push("there");
+        v.push("burma");
+        v.push("shave");
         assert_eq!(&*v, &[
-            "hello".to_owned(),
-            "there".to_owned(),
-            "burma".to_owned(),
-            "shave".to_owned(),
-            "hello".to_owned(),
-            "there".to_owned(),
-            "burma".to_owned(),
-            "shave".to_owned(),
+            "hello",
+            "there",
+            "burma",
+            "shave",
+            "hello",
+            "there",
+            "burma",
+            "shave",
         ][..]);
     }
 

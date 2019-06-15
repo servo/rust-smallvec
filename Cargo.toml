@@ -18,12 +18,10 @@ serde = { version = "1", optional = true }
 bincode = "1.0.1"
 
 [features]
-alloc = []
 const_generics = []
-default = ["alloc"]
 may_dangle = []
 specialization = []
-std = ["alloc"]
+std = []
 union = []
 
 [lib]
