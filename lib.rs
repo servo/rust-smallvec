@@ -39,7 +39,7 @@ use core::{
     fmt,
     hash::{Hash, Hasher},
     iter::{IntoIterator, FromIterator, repeat},
-    mem::{ManuallyDrop, self},
+    mem::{MaybeUninit, self},
     ops,
     ptr::{self, NonNull},
     slice,
@@ -213,7 +213,7 @@ impl<'a, T: 'a> Drop for Drain<'a,T> {
 
 #[cfg(feature = "union")]
 union SmallVecData<A: Array> {
-    inline: ManuallyDrop<A>,
+    inline: MaybeUninit<A>,
     heap: (NonNull<A::Item>, usize),
 }
 
@@ -221,18 +221,18 @@ union SmallVecData<A: Array> {
 impl<A: Array> SmallVecData<A> {
     #[inline]
     unsafe fn inline(&self) -> &A {
-        &self.inline
+        &*self.inline.as_ptr()
     }
     #[inline]
     unsafe fn inline_mut(&mut self) -> &mut A {
-        &mut self.inline
+        &mut *self.inline.as_mut_ptr()
     }
     #[inline]
-    fn from_inline(inline: A) -> SmallVecData<A> {
-        SmallVecData { inline: ManuallyDrop::new(inline) }
+    fn from_inline(inline: MaybeUninit<A>) -> SmallVecData<A> {
+        SmallVecData { inline }
     }
     #[inline]
-    unsafe fn into_inline(self) -> A { ManuallyDrop::into_inner(self.inline) }
+    unsafe fn into_inline(self) -> A { self.inline.assume_init() }
     #[inline]
     unsafe fn heap(&self) -> (*mut A::Item, usize) {
         (self.heap.0.as_ptr(), self.heap.1)
@@ -249,7 +249,7 @@ impl<A: Array> SmallVecData<A> {
 
 #[cfg(not(feature = "union"))]
 enum SmallVecData<A: Array> {
-    Inline(ManuallyDrop<A>),
+    Inline(MaybeUninit<A>),
     Heap((NonNull<A::Item>, usize)),
 }
 
@@ -258,25 +258,25 @@ impl<A: Array> SmallVecData<A> {
     #[inline]
     unsafe fn inline(&self) -> &A {
         match *self {
-            SmallVecData::Inline(ref a) => a,
+            SmallVecData::Inline(ref a) => &*a.as_ptr(),
             _ => debug_unreachable!(),
         }
     }
     #[inline]
     unsafe fn inline_mut(&mut self) -> &mut A {
         match *self {
-            SmallVecData::Inline(ref mut a) => a,
+            SmallVecData::Inline(ref mut a) => &mut *a.as_mut_ptr(),
             _ => debug_unreachable!(),
         }
     }
     #[inline]
-    fn from_inline(inline: A) -> SmallVecData<A> {
-        SmallVecData::Inline(ManuallyDrop::new(inline))
+    fn from_inline(inline: MaybeUninit<A>) -> SmallVecData<A> {
+        SmallVecData::Inline(inline)
     }
     #[inline]
     unsafe fn into_inline(self) -> A {
         match self {
-            SmallVecData::Inline(a) => ManuallyDrop::into_inner(a),
+            SmallVecData::Inline(a) => a.assume_init(),
             _ => debug_unreachable!(),
         }
     }
@@ -421,7 +421,7 @@ impl<A: Array> SmallVec<A> {
     pub fn from_buf(buf: A) -> SmallVec<A> {
         SmallVec {
             capacity: A::size(),
-            data: SmallVecData::from_inline(buf),
+            data: SmallVecData::from_inline(MaybeUninit::new(buf)),
         }
     }
 
@@ -461,7 +461,7 @@ impl<A: Array> SmallVec<A> {
     pub unsafe fn from_buf_and_len_unchecked(buf: A, len: usize) -> SmallVec<A> {
         SmallVec {
             capacity: len,
-            data: SmallVecData::from_inline(buf),
+            data: SmallVecData::from_inline(MaybeUninit::new(buf)),
         }
     }
 
@@ -979,8 +979,9 @@ impl<A: Array> SmallVec<A> where A::Item: Copy {
             SmallVec {
                 capacity: len,
                 data: SmallVecData::from_inline(unsafe {
-                    let mut data: A = mem::uninitialized();
-                    ptr::copy_nonoverlapping(slice.as_ptr(), data.as_mut_ptr(), len);
+                    let mut data = MaybeUninit::<A>::uninit();
+                    let slice_mut = &mut *data.as_mut_ptr();
+                    ptr::copy_nonoverlapping(slice.as_ptr(), slice_mut.as_mut_ptr(), len);
                     data
                 })
             }
@@ -994,7 +995,6 @@ impl<A: Array> SmallVec<A> where A::Item: Copy {
             }
         }
     }
-
     /// Copy elements from a slice into the vector at position `index`, shifting any following
     /// elements toward the back.
     ///
