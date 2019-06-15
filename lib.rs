@@ -28,47 +28,39 @@
 //! To use this feature add `features = ["union"]` in the `smallvec` section of Cargo.toml.
 //! Note that this feature requires a nightly compiler (for now).
 
-#![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(alloc))]
-#![cfg_attr(feature = "union", feature(untagged_unions))]
-#![cfg_attr(feature = "specialization", feature(specialization))]
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
+#![cfg_attr(feature = "specialization", feature(specialization))]
+#![cfg_attr(feature = "union", feature(untagged_unions))]
+#![cfg_attr(not(feature = "alloc"), no_std)]
 #![deny(missing_docs)]
 
-
-#[cfg(not(feature = "std"))]
-#[macro_use]
+#[cfg(feature = "alloc")]
 extern crate alloc;
-
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
 
 #[cfg(feature = "serde")]
 extern crate serde;
 
-#[cfg(not(feature = "std"))]
-mod std {
-    pub use core::*;
-}
-
-use std::borrow::{Borrow, BorrowMut};
-use std::cmp;
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::iter::{IntoIterator, FromIterator, repeat};
-use std::mem;
-use std::mem::ManuallyDrop;
-use std::ops;
-use std::ptr;
-use std::slice;
+use core::{
+    borrow::{Borrow, BorrowMut},
+    cmp,
+    fmt,
+    hash::{Hash, Hasher},
+    iter::{IntoIterator, FromIterator, repeat},
+    mem::{ManuallyDrop, self},
+    ops,
+    ptr,
+    slice,
+};
 #[cfg(feature = "std")]
 use std::io;
 #[cfg(feature = "serde")]
-use serde::ser::{Serialize, Serializer, SerializeSeq};
-#[cfg(feature = "serde")]
-use serde::de::{Deserialize, Deserializer, SeqAccess, Visitor};
-#[cfg(feature = "serde")]
-use std::marker::PhantomData;
+use {
+    serde::{
+        ser::{Serialize, Serializer, SerializeSeq},
+        de::{Deserialize, Deserializer, SeqAccess, Visitor},
+    },
+    core::marker::PhantomData
+};
 
 /// Creates a [`SmallVec`] containing the arguments.
 ///
@@ -821,7 +813,7 @@ impl<A: Array> SmallVec<A> {
         }
 
         let (lower_size_bound, _) = iter.size_hint();
-        assert!(lower_size_bound <= std::isize::MAX as usize);  // Ensure offset is indexable
+        assert!(lower_size_bound <= core::isize::MAX as usize);  // Ensure offset is indexable
         assert!(index + lower_size_bound >= index);  // Protect against overflow
         self.reserve(lower_size_bound);
 
@@ -1121,7 +1113,7 @@ impl<A: Array> SmallVec<A> where A::Item: Clone {
                 let mut local_len = SetLenOnDrop::new(len_ptr);
 
                 for i in 0..n as isize {
-                    ::std::ptr::write(ptr.offset(i), elem.clone());
+                    core::ptr::write(ptr.offset(i), elem.clone());
                     local_len.increment_len(1);
                 }
             }
@@ -1606,9 +1598,9 @@ impl_array!(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32
 
 #[cfg(test)]
 mod tests {
-    use SmallVec;
+    use crate::SmallVec;
 
-    use std::iter::FromIterator;
+    use core::iter::FromIterator;
 
     #[cfg(feature = "std")]
     use std::borrow::ToOwned;
@@ -1766,7 +1758,7 @@ mod tests {
 
     #[test]
     fn into_iter_drop() {
-        use std::cell::Cell;
+        use core::cell::Cell;
 
         struct DropCounter<'a>(&'a Cell<i32>);
 
@@ -2061,7 +2053,7 @@ mod tests {
 
     #[test]
     fn test_borrow() {
-        use std::borrow::Borrow;
+        use core::borrow::Borrow;
 
         let mut a: SmallVec<[u32; 2]> = SmallVec::new();
         a.push(1);
@@ -2074,7 +2066,7 @@ mod tests {
 
     #[test]
     fn test_borrow_mut() {
-        use std::borrow::BorrowMut;
+        use core::borrow::BorrowMut;
 
         let mut a: SmallVec<[u32; 2]> = SmallVec::new();
         a.push(1);
@@ -2279,7 +2271,7 @@ mod tests {
     #[cfg(feature = "std")]
     #[test]
     fn test_write() {
-        use io::Write;
+        use std::io::Write;
 
         let data = [1, 2, 3, 4, 5];
 

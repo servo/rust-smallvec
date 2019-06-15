@@ -1,28 +1,31 @@
 [package]
-name = "smallvec"
-version = "0.6.10"
 authors = ["Simon Sapin <simon.sapin@exyr.org>"]
-license = "MIT/Apache-2.0"
-repository = "https://github.com/servo/rust-smallvec"
-description = "'Small vector' optimization: store up to a small number of items on the stack"
-keywords = ["small", "vec", "vector", "stack", "no_std"]
 categories = ["data-structures"]
-readme = "README.md"
+description = "'Small vector' optimization: store up to a small number of items on the stack"
 documentation = "https://doc.servo.org/smallvec/"
-
-[features]
-std = []
-union = []
-default = ["std"]
-specialization = []
-may_dangle = []
-
-[lib]
+edition = "2018"
+keywords = ["small", "vec", "vector", "stack", "no_std"]
+license = "MIT/Apache-2.0"
 name = "smallvec"
-path = "lib.rs"
+readme = "README.md"
+repository = "https://github.com/servo/rust-smallvec"
+version = "0.6.10"
 
 [dependencies]
 serde = { version = "1", optional = true }
 
 [dev_dependencies]
 bincode = "1.0.1"
+
+[features]
+alloc = []
+const_generics = []
+default = ["alloc"]
+may_dangle = []
+specialization = []
+std = ["alloc"]
+union = []
+
+[lib]
+name = "smallvec"
+path = "lib.rs"
