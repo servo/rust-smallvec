@@ -260,7 +260,7 @@ impl<'a, T: 'a + Array> Drop for Drain<'a, T> {
 #[cfg(feature = "union")]
 union SmallVecData<A: Array> {
     inline: MaybeUninit<A>,
-    heap: (*mut A::Item, usize),
+    heap: (NonNull<A::Item>, usize),
 }
 
 #[cfg(feature = "union")]
@@ -283,37 +283,39 @@ impl<A: Array> SmallVecData<A> {
     }
     #[inline]
     unsafe fn heap(&self) -> (*mut A::Item, usize) {
-        self.heap
+        (self.heap.0.as_ptr(), self.heap.1)
     }
     #[inline]
-    unsafe fn heap_mut(&mut self) -> &mut (*mut A::Item, usize) {
-        &mut self.heap
+    unsafe fn heap_mut(&mut self) -> (*mut A::Item, &mut usize) {
+        (self.heap.0.as_ptr(), &mut self.heap.1)
     }
     #[inline]
     fn from_heap(ptr: *mut A::Item, len: usize) -> SmallVecData<A> {
-        SmallVecData { heap: (ptr, len) }
+        SmallVecData {
+            heap: (NonNull::new(ptr).unwrap(), len),
+        }
     }
 }
 
 #[cfg(not(feature = "union"))]
 enum SmallVecData<A: Array> {
     Inline(MaybeUninit<A>),
-    Heap((*mut A::Item, usize)),
+    Heap((NonNull<A::Item>, usize)),
 }
 
 #[cfg(not(feature = "union"))]
 impl<A: Array> SmallVecData<A> {
     #[inline]
     unsafe fn inline(&self) -> *const A::Item {
-        match *self {
-            SmallVecData::Inline(ref a) => a.as_ptr() as *const A::Item,
+        match self {
+            SmallVecData::Inline(a) => a.as_ptr() as *const A::Item,
             _ => debug_unreachable!(),
         }
     }
     #[inline]
     unsafe fn inline_mut(&mut self) -> *mut A::Item {
-        match *self {
-            SmallVecData::Inline(ref mut a) => a.as_mut_ptr() as *mut A::Item,
+        match self {
+            SmallVecData::Inline(a) => a.as_mut_ptr() as *mut A::Item,
             _ => debug_unreachable!(),
         }
     }
@@ -330,21 +332,21 @@ impl<A: Array> SmallVecData<A> {
     }
     #[inline]
     unsafe fn heap(&self) -> (*mut A::Item, usize) {
-        match *self {
-            SmallVecData::Heap(data) => data,
+        match self {
+            SmallVecData::Heap(data) => (data.0.as_ptr(), data.1),
             _ => debug_unreachable!(),
         }
     }
     #[inline]
-    unsafe fn heap_mut(&mut self) -> &mut (*mut A::Item, usize) {
-        match *self {
-            SmallVecData::Heap(ref mut data) => data,
+    unsafe fn heap_mut(&mut self) -> (*mut A::Item, &mut usize) {
+        match self {
+            SmallVecData::Heap(data) => (data.0.as_ptr(), &mut data.1),
             _ => debug_unreachable!(),
         }
     }
     #[inline]
     fn from_heap(ptr: *mut A::Item, len: usize) -> SmallVecData<A> {
-        SmallVecData::Heap((ptr, len))
+        SmallVecData::Heap((NonNull::new(ptr).unwrap(), len))
     }
 }
 
@@ -571,7 +573,7 @@ impl<A: Array> SmallVec<A> {
     fn triple_mut(&mut self) -> (*mut A::Item, &mut usize, usize) {
         unsafe {
             if self.spilled() {
-                let &mut (ptr, ref mut len_ptr) = self.data.heap_mut();
+                let (ptr, len_ptr) = self.data.heap_mut();
                 (ptr, len_ptr, self.capacity)
             } else {
                 (self.data.inline_mut(), &mut self.capacity, A::size())
