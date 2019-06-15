@@ -1,14 +1,11 @@
 language: rust
 rust:
-  - 1.20.0
+  #- 1.36.0
   - nightly
   - beta
-  - stable
-script: |
-  cargo build --verbose &&
-  cargo test --verbose &&
-  cargo test --verbose --features serde &&
-  ([ $TRAVIS_RUST_VERSION != nightly ] || cargo check --verbose --no-default-features) &&
-  ([ $TRAVIS_RUST_VERSION != nightly ] || cargo test --verbose --features union) &&
-  ([ $TRAVIS_RUST_VERSION != nightly ] || cargo test --verbose --all-features) &&
-  ([ $TRAVIS_RUST_VERSION != nightly ] || cargo bench --verbose bench)
+  #- stable
+script:
+  - pushd ./scripts
+  - ./test-stable.sh
+  - ([ $TRAVIS_RUST_VERSION != nightly ] || ./test-nightly.sh)
+  - popd
