@@ -6,7 +6,7 @@ macro_rules! debug_unreachable {
     };
     ($e:expr) => {
         if cfg!(not(debug_assertions)) {
-            crate::utils::unreachable();
+            core::hint::unreachable_unchecked();
         } else {
             panic!($e);
         }

@@ -2,7 +2,7 @@
 use crate::small_vec_visitor::SmallVecVisitor;
 #[cfg(feature = "specialization")]
 use crate::spec_from::SpecFrom;
-use crate::utils::{deallocate, unreachable};
+use crate::utils::deallocate;
 #[cfg(not(feature = "const_generics"))]
 use crate::Array;
 use crate::{
@@ -13,6 +13,7 @@ use core::{
     cmp::{Eq, Ord, Ordering, PartialOrd},
     fmt::{self, Debug},
     hash::{Hash, Hasher},
+    hint::unreachable_unchecked,
     iter::{repeat, FromIterator},
     mem::{self, MaybeUninit},
     ops::{Deref, DerefMut, Index, IndexMut, Range, RangeFrom, RangeFull, RangeTo},
@@ -435,7 +436,7 @@ impl<A: Array> SmallVec<A> {
     pub fn swap_remove(&mut self, index: usize) -> A::Item {
         let len = self.len();
         self.swap(len - 1, index);
-        self.pop().unwrap_or_else(|| unsafe { unreachable() })
+        self.pop().unwrap_or_else(|| unsafe { unreachable_unchecked() })
     }
 
     /// Remove all elements from the vector.
