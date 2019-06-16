@@ -2,8 +2,8 @@
 
 extern crate test;
 
-use test::Bencher;
 use smallvec::{smallvec, ExtendFromSlice, SmallVec};
+use test::Bencher;
 
 const VEC_SIZE: usize = 16;
 const SPILLED_SIZE: usize = 100;

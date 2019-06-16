@@ -23,7 +23,3 @@ may_dangle = []
 specialization = []
 std = []
 union = []
-
-[lib]
-name = "smallvec"
-path = "lib.rs"
