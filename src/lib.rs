@@ -8,14 +8,10 @@
 //! to the heap for larger allocations.  This can be a useful optimization for improving cache
 //! locality and reducing allocator traffic for workloads that fit within the inline buffer.
 //!
-//! ## no_std support
+//! ## `alloc` support
 //!
-//! By default, `smallvec` depends on `libstd`. However, it can be configured to use the unstable
-//! `liballoc` API instead, for use on platforms that have `liballoc` but not `libstd`.  This
-//! configuration is currently unstable and is not guaranteed to work on all versions of Rust.
-//!
-//! To depend on `smallvec` without `libstd`, use `default-features = false` in the `smallvec`
-//! section of Cargo.toml to disable its `"alloc"` feature.
+//! By default, `smallvec` uses the `alloc` crate, which means that it can be used on platforms
+//! that have `liballoc` but not `libstd`.
 //!
 //! ## `union` feature
 //!
