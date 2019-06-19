@@ -11,7 +11,7 @@ impl<'a> SetLenOnDrop<'a> {
     pub fn new(len: &'a mut usize) -> Self {
         SetLenOnDrop {
             local_len: *len,
-            len: len,
+            len,
         }
     }
 

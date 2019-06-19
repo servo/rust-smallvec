@@ -64,7 +64,7 @@ impl<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> DoubleEndedIte
         } else {
             unsafe {
                 self.end -= 1;
-                Some(ptr::read(self.data.as_ptr().offset(self.end as isize)))
+                Some(ptr::read(self.data.as_ptr().add(self.end)))
             }
         }
     }
