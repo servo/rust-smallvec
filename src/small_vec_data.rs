@@ -19,12 +19,12 @@ pub union SmallVecData<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?)
 #[cfg(feature = "union")]
 impl<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> SmallVecData<$s_decl_ty$(, {$s_decl_const_ty})?> {
     #[inline]
-    pub unsafe fn inline(&self) -> &$array {
-        &*self.inline.as_ptr()
+    pub unsafe fn inline(&self) -> *const $array_item {
+        (*self.inline.as_ptr()).as_ptr()
     }
     #[inline]
-    pub unsafe fn inline_mut(&mut self) -> &mut $array {
-        &mut *self.inline.as_mut_ptr()
+    pub unsafe fn inline_mut(&mut self) -> *mut $array_item {
+        (*self.inline.as_mut_ptr()).as_mut_ptr()
     }
     #[inline]
     pub fn from_inline(inline: MaybeUninit<$array>) -> Self {
@@ -59,16 +59,16 @@ pub enum SmallVecData<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),
 #[cfg(not(feature = "union"))]
 impl<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> SmallVecData<$s_decl_ty$(, {$s_decl_const_ty})?> {
     #[inline]
-    pub unsafe fn inline(&self) -> &$array {
+    pub unsafe fn inline(&self) -> *const $array_item {
         match *self {
-            SmallVecData::Inline(ref a) => &*a.as_ptr(),
+            SmallVecData::Inline(ref a) => (*a.as_ptr()).as_ptr(),
             _ => debug_unreachable!(),
         }
     }
     #[inline]
-    pub unsafe fn inline_mut(&mut self) -> &mut $array {
+    pub unsafe fn inline_mut(&mut self) -> *mut $array_item {
         match *self {
-            SmallVecData::Inline(ref mut a) => &mut *a.as_mut_ptr(),
+            SmallVecData::Inline(ref mut a) => (*a.as_mut_ptr()).as_mut_ptr(),
             _ => debug_unreachable!(),
         }
     }

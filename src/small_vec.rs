@@ -121,7 +121,7 @@ impl<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> SmallVec<$s_de
                 let mut data = SmallVecData::<$s_decl_ty$(, {$s_decl_const_ty})?>::from_inline(MaybeUninit::uninit());
                 let len = vec.len();
                 vec.set_len(0);
-                ptr::copy_nonoverlapping(vec.as_ptr(), data.inline_mut().as_mut_ptr(), len);
+                ptr::copy_nonoverlapping(vec.as_ptr(), data.inline_mut(), len);
 
                 SmallVec {
                     capacity: len,
@@ -241,7 +241,7 @@ impl<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> SmallVec<$s_de
                 let (ptr, len) = self.data.heap();
                 (ptr, len, self.capacity)
             } else {
-                (self.data.inline().as_ptr(), self.capacity, $array_size)
+                (self.data.inline(), self.capacity, $array_size)
             }
         }
     }
@@ -255,7 +255,7 @@ impl<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> SmallVec<$s_de
                 (ptr, len_ptr, self.capacity)
             } else {
                 (
-                    self.data.inline_mut().as_mut_ptr(),
+                    self.data.inline_mut(),
                     &mut self.capacity,
                     $array_size,
                 )
@@ -326,7 +326,7 @@ impl<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> SmallVec<$s_de
                     return;
                 }
                 self.data = SmallVecData::<$s_decl_ty$(, {$s_decl_const_ty})?>::from_inline(MaybeUninit::uninit());
-                ptr::copy_nonoverlapping(ptr, self.data.inline_mut().as_mut_ptr(), len);
+                ptr::copy_nonoverlapping(ptr, self.data.inline_mut(), len);
                 self.capacity = len;
             } else if new_cap != cap {
                 let mut vec = Vec::with_capacity(new_cap);
@@ -393,7 +393,7 @@ impl<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> SmallVec<$s_de
             unsafe {
                 let (ptr, len) = self.data.heap();
                 self.data = SmallVecData::<$s_decl_ty$(, {$s_decl_const_ty})?>::from_inline(MaybeUninit::uninit());
-                ptr::copy_nonoverlapping(ptr, self.data.inline_mut().as_mut_ptr(), len);
+                ptr::copy_nonoverlapping(ptr, self.data.inline_mut(), len);
                 deallocate(ptr, self.capacity);
                 self.capacity = len;
             }
