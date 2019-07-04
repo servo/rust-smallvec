@@ -1,8 +1,8 @@
 language: rust
 rust:
   - 1.36.0
-  - nightly
   - beta
+  - nightly
   - stable
 script:
   - pushd ./scripts

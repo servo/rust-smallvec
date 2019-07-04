@@ -12,7 +12,7 @@ repository = "https://github.com/servo/rust-smallvec"
 version = "0.6.10"
 
 [package.metadata.docs.rs]
-all-features = true
+features = ["may_dangle", "specialization", "std", "union"]
 
 [dependencies]
 serde = { version = "1", optional = true }
