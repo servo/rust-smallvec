@@ -1136,7 +1136,8 @@ where
 }
 
 #[cfg(feature = "specialization")]
-impl<'a, $($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> SpecFrom<A, &'a [$array_item]>
+impl<'a, $($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*>
+    SpecFrom<&'a [$array_item], $s_decl_ty$(, {$s_decl_const_ty})?>
     for SmallVec<$s_decl_ty$(, {$s_decl_const_ty})?>
 where
     $array_item: Clone,
@@ -1148,7 +1149,8 @@ where
 }
 
 #[cfg(feature = "specialization")]
-impl<'a, $($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> SpecFrom<A, &'a [$array_item]>
+impl<'a, $($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*>
+    SpecFrom<&'a [$array_item], $s_decl_ty$(, {$s_decl_const_ty})?>
     for SmallVec<$s_decl_ty$(, {$s_decl_const_ty})?>
 where
     $array_item: Copy,

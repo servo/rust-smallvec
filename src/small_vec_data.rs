@@ -12,7 +12,7 @@ macro_rules! create_with_parts {
 
 #[cfg(feature = "union")]
 pub union SmallVecData<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> {
-    inline: MaybeUninit<$s_decl_ty$(, {$s_decl_const_ty})?>,
+    inline: MaybeUninit<$array>,
     heap: (NonNull<$array_item>, usize),
 }
 

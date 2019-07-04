@@ -5,21 +5,22 @@ use core::{fmt, marker::PhantomData};
 use serde::de::{Deserialize, SeqAccess, Visitor};
 
 macro_rules! create_with_parts {
-    (
+(
     <$($({$s_impl_ty_prefix:ident})? $s_impl_ty:ident$(: $s_impl_ty_bound:ident)?),*>,
-    <$s_decl_ty:ident$(, {$s_decl_const_ty:ident})?>
+    <$s_decl_ty:ident$(, {$s_decl_const_ty:ident})?>,
+    $array_item:ty
 ) => {
 
 #[cfg(feature = "serde")]
 pub struct SmallVecVisitor<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> {
-    pub(crate) phantom: PhantomData<$s_decl_ty$(, {$s_decl_const_ty})?>,
+    pub(crate) phantom: PhantomData<$s_decl_ty>,
 }
 
 #[cfg(feature = "serde")]
 impl<'de, $($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> Visitor<'de>
     for SmallVecVisitor<$s_decl_ty$(, {$s_decl_const_ty})?>
 where
-    A::Item: Deserialize<'de>,
+    $array_item: Deserialize<'de>,
 {
     type Value = SmallVec<$s_decl_ty$(, {$s_decl_const_ty})?>;
 
@@ -46,6 +47,6 @@ where
 }
 
 #[cfg(feature = "const_generics")]
-create_with_parts!(<T, {const} N: usize>, <T, {N}>);
+create_with_parts!(<T, {const} N: usize>, <T, {N}>, T);
 #[cfg(not(feature = "const_generics"))]
-create_with_parts!(<A: Array>, <A>);
+create_with_parts!(<A: Array>, <A>, A::Item);
