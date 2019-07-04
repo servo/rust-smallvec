@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 /// Trait to be implemented by a collection that can be extended from a slice
 ///
 /// ## Example

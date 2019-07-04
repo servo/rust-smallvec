@@ -28,7 +28,10 @@
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 #![cfg_attr(feature = "specialization", feature(specialization))]
 #![cfg_attr(feature = "union", feature(untagged_unions))]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(missing_docs)]
+
+extern crate alloc;
 
 #[cfg(not(feature = "const_generics"))]
 mod array;

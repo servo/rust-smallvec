@@ -21,25 +21,19 @@ macro_rules! debug_unreachable {
 /// - Create a [`SmallVec`] containing a given list of elements:
 ///
 /// ```
-/// # #[macro_use] extern crate smallvec;
-/// # use smallvec::SmallVec;
-/// # fn main() {
+/// use smallvec::{smallvec, SmallVec};
 /// let v: SmallVec<[_; 128]> = smallvec![1, 2, 3];
 /// assert_eq!(v[0], 1);
 /// assert_eq!(v[1], 2);
 /// assert_eq!(v[2], 3);
-/// # }
 /// ```
 ///
 /// - Create a [`SmallVec`] from a given element and size:
 ///
 /// ```
-/// # #[macro_use] extern crate smallvec;
-/// # use smallvec::SmallVec;
-/// # fn main() {
+/// use smallvec::{smallvec, SmallVec};
 /// let v: SmallVec<[_; 0x8000]> = smallvec![1; 3];
 /// assert_eq!(v, SmallVec::from_buf([1, 1, 1]));
-/// # }
 /// ```
 ///
 /// Note that unlike array expressions this syntax supports all elements

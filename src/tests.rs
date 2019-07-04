@@ -1,7 +1,7 @@
 extern crate alloc;
 
 use crate::SmallVec;
-use alloc::{boxed::Box, rc::Rc};
+use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
 use core::iter::FromIterator;
 
 #[test]
@@ -290,6 +290,7 @@ fn test_insert_many_long_hint() {
     );
 }
 
+#[cfg(feature = "std")]
 #[test]
 // https://github.com/servo/rust-smallvec/issues/96
 fn test_insert_many_panic() {
@@ -324,7 +325,7 @@ fn test_insert_many_panic() {
         },
     ]
     .into();
-    let result = ::std::panic::catch_unwind(move || {
+    let result = std::panic::catch_unwind(move || {
         vec.insert_many(0, BadIter);
     });
     assert!(result.is_err());
@@ -422,10 +423,10 @@ fn test_ord() {
     assert!(c > b);
 }
 
+#[cfg(feature = "std")]
 #[test]
 fn test_hash() {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::Hash;
+    use std::{collections::hash_map::DefaultHasher, hash::Hash};
 
     {
         let mut a: SmallVec<[u32; 2]> = SmallVec::new();

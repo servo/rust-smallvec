@@ -8,6 +8,9 @@ use crate::Array;
 use crate::{
     set_len_on_drop::SetLenOnDrop, small_vec_data::SmallVecData, Drain, ExtendFromSlice, IntoIter,
 };
+use alloc::{vec, vec::Vec};
+#[cfg(feature = "serde")]
+use core::marker::PhantomData;
 use core::{
     borrow::{Borrow, BorrowMut},
     cmp::{Eq, Ord, Ordering, PartialOrd},
@@ -26,8 +29,6 @@ use serde::{
 };
 #[cfg(feature = "std")]
 use std::io;
-#[cfg(feature = "serde")]
-use std::marker::PhantomData;
 
 macro_rules! create_with_parts {
 (
@@ -667,10 +668,8 @@ impl<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> SmallVec<$s_de
     /// # Examples
     ///
     /// ```
-    /// # #[macro_use] extern crate smallvec;
-    /// # use smallvec::SmallVec;
-    /// use std::mem;
-    /// use std::ptr;
+    /// use core::{mem, ptr};
+    /// use smallvec::{smallvec, SmallVec};
     ///
     /// fn main() {
     ///     let mut v: SmallVec<[_; 1]> = smallvec![1, 2, 3];
@@ -1166,7 +1165,7 @@ where
 #[cfg(feature = "const_generics")]
 impl<T, const N: usize> PartialEq<Self> for SmallVec<T, { N }>
 where
-    T: PartialEq
+    T: PartialEq,
 {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -1190,8 +1189,7 @@ where
 }
 
 #[cfg(all(feature = "std", feature = "const_generics"))]
-impl<const N: usize> io::Write for SmallVec<u8, { N }>
-{
+impl<const N: usize> io::Write for SmallVec<u8, { N }> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.extend_from_slice(buf);
