@@ -1,9 +1,9 @@
 language: rust
 rust:
-  #- 1.36.0
+  - 1.36.0
   - nightly
   - beta
-  #- stable
+  - stable
 script:
   - pushd ./scripts
   - ./test-stable.sh
