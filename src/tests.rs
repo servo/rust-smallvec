@@ -1,7 +1,5 @@
-extern crate alloc;
-
 use crate::SmallVec;
-use alloc::{boxed::Box, rc::Rc, vec, vec::Vec};
+use alloc::{borrow::ToOwned, boxed::Box, rc::Rc, vec, vec::Vec};
 use core::iter::FromIterator;
 
 #[test]
@@ -18,37 +16,54 @@ pub fn test_zero() {
 #[test]
 pub fn test_inline() {
     let mut v = SmallVec::<[_; 16]>::new();
-    v.push("hello");
-    v.push("there");
-    assert_eq!(&*v, &["hello", "there",][..]);
+    v.push("hello".to_owned());
+    v.push("there".to_owned());
+    assert_eq!(&*v, &["hello".to_owned(), "there".to_owned()][..]);
 }
 
 #[test]
 pub fn test_spill() {
     let mut v = SmallVec::<[_; 2]>::new();
-    v.push("hello");
+    v.push("hello".to_owned());
     assert_eq!(v[0], "hello");
-    v.push("there");
-    v.push("burma");
+    v.push("there".to_owned());
+    v.push("burma".to_owned());
     assert_eq!(v[0], "hello");
-    v.push("shave");
-    assert_eq!(&*v, &["hello", "there", "burma", "shave",][..]);
+    v.push("shave".to_owned());
+    assert_eq!(
+        &*v,
+        &[
+            "hello".to_owned(),
+            "there".to_owned(),
+            "burma".to_owned(),
+            "shave".to_owned()
+        ][..]
+    );
 }
 
 #[test]
 pub fn test_double_spill() {
     let mut v = SmallVec::<[_; 2]>::new();
-    v.push("hello");
-    v.push("there");
-    v.push("burma");
-    v.push("shave");
-    v.push("hello");
-    v.push("there");
-    v.push("burma");
-    v.push("shave");
+    v.push("hello".to_owned());
+    v.push("there".to_owned());
+    v.push("burma".to_owned());
+    v.push("shave".to_owned());
+    v.push("hello".to_owned());
+    v.push("there".to_owned());
+    v.push("burma".to_owned());
+    v.push("shave".to_owned());
     assert_eq!(
         &*v,
-        &["hello", "there", "burma", "shave", "hello", "there", "burma", "shave",][..]
+        &[
+            "hello".to_owned(),
+            "there".to_owned(),
+            "burma".to_owned(),
+            "shave".to_owned(),
+            "hello".to_owned(),
+            "there".to_owned(),
+            "burma".to_owned(),
+            "shave".to_owned()
+        ][..]
     );
 }
 
