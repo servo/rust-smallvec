@@ -1,5 +1,3 @@
-#[cfg(feature = "serde")]
-use crate::small_vec_visitor::SmallVecVisitor;
 #[cfg(feature = "specialization")]
 use crate::spec_from::SpecFrom;
 use crate::utils::deallocate;
@@ -9,8 +7,6 @@ use crate::{
     set_len_on_drop::SetLenOnDrop, small_vec_data::SmallVecData, Drain, ExtendFromSlice, IntoIter,
 };
 use alloc::{vec, vec::Vec};
-#[cfg(feature = "serde")]
-use core::marker::PhantomData;
 use core::{
     borrow::{Borrow, BorrowMut},
     cmp::{Eq, Ord, Ordering, PartialOrd},
@@ -19,16 +15,20 @@ use core::{
     hint::unreachable_unchecked,
     iter::{repeat, FromIterator},
     mem::{self, MaybeUninit},
-    ops::{Deref, DerefMut, Index, IndexMut, Range, RangeFrom, RangeFull, RangeTo},
+    ops::{Deref, DerefMut},
     ptr, slice,
-};
-#[cfg(feature = "serde")]
-use serde::{
-    de::{Deserialize, Deserializer},
-    ser::{Serialize, SerializeSeq, Serializer},
 };
 #[cfg(feature = "std")]
 use std::io;
+#[cfg(feature = "serde")]
+use {
+    crate::small_vec_visitor::SmallVecVisitor,
+    core::marker::PhantomData,
+    serde::{
+        de::{Deserialize, Deserializer},
+        ser::{Serialize, SerializeSeq, Serializer},
+    },
+};
 
 macro_rules! create_with_parts {
 (
@@ -47,13 +47,13 @@ macro_rules! create_with_parts {
 ///
 /// The amount of data that a `SmallVec` can store inline depends on its backing store. The backing
 /// store can be any type that implements the `Array` trait; usually it is a small fixed-sized
-/// array.  For example a `SmallVec<[u64; 8]>` can hold up to eight 64-bit integers inline.
+/// array.  For example a `SmallVec<[u64; 8]>`/`SmallVec<u64, 8>` can hold up to eight 64-bit integers inline.
 ///
 /// ## Example
 ///
 /// ```rust
 /// use smallvec::SmallVec;
-/// let mut v = SmallVec::<[u8; 4]>::new(); // initialize an empty vector
+/// let mut v: SmallVec<[u8; 4]> = SmallVec::new(); // initialize an empty vector
 ///
 /// // The vector can hold up to 4 items without spilling onto the heap.
 /// v.extend(0..4);
@@ -697,7 +697,7 @@ impl<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> SmallVec<$s_de
     ///
     ///         // Put everything back together into a SmallVec with a different
     ///         // amount of inline storage, but which is still less than `cap`.
-    ///         let rebuilt = SmallVec::<[_; 2]>::from_raw_parts(p, len, cap);
+    ///         let rebuilt: SmallVec<[_; 2]> = SmallVec::from_raw_parts(p, len, cap);
     ///         assert_eq!(&*rebuilt, &[4, 5, 6]);
     ///     }
     /// }
@@ -735,7 +735,7 @@ where
     /// ```
     /// use smallvec::SmallVec;
     ///
-    /// let v = SmallVec::<[char; 128]>::from_elem('d', 2);
+    /// let v: SmallVec<[char; 128]> = SmallVec::from_elem('d', 2);
     /// assert_eq!(v, SmallVec::from_buf(['d', 'd']));
     /// ```
     pub fn from_elem(elem: $array_item, n: usize) -> Self {
@@ -1229,37 +1229,6 @@ impl<A: Array<Item = u8>> io::Write for SmallVec<A> {
         Ok(())
     }
 }
-
-#[cfg(not(feature = "const_generics"))]
-macro_rules! impl_index {
-    ($index_type: ty, $output_type: ty) => {
-        impl<A: Array> Index<$index_type> for SmallVec<A> {
-            type Output = $output_type;
-            #[inline]
-            fn index(&self, index: $index_type) -> &$output_type {
-                &(&**self)[index]
-            }
-        }
-
-        impl<A: Array> IndexMut<$index_type> for SmallVec<A> {
-            #[inline]
-            fn index_mut(&mut self, index: $index_type) -> &mut $output_type {
-                &mut (&mut **self)[index]
-            }
-        }
-    };
-}
-
-#[cfg(not(feature = "const_generics"))]
-impl_index!(usize, A::Item);
-#[cfg(not(feature = "const_generics"))]
-impl_index!(Range<usize>, [A::Item]);
-#[cfg(not(feature = "const_generics"))]
-impl_index!(RangeFrom<usize>, [A::Item]);
-#[cfg(not(feature = "const_generics"))]
-impl_index!(RangeTo<usize>, [A::Item]);
-#[cfg(not(feature = "const_generics"))]
-impl_index!(RangeFull, [A::Item]);
 
 #[cfg(feature = "const_generics")]
 create_with_parts!(<T, {const} N: usize>, <T, {N}>, [T; N], T, N);
