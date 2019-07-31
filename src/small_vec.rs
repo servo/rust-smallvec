@@ -15,7 +15,7 @@ use core::{
     hint::unreachable_unchecked,
     iter::{repeat, FromIterator},
     mem::{self, MaybeUninit},
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut, Index, IndexMut, Range, RangeFrom, RangeFull, RangeTo},
     ptr, slice,
 };
 #[cfg(feature = "std")]
@@ -1160,6 +1160,35 @@ where
         Self::from_slice(slice)
     }
 }
+
+macro_rules! impl_index {
+    ($index_type: ty, $output_type: ty) => {
+        impl<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> Index<$index_type>
+            for SmallVec<$s_decl_ty$(, {$s_decl_const_ty})?>
+        {
+            type Output = $output_type;
+            #[inline]
+            fn index(&self, index: $index_type) -> &$output_type {
+                &(&**self)[index]
+            }
+        }
+
+        impl<$($($s_impl_ty_prefix)? $s_impl_ty$(: $s_impl_ty_bound)?),*> IndexMut<$index_type>
+            for SmallVec<$s_decl_ty$(, {$s_decl_const_ty})?>
+        {
+            #[inline]
+            fn index_mut(&mut self, index: $index_type) -> &mut $output_type {
+                &mut (&mut **self)[index]
+            }
+        }
+    };
+}
+
+impl_index!(usize, $array_item);
+impl_index!(Range<usize>, [$array_item]);
+impl_index!(RangeFrom<usize>, [$array_item]);
+impl_index!(RangeTo<usize>, [$array_item]);
+impl_index!(RangeFull, [$array_item]);
 
     }
 }

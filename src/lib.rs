@@ -43,7 +43,6 @@ mod macros;
 mod set_len_on_drop;
 mod small_vec;
 mod small_vec_data;
-mod small_vec_index_impls;
 #[cfg(feature = "serde")]
 mod small_vec_visitor;
 #[cfg(feature = "specialization")]
