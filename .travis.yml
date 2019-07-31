@@ -1,4 +1,6 @@
 language: rust
+allow_failures:
+  - rust: nightly
 rust:
   - 1.36.0
   - beta
