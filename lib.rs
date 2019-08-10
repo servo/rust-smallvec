@@ -29,7 +29,6 @@
 //! Note that this feature requires a nightly compiler (for now).
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(not(feature = "std"), feature(alloc))]
 #![cfg_attr(feature = "union", feature(untagged_unions))]
 #![cfg_attr(feature = "specialization", feature(specialization))]
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
