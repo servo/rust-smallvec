@@ -56,7 +56,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::iter::{IntoIterator, FromIterator, repeat};
 use std::mem;
-use std::mem::ManuallyDrop;
+use std::mem::MaybeUninit;
 use std::ops;
 use std::ptr;
 use std::slice;
@@ -275,26 +275,26 @@ impl<'a, T: 'a> Drop for Drain<'a,T> {
 
 #[cfg(feature = "union")]
 union SmallVecData<A: Array> {
-    inline: ManuallyDrop<A>,
+    inline: MaybeUninit<A>,
     heap: (*mut A::Item, usize),
 }
 
 #[cfg(feature = "union")]
 impl<A: Array> SmallVecData<A> {
     #[inline]
-    unsafe fn inline(&self) -> &A {
-        &self.inline
+    unsafe fn inline(&self) -> *const A::Item {
+        self.inline.as_ptr() as *const A::Item
     }
     #[inline]
-    unsafe fn inline_mut(&mut self) -> &mut A {
-        &mut self.inline
+    unsafe fn inline_mut(&mut self) -> *mut A::Item {
+        self.inline.as_mut_ptr() as *mut A::Item
     }
     #[inline]
-    fn from_inline(inline: A) -> SmallVecData<A> {
-        SmallVecData { inline: ManuallyDrop::new(inline) }
+    fn from_inline(inline: MaybeUninit<A>) -> SmallVecData<A> {
+        SmallVecData { inline }
     }
     #[inline]
-    unsafe fn into_inline(self) -> A { ManuallyDrop::into_inner(self.inline) }
+    unsafe fn into_inline(self) -> MaybeUninit<A> { self.inline }
     #[inline]
     unsafe fn heap(&self) -> (*mut A::Item, usize) {
         self.heap
@@ -311,34 +311,34 @@ impl<A: Array> SmallVecData<A> {
 
 #[cfg(not(feature = "union"))]
 enum SmallVecData<A: Array> {
-    Inline(ManuallyDrop<A>),
+    Inline(MaybeUninit<A>),
     Heap((*mut A::Item, usize)),
 }
 
 #[cfg(not(feature = "union"))]
 impl<A: Array> SmallVecData<A> {
     #[inline]
-    unsafe fn inline(&self) -> &A {
+    unsafe fn inline(&self) -> *const A::Item {
         match *self {
-            SmallVecData::Inline(ref a) => a,
+            SmallVecData::Inline(ref a) => a.as_ptr() as *const A::Item,
             _ => debug_unreachable!(),
         }
     }
     #[inline]
-    unsafe fn inline_mut(&mut self) -> &mut A {
+    unsafe fn inline_mut(&mut self) -> *mut A::Item {
         match *self {
-            SmallVecData::Inline(ref mut a) => a,
+            SmallVecData::Inline(ref mut a) => a.as_mut_ptr() as *mut A::Item,
             _ => debug_unreachable!(),
         }
     }
     #[inline]
-    fn from_inline(inline: A) -> SmallVecData<A> {
-        SmallVecData::Inline(ManuallyDrop::new(inline))
+    fn from_inline(inline: MaybeUninit<A>) -> SmallVecData<A> {
+        SmallVecData::Inline(inline)
     }
     #[inline]
-    unsafe fn into_inline(self) -> A {
+    unsafe fn into_inline(self) -> MaybeUninit<A> {
         match self {
-            SmallVecData::Inline(a) => ManuallyDrop::into_inner(a),
+            SmallVecData::Inline(a) => a,
             _ => debug_unreachable!(),
         }
     }
@@ -403,11 +403,13 @@ impl<A: Array> SmallVec<A> {
     /// Construct an empty vector
     #[inline]
     pub fn new() -> SmallVec<A> {
-        unsafe {
-            SmallVec {
-                capacity: 0,
-                data: SmallVecData::from_inline(mem::uninitialized()),
-            }
+        debug_assert!(
+            (mem::size_of::<A>() == A::size() * mem::size_of::<A::Item>()) &&
+            (mem::align_of::<A>() >= mem::align_of::<A::Item>())
+        );
+        SmallVec {
+            capacity: 0,
+            data: SmallVecData::from_inline(MaybeUninit::uninit()),
         }
     }
 
@@ -447,10 +449,10 @@ impl<A: Array> SmallVec<A> {
     pub fn from_vec(mut vec: Vec<A::Item>) -> SmallVec<A> {
         if vec.capacity() <= A::size() {
             unsafe {
-                let mut data = SmallVecData::<A>::from_inline(mem::uninitialized());
+                let mut data = SmallVecData::<A>::from_inline(MaybeUninit::uninit());
                 let len = vec.len();
                 vec.set_len(0);
-                ptr::copy_nonoverlapping(vec.as_ptr(), data.inline_mut().ptr_mut(), len);
+                ptr::copy_nonoverlapping(vec.as_ptr(), data.inline_mut(), len);
 
                 SmallVec {
                     capacity: len,
@@ -483,7 +485,7 @@ impl<A: Array> SmallVec<A> {
     pub fn from_buf(buf: A) -> SmallVec<A> {
         SmallVec {
             capacity: A::size(),
-            data: SmallVecData::from_inline(buf),
+            data: SmallVecData::from_inline(MaybeUninit::new(buf)),
         }
     }
 
@@ -502,7 +504,7 @@ impl<A: Array> SmallVec<A> {
     #[inline]
     pub fn from_buf_and_len(buf: A, len: usize) -> SmallVec<A> {
         assert!(len <= A::size());
-        unsafe { SmallVec::from_buf_and_len_unchecked(buf, len) }
+        unsafe { SmallVec::from_buf_and_len_unchecked(MaybeUninit::new(buf), len) }
     }
 
     /// Constructs a new `SmallVec` on the stack from an `A` without
@@ -511,16 +513,17 @@ impl<A: Array> SmallVec<A> {
     ///
     /// ```rust
     /// use smallvec::SmallVec;
+    /// use std::mem::MaybeUninit;
     ///
     /// let buf = [1, 2, 3, 4, 5, 0, 0, 0];
     /// let small_vec: SmallVec<_> = unsafe {
-    ///     SmallVec::from_buf_and_len_unchecked(buf, 5)
+    ///     SmallVec::from_buf_and_len_unchecked(MaybeUninit::new(buf), 5)
     /// };
     ///
     /// assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
     /// ```
     #[inline]
-    pub unsafe fn from_buf_and_len_unchecked(buf: A, len: usize) -> SmallVec<A> {
+    pub unsafe fn from_buf_and_len_unchecked(buf: MaybeUninit<A>, len: usize) -> SmallVec<A> {
         SmallVec {
             capacity: len,
             data: SmallVecData::from_inline(buf),
@@ -571,7 +574,7 @@ impl<A: Array> SmallVec<A> {
                 let (ptr, len) = self.data.heap();
                 (ptr, len, self.capacity)
             } else {
-                (self.data.inline().ptr(), self.capacity, A::size())
+                (self.data.inline(), self.capacity, A::size())
             }
         }
     }
@@ -584,7 +587,7 @@ impl<A: Array> SmallVec<A> {
                 let &mut (ptr, ref mut len_ptr) = self.data.heap_mut();
                 (ptr, len_ptr, self.capacity)
             } else {
-                (self.data.inline_mut().ptr_mut(), &mut self.capacity, A::size())
+                (self.data.inline_mut(), &mut self.capacity, A::size())
             }
         }
     }
@@ -651,8 +654,8 @@ impl<A: Array> SmallVec<A> {
                 if unspilled {
                     return;
                 }
-                self.data = SmallVecData::from_inline(mem::uninitialized());
-                ptr::copy_nonoverlapping(ptr, self.data.inline_mut().ptr_mut(), len);
+                self.data = SmallVecData::from_inline(MaybeUninit::uninit());
+                ptr::copy_nonoverlapping(ptr, self.data.inline_mut(), len);
                 self.capacity = len;
             } else if new_cap != cap {
                 let mut vec = Vec::with_capacity(new_cap);
@@ -717,8 +720,8 @@ impl<A: Array> SmallVec<A> {
         if self.inline_size() >= len {
             unsafe {
                 let (ptr, len) = self.data.heap();
-                self.data = SmallVecData::from_inline(mem::uninitialized());
-                ptr::copy_nonoverlapping(ptr, self.data.inline_mut().ptr_mut(), len);
+                self.data = SmallVecData::from_inline(MaybeUninit::uninit());
+                ptr::copy_nonoverlapping(ptr, self.data.inline_mut(), len);
                 deallocate(ptr, self.capacity);
                 self.capacity = len;
             }
@@ -883,7 +886,7 @@ impl<A: Array> SmallVec<A> {
             unsafe {
                 let data = ptr::read(&self.data);
                 mem::forget(self);
-                Ok(data.into_inline())
+                Ok(data.into_inline().assume_init())
             }
         }
     }
@@ -1041,8 +1044,8 @@ impl<A: Array> SmallVec<A> where A::Item: Copy {
             SmallVec {
                 capacity: len,
                 data: SmallVecData::from_inline(unsafe {
-                    let mut data: A = mem::uninitialized();
-                    ptr::copy_nonoverlapping(slice.as_ptr(), data.ptr_mut(), len);
+                    let mut data: MaybeUninit<A> = MaybeUninit::uninit();
+                    ptr::copy_nonoverlapping(slice.as_ptr(), data.as_mut_ptr() as *mut A::Item, len);
                     data
                 })
             }
@@ -1543,10 +1546,6 @@ pub unsafe trait Array {
     type Item;
     /// Returns the number of items the array can hold.
     fn size() -> usize;
-    /// Returns a pointer to the first element of the array.
-    fn ptr(&self) -> *const Self::Item;
-    /// Returns a mutable pointer to the first element of the array.
-    fn ptr_mut(&mut self) -> *mut Self::Item;
 }
 
 /// Set the length of the vec when the `SetLenOnDrop` value goes out of scope.
@@ -1587,8 +1586,6 @@ macro_rules! impl_array(
             unsafe impl<T> Array for [T; $size] {
                 type Item = T;
                 fn size() -> usize { $size }
-                fn ptr(&self) -> *const T { self.as_ptr() }
-                fn ptr_mut(&mut self) -> *mut T { self.as_mut_ptr() }
             }
         )+
     }
@@ -1889,7 +1886,7 @@ mod tests {
         assert_eq!(&v.iter().map(|v| *v).collect::<Vec<_>>(), &[0, 5, 6, 1, 2, 3]);
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(miri)))] // Miri currently does not support unwinding
     #[test]
     // https://github.com/servo/rust-smallvec/issues/96
     fn test_insert_many_panic() {
