@@ -1,6 +1,6 @@
 [package]
 name = "smallvec"
-version = "0.6.12"
+version = "0.6.13"
 authors = ["Simon Sapin <simon.sapin@exyr.org>"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/servo/rust-smallvec"
@@ -23,6 +23,7 @@ path = "lib.rs"
 
 [dependencies]
 serde = { version = "1", optional = true }
+maybe-uninit = "2.0"
 
 [dev_dependencies]
 bincode = "1.0.1"
