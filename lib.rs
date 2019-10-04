@@ -142,54 +142,6 @@ macro_rules! debug_unreachable {
     };
 }
 
-/// Common operations implemented by both `Vec` and `SmallVec`.
-///
-/// This can be used to write generic code that works with both `Vec` and `SmallVec`.
-///
-/// ## Example
-///
-/// ```rust
-/// use smallvec::{VecLike, SmallVec};
-///
-/// fn initialize<V: VecLike<u8>>(v: &mut V) {
-///     for i in 0..5 {
-///         v.push(i);
-///     }
-/// }
-///
-/// let mut vec = Vec::new();
-/// initialize(&mut vec);
-///
-/// let mut small_vec = SmallVec::<[u8; 8]>::new();
-/// initialize(&mut small_vec);
-/// ```
-#[deprecated(note = "Use `Extend` and `Deref<[T]>` instead")]
-pub trait VecLike<T>:
-    ops::Index<usize, Output = T>
-    + ops::IndexMut<usize>
-    + ops::Index<ops::Range<usize>, Output = [T]>
-    + ops::IndexMut<ops::Range<usize>>
-    + ops::Index<ops::RangeFrom<usize>, Output = [T]>
-    + ops::IndexMut<ops::RangeFrom<usize>>
-    + ops::Index<ops::RangeTo<usize>, Output = [T]>
-    + ops::IndexMut<ops::RangeTo<usize>>
-    + ops::Index<ops::RangeFull, Output = [T]>
-    + ops::IndexMut<ops::RangeFull>
-    + ops::DerefMut<Target = [T]>
-    + Extend<T>
-{
-    /// Append an element to the vector.
-    fn push(&mut self, value: T);
-}
-
-#[allow(deprecated)]
-impl<T> VecLike<T> for Vec<T> {
-    #[inline]
-    fn push(&mut self, value: T) {
-        Vec::push(self, value);
-    }
-}
-
 /// Trait to be implemented by a collection that can be extended from a slice
 ///
 /// ## Example
@@ -1357,14 +1309,6 @@ where
     }
 }
 
-#[allow(deprecated)]
-impl<A: Array> VecLike<A::Item> for SmallVec<A> {
-    #[inline]
-    fn push(&mut self, value: A::Item) {
-        SmallVec::push(self, value);
-    }
-}
-
 impl<A: Array> FromIterator<A::Item> for SmallVec<A> {
     fn from_iter<I: IntoIterator<Item = A::Item>>(iterable: I) -> SmallVec<A> {
         let mut v = SmallVec::new();
@@ -2225,23 +2169,6 @@ mod tests {
         let mut vec = SmallVec::<[u32; 2]>::from(&[1, 2, 3][..]);
         assert_eq!(vec.clone().into_iter().len(), 3);
         assert_eq!(vec.drain().len(), 3);
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn veclike_deref_slice() {
-        use super::VecLike;
-
-        fn test<T: VecLike<i32>>(vec: &mut T) {
-            assert!(!vec.is_empty());
-            assert_eq!(vec.len(), 3);
-
-            vec.sort();
-            assert_eq!(&vec[..], [1, 2, 3]);
-        }
-
-        let mut vec = SmallVec::<[i32; 2]>::from(&[3, 1, 2][..]);
-        test(&mut vec);
     }
 
     #[test]
