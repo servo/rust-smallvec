@@ -57,6 +57,7 @@ use std::borrow::{Borrow, BorrowMut};
 use std::cmp;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::hint::unreachable_unchecked;
 #[cfg(feature = "std")]
 use std::io;
 use std::iter::{repeat, FromIterator, IntoIterator};
@@ -129,12 +130,11 @@ macro_rules! smallvec {
 /// Hint to the optimizer that any code path which calls this function is
 /// statically unreachable and can be removed.
 ///
-/// Equivalent to `std::hint::unreachable_unchecked` but works in older versions of Rust.
+/// Equivalent to `std::hint::unreachable_unchecked`.
 #[inline]
+#[deprecated(note = "Use std::hint::unreachable_unchecked instead")]
 pub unsafe fn unreachable() -> ! {
-    enum Void {}
-    let x: &Void = mem::transmute(1usize);
-    match *x {}
+    unreachable_unchecked()
 }
 
 /// `panic!()` in debug builds, optimization hint in release.
@@ -145,7 +145,7 @@ macro_rules! debug_unreachable {
     };
     ($e:expr) => {
         if cfg!(not(debug_assertions)) {
-            unreachable();
+            unreachable_unchecked();
         } else {
             panic!($e);
         }
@@ -780,7 +780,8 @@ impl<A: Array> SmallVec<A> {
     pub fn swap_remove(&mut self, index: usize) -> A::Item {
         let len = self.len();
         self.swap(len - 1, index);
-        self.pop().unwrap_or_else(|| unsafe { unreachable() })
+        self.pop()
+            .unwrap_or_else(|| unsafe { unreachable_unchecked() })
     }
 
     /// Remove all elements from the vector.
