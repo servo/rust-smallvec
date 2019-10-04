@@ -67,7 +67,7 @@ use std::mem;
 use std::mem::MaybeUninit;
 use std::ops;
 use std::ptr;
-use std::slice;
+use std::slice::{self, SliceIndex};
 
 /// Creates a [`SmallVec`] containing the arguments.
 ///
@@ -1275,30 +1275,19 @@ impl<A: Array> From<A> for SmallVec<A> {
     }
 }
 
-macro_rules! impl_index {
-    ($index_type: ty, $output_type: ty) => {
-        impl<A: Array> ops::Index<$index_type> for SmallVec<A> {
-            type Output = $output_type;
-            #[inline]
-            fn index(&self, index: $index_type) -> &$output_type {
-                &(&**self)[index]
-            }
-        }
+impl<A: Array, I: SliceIndex<[A::Item]>> ops::Index<I> for SmallVec<A> {
+    type Output = I::Output;
 
-        impl<A: Array> ops::IndexMut<$index_type> for SmallVec<A> {
-            #[inline]
-            fn index_mut(&mut self, index: $index_type) -> &mut $output_type {
-                &mut (&mut **self)[index]
-            }
-        }
-    };
+    fn index(&self, index: I) -> &I::Output {
+        &(**self)[index]
+    }
 }
 
-impl_index!(usize, A::Item);
-impl_index!(ops::Range<usize>, [A::Item]);
-impl_index!(ops::RangeFrom<usize>, [A::Item]);
-impl_index!(ops::RangeTo<usize>, [A::Item]);
-impl_index!(ops::RangeFull, [A::Item]);
+impl<A: Array, I: SliceIndex<[A::Item]>> ops::IndexMut<I> for SmallVec<A> {
+    fn index_mut(&mut self, index: I) -> &mut I::Output {
+        &mut (&mut **self)[index]
+    }
+}
 
 impl<A: Array> ExtendFromSlice<A::Item> for SmallVec<A>
 where
