@@ -1,0 +1,26 @@
+[package]
+name = "smallvec-fuzz"
+version = "0.1.0"
+authors = ["Dawid Ciężarkiewicz <dpc@dpc.pw>"]
+edition = "2018"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[features]
+afl_fuzz = ["afl"]
+honggfuzz_fuzz = ["honggfuzz"]
+
+
+[dependencies]
+honggfuzz = { version = "0.5.45", optional = true }
+afl = { version = "0.4", optional = true }
+smallvec = { path = ".." }
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "smallvec_ops"
+path = "fuzz_targets/smallvec_ops.rs"
