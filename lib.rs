@@ -2351,6 +2351,13 @@ mod tests {
         assert_eq!(v[..], ['a']);
     }
 
+    // #139
+    #[test]
+    fn uninhabited() {
+        enum Void {}
+        let _sv = SmallVec::<[Void; 8]>::new();
+    }
+
     #[test]
     fn grow_spilled_same_size() {
         let mut v: SmallVec<[u8; 2]> = SmallVec::new();
