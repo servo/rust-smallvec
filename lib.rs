@@ -57,6 +57,7 @@ use std::borrow::{Borrow, BorrowMut};
 use std::cmp;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::hint::unreachable_unchecked;
 #[cfg(feature = "std")]
 use std::io;
 use std::iter::{repeat, FromIterator, IntoIterator};
@@ -66,7 +67,7 @@ use std::mem;
 use std::mem::MaybeUninit;
 use std::ops;
 use std::ptr;
-use std::slice;
+use std::slice::{self, SliceIndex};
 
 /// Creates a [`SmallVec`] containing the arguments.
 ///
@@ -126,17 +127,6 @@ macro_rules! smallvec {
     });
 }
 
-/// Hint to the optimizer that any code path which calls this function is
-/// statically unreachable and can be removed.
-///
-/// Equivalent to `std::hint::unreachable_unchecked` but works in older versions of Rust.
-#[inline]
-pub unsafe fn unreachable() -> ! {
-    enum Void {}
-    let x: &Void = mem::transmute(1usize);
-    match *x {}
-}
-
 /// `panic!()` in debug builds, optimization hint in release.
 #[cfg(not(feature = "union"))]
 macro_rules! debug_unreachable {
@@ -145,59 +135,11 @@ macro_rules! debug_unreachable {
     };
     ($e:expr) => {
         if cfg!(not(debug_assertions)) {
-            unreachable();
+            unreachable_unchecked();
         } else {
             panic!($e);
         }
     };
-}
-
-/// Common operations implemented by both `Vec` and `SmallVec`.
-///
-/// This can be used to write generic code that works with both `Vec` and `SmallVec`.
-///
-/// ## Example
-///
-/// ```rust
-/// use smallvec::{VecLike, SmallVec};
-///
-/// fn initialize<V: VecLike<u8>>(v: &mut V) {
-///     for i in 0..5 {
-///         v.push(i);
-///     }
-/// }
-///
-/// let mut vec = Vec::new();
-/// initialize(&mut vec);
-///
-/// let mut small_vec = SmallVec::<[u8; 8]>::new();
-/// initialize(&mut small_vec);
-/// ```
-#[deprecated(note = "Use `Extend` and `Deref<[T]>` instead")]
-pub trait VecLike<T>:
-    ops::Index<usize, Output = T>
-    + ops::IndexMut<usize>
-    + ops::Index<ops::Range<usize>, Output = [T]>
-    + ops::IndexMut<ops::Range<usize>>
-    + ops::Index<ops::RangeFrom<usize>, Output = [T]>
-    + ops::IndexMut<ops::RangeFrom<usize>>
-    + ops::Index<ops::RangeTo<usize>, Output = [T]>
-    + ops::IndexMut<ops::RangeTo<usize>>
-    + ops::Index<ops::RangeFull, Output = [T]>
-    + ops::IndexMut<ops::RangeFull>
-    + ops::DerefMut<Target = [T]>
-    + Extend<T>
-{
-    /// Append an element to the vector.
-    fn push(&mut self, value: T);
-}
-
-#[allow(deprecated)]
-impl<T> VecLike<T> for Vec<T> {
-    #[inline]
-    fn push(&mut self, value: T) {
-        Vec::push(self, value);
-    }
 }
 
 /// Trait to be implemented by a collection that can be extended from a slice
@@ -780,7 +722,8 @@ impl<A: Array> SmallVec<A> {
     pub fn swap_remove(&mut self, index: usize) -> A::Item {
         let len = self.len();
         self.swap(len - 1, index);
-        self.pop().unwrap_or_else(|| unsafe { unreachable() })
+        self.pop()
+            .unwrap_or_else(|| unsafe { unreachable_unchecked() })
     }
 
     /// Remove all elements from the vector.
@@ -1332,30 +1275,19 @@ impl<A: Array> From<A> for SmallVec<A> {
     }
 }
 
-macro_rules! impl_index {
-    ($index_type: ty, $output_type: ty) => {
-        impl<A: Array> ops::Index<$index_type> for SmallVec<A> {
-            type Output = $output_type;
-            #[inline]
-            fn index(&self, index: $index_type) -> &$output_type {
-                &(&**self)[index]
-            }
-        }
+impl<A: Array, I: SliceIndex<[A::Item]>> ops::Index<I> for SmallVec<A> {
+    type Output = I::Output;
 
-        impl<A: Array> ops::IndexMut<$index_type> for SmallVec<A> {
-            #[inline]
-            fn index_mut(&mut self, index: $index_type) -> &mut $output_type {
-                &mut (&mut **self)[index]
-            }
-        }
-    };
+    fn index(&self, index: I) -> &I::Output {
+        &(**self)[index]
+    }
 }
 
-impl_index!(usize, A::Item);
-impl_index!(ops::Range<usize>, [A::Item]);
-impl_index!(ops::RangeFrom<usize>, [A::Item]);
-impl_index!(ops::RangeTo<usize>, [A::Item]);
-impl_index!(ops::RangeFull, [A::Item]);
+impl<A: Array, I: SliceIndex<[A::Item]>> ops::IndexMut<I> for SmallVec<A> {
+    fn index_mut(&mut self, index: I) -> &mut I::Output {
+        &mut (&mut **self)[index]
+    }
+}
 
 impl<A: Array> ExtendFromSlice<A::Item> for SmallVec<A>
 where
@@ -1363,14 +1295,6 @@ where
 {
     fn extend_from_slice(&mut self, other: &[A::Item]) {
         SmallVec::extend_from_slice(self, other)
-    }
-}
-
-#[allow(deprecated)]
-impl<A: Array> VecLike<A::Item> for SmallVec<A> {
-    #[inline]
-    fn push(&mut self, value: A::Item) {
-        SmallVec::push(self, value);
     }
 }
 
@@ -2234,23 +2158,6 @@ mod tests {
         let mut vec = SmallVec::<[u32; 2]>::from(&[1, 2, 3][..]);
         assert_eq!(vec.clone().into_iter().len(), 3);
         assert_eq!(vec.drain().len(), 3);
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn veclike_deref_slice() {
-        use super::VecLike;
-
-        fn test<T: VecLike<i32>>(vec: &mut T) {
-            assert!(!vec.is_empty());
-            assert_eq!(vec.len(), 3);
-
-            vec.sort();
-            assert_eq!(&vec[..], [1, 2, 3]);
-        }
-
-        let mut vec = SmallVec::<[i32; 2]>::from(&[3, 1, 2][..]);
-        test(&mut vec);
     }
 
     #[test]
