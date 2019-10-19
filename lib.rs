@@ -127,16 +127,6 @@ macro_rules! smallvec {
     });
 }
 
-/// Hint to the optimizer that any code path which calls this function is
-/// statically unreachable and can be removed.
-///
-/// Equivalent to `std::hint::unreachable_unchecked`.
-#[inline]
-#[deprecated(note = "Use std::hint::unreachable_unchecked instead")]
-pub unsafe fn unreachable() -> ! {
-    unreachable_unchecked()
-}
-
 /// `panic!()` in debug builds, optimization hint in release.
 #[cfg(not(feature = "union"))]
 macro_rules! debug_unreachable {
