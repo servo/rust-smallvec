@@ -1561,6 +1561,7 @@ impl<A: Array> DoubleEndedIterator for IntoIter<A> {
 }
 
 impl<A: Array> ExactSizeIterator for IntoIter<A> {}
+impl<A: Array> FusedIterator for IntoIter<A> {}
 
 impl<A: Array> IntoIterator for SmallVec<A> {
     type IntoIter = IntoIter<A>;
