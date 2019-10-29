@@ -11,9 +11,8 @@ readme = "README.md"
 documentation = "https://doc.servo.org/smallvec/"
 
 [features]
-std = []
+write = []
 union = []
-default = ["std"]
 specialization = []
 may_dangle = []
 

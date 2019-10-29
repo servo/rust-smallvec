@@ -8,11 +8,11 @@
 //! to the heap for larger allocations.  This can be a useful optimization for improving cache
 //! locality and reducing allocator traffic for workloads that fit within the inline buffer.
 //!
-//! ## no_std support
+//! ## `no_std` support
 //!
-//! By default, `smallvec` depends on `libstd`. However, it can be configured to use the unstable
-//! `liballoc` API instead, for use on platforms that have `liballoc` but not `libstd`.  This
-//! configuration is currently unstable and is not guaranteed to work on all versions of Rust.
+//! By default, `smallvec` does not depend on `std`.  However, the optional
+//! `write` feature implements the `std::io::Write` trait for vectors of `u8`.
+//! When this feature is enabled, `smallvec` depends on `std`.
 //!
 //! To depend on `smallvec` without `libstd`, use `default-features = false` in the `smallvec`
 //! section of Cargo.toml to disable its `"std"` feature.
@@ -28,46 +28,43 @@
 //! To use this feature add `features = ["union"]` in the `smallvec` section of Cargo.toml.
 //! Note that this feature requires a nightly compiler (for now).
 
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
 #![cfg_attr(feature = "union", feature(untagged_unions))]
 #![cfg_attr(feature = "specialization", feature(specialization))]
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 #![deny(missing_docs)]
 
-#[cfg(not(feature = "std"))]
 #[macro_use]
 extern crate alloc;
 
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
+#[cfg(any(test, feature = "write"))]
+extern crate std;
 
 #[cfg(feature = "serde")]
 extern crate serde;
-
-#[cfg(not(feature = "std"))]
-mod std {
-    pub use core::*;
-}
 
 #[cfg(feature = "serde")]
 use serde::de::{Deserialize, Deserializer, SeqAccess, Visitor};
 #[cfg(feature = "serde")]
 use serde::ser::{Serialize, SerializeSeq, Serializer};
-use std::borrow::{Borrow, BorrowMut};
-use std::cmp;
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::hint::unreachable_unchecked;
-#[cfg(feature = "std")]
-use std::io;
-use std::iter::{repeat, FromIterator, FusedIterator, IntoIterator};
+
+use alloc::vec::Vec;
+use core::borrow::{Borrow, BorrowMut};
+use core::cmp;
+use core::fmt;
+use core::hash::{Hash, Hasher};
+use core::hint::unreachable_unchecked;
+use core::iter::{repeat, FromIterator, FusedIterator, IntoIterator};
 #[cfg(feature = "serde")]
-use std::marker::PhantomData;
-use std::mem;
-use std::mem::MaybeUninit;
-use std::ops::{self, Bound, RangeBounds};
-use std::ptr::{self, NonNull};
-use std::slice::{self, SliceIndex};
+use core::marker::PhantomData;
+use core::mem;
+use core::mem::MaybeUninit;
+use core::ops::{self, Bound, RangeBounds};
+use core::ptr::{self, NonNull};
+use core::slice::{self, SliceIndex};
+
+#[cfg(feature = "write")]
+use std::io;
 
 /// Creates a [`SmallVec`] containing the arguments.
 ///
@@ -846,7 +843,7 @@ impl<A: Array> SmallVec<A> {
         }
 
         let (lower_size_bound, _) = iter.size_hint();
-        assert!(lower_size_bound <= std::isize::MAX as usize); // Ensure offset is indexable
+        assert!(lower_size_bound <= core::isize::MAX as usize); // Ensure offset is indexable
         assert!(index + lower_size_bound >= index); // Protect against overflow
         self.reserve(lower_size_bound);
 
@@ -1161,7 +1158,7 @@ where
                 let mut local_len = SetLenOnDrop::new(len_ptr);
 
                 for i in 0..n as isize {
-                    ::std::ptr::write(ptr.offset(i), elem.clone());
+                    ::core::ptr::write(ptr.offset(i), elem.clone());
                     local_len.increment_len(1);
                 }
             }
@@ -1219,7 +1216,7 @@ impl<A: Array> BorrowMut<[A::Item]> for SmallVec<A> {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "write")]
 impl<A: Array<Item = u8>> io::Write for SmallVec<A> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
@@ -1662,18 +1659,10 @@ mod tests {
 
     use std::iter::FromIterator;
 
-    #[cfg(not(feature = "std"))]
     use alloc::borrow::ToOwned;
-    #[cfg(not(feature = "std"))]
     use alloc::boxed::Box;
-    #[cfg(not(feature = "std"))]
     use alloc::rc::Rc;
-    #[cfg(not(feature = "std"))]
     use alloc::vec::Vec;
-    #[cfg(feature = "std")]
-    use std::borrow::ToOwned;
-    #[cfg(feature = "std")]
-    use std::rc::Rc;
 
     #[test]
     pub fn test_zero() {
