@@ -40,14 +40,6 @@ extern crate alloc;
 #[cfg(any(test, feature = "write"))]
 extern crate std;
 
-#[cfg(feature = "serde")]
-extern crate serde;
-
-#[cfg(feature = "serde")]
-use serde::de::{Deserialize, Deserializer, SeqAccess, Visitor};
-#[cfg(feature = "serde")]
-use serde::ser::{Serialize, SerializeSeq, Serializer};
-
 use alloc::vec::Vec;
 use core::borrow::{Borrow, BorrowMut};
 use core::cmp;
@@ -55,13 +47,20 @@ use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::hint::unreachable_unchecked;
 use core::iter::{repeat, FromIterator, FusedIterator, IntoIterator};
-#[cfg(feature = "serde")]
-use core::marker::PhantomData;
 use core::mem;
 use core::mem::MaybeUninit;
-use core::ops::{self, Bound, RangeBounds};
+use core::ops::{self, RangeBounds};
 use core::ptr::{self, NonNull};
 use core::slice::{self, SliceIndex};
+
+#[cfg(feature = "serde")]
+use serde::{
+    de::{Deserialize, Deserializer, SeqAccess, Visitor},
+    ser::{Serialize, SerializeSeq, Serializer},
+};
+
+#[cfg(feature = "serde")]
+use core::marker::PhantomData;
 
 #[cfg(feature = "write")]
 use std::io;
@@ -190,7 +189,7 @@ impl<'a, T: 'a + Array> fmt::Debug for Drain<'a, T>
 where
     T::Item: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Drain").field(&self.iter.as_slice()).finish()
     }
 }
@@ -597,11 +596,11 @@ impl<A: Array> SmallVec<A> {
     ///
     /// Panics if the starting point is greater than the end point or if
     /// the end point is greater than the length of the vector.
-    pub fn drain<R>(&mut self, range: R) -> Drain<A>
+    pub fn drain<R>(&mut self, range: R) -> Drain<'_, A>
     where
         R: RangeBounds<usize>,
     {
-        use Bound::*;
+        use core::ops::Bound::*;
 
         let len = self.len();
         let start = match range.start_bound() {
@@ -1274,7 +1273,7 @@ where
 {
     type Value = SmallVec<A>;
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("a sequence")
     }
 
@@ -1403,7 +1402,7 @@ impl<A: Array> fmt::Debug for SmallVec<A>
 where
     A::Item: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_list().entries(self.iter()).finish()
     }
 }
@@ -1655,7 +1654,7 @@ impl_array!(
 
 #[cfg(test)]
 mod tests {
-    use SmallVec;
+    use crate::SmallVec;
 
     use std::iter::FromIterator;
 
@@ -1832,7 +1831,7 @@ mod tests {
 
         {
             let cell = Cell::new(0);
-            let mut v: SmallVec<[DropCounter; 2]> = SmallVec::new();
+            let mut v: SmallVec<[DropCounter<'_>; 2]> = SmallVec::new();
             v.push(DropCounter(&cell));
             v.into_iter();
             assert_eq!(cell.get(), 1);
@@ -1840,7 +1839,7 @@ mod tests {
 
         {
             let cell = Cell::new(0);
-            let mut v: SmallVec<[DropCounter; 2]> = SmallVec::new();
+            let mut v: SmallVec<[DropCounter<'_>; 2]> = SmallVec::new();
             v.push(DropCounter(&cell));
             v.push(DropCounter(&cell));
             assert!(v.into_iter().next().is_some());
@@ -1849,7 +1848,7 @@ mod tests {
 
         {
             let cell = Cell::new(0);
-            let mut v: SmallVec<[DropCounter; 2]> = SmallVec::new();
+            let mut v: SmallVec<[DropCounter<'_>; 2]> = SmallVec::new();
             v.push(DropCounter(&cell));
             v.push(DropCounter(&cell));
             v.push(DropCounter(&cell));
@@ -1858,7 +1857,7 @@ mod tests {
         }
         {
             let cell = Cell::new(0);
-            let mut v: SmallVec<[DropCounter; 2]> = SmallVec::new();
+            let mut v: SmallVec<[DropCounter<'_>; 2]> = SmallVec::new();
             v.push(DropCounter(&cell));
             v.push(DropCounter(&cell));
             v.push(DropCounter(&cell));
