@@ -641,7 +641,7 @@ impl<A: Array> SmallVec<A> {
             }
             let (ptr, len_ptr, _) = self.triple_mut();
             *len_ptr = len + 1;
-            ptr::write(ptr.offset(len as isize), value);
+            ptr::write(ptr.add(len), value);
         }
     }
 
@@ -655,7 +655,7 @@ impl<A: Array> SmallVec<A> {
             }
             let last_index = *len_ptr - 1;
             *len_ptr = last_index;
-            Some(ptr::read(ptr.offset(last_index as isize)))
+            Some(ptr::read(ptr.add(last_index)))
         }
     }
 
@@ -761,7 +761,7 @@ impl<A: Array> SmallVec<A> {
             while len < *len_ptr {
                 let last_index = *len_ptr - 1;
                 *len_ptr = last_index;
-                ptr::drop_in_place(ptr.offset(last_index as isize));
+                ptr::drop_in_place(ptr.add(last_index));
             }
         }
     }
@@ -809,9 +809,9 @@ impl<A: Array> SmallVec<A> {
             let len = *len_ptr;
             assert!(index < len);
             *len_ptr = len - 1;
-            ptr = ptr.offset(index as isize);
+            ptr = ptr.add(index);
             let item = ptr::read(ptr);
-            ptr::copy(ptr.offset(1), ptr, len - index - 1);
+            ptr::copy(ptr.add(1), ptr, len - index - 1);
             item
         }
     }
@@ -827,8 +827,8 @@ impl<A: Array> SmallVec<A> {
             let len = *len_ptr;
             assert!(index <= len);
             *len_ptr = len + 1;
-            ptr = ptr.offset(index as isize);
-            ptr::copy(ptr, ptr.offset(1), len - index);
+            ptr = ptr.add(index);
+            ptr::copy(ptr, ptr.add(1), len - index);
             ptr::write(ptr, element);
         }
     }
@@ -849,23 +849,23 @@ impl<A: Array> SmallVec<A> {
         unsafe {
             let old_len = self.len();
             assert!(index <= old_len);
-            let mut ptr = self.as_mut_ptr().offset(index as isize);
+            let mut ptr = self.as_mut_ptr().add(index);
 
             // Move the trailing elements.
-            ptr::copy(ptr, ptr.offset(lower_size_bound as isize), old_len - index);
+            ptr::copy(ptr, ptr.add(lower_size_bound), old_len - index);
 
             // In case the iterator panics, don't double-drop the items we just copied above.
             self.set_len(index);
 
             let mut num_added = 0;
             for element in iter {
-                let mut cur = ptr.offset(num_added as isize);
+                let mut cur = ptr.add(num_added);
                 if num_added >= lower_size_bound {
                     // Iterator provided more elements than the hint.  Move trailing items again.
                     self.reserve(1);
-                    ptr = self.as_mut_ptr().offset(index as isize);
-                    cur = ptr.offset(num_added as isize);
-                    ptr::copy(cur, cur.offset(1), old_len - index);
+                    ptr = self.as_mut_ptr().add(index);
+                    cur = ptr.add(num_added);
+                    ptr::copy(cur, cur.add(1), old_len - index);
                 }
                 ptr::write(cur, element);
                 num_added += 1;
@@ -873,8 +873,8 @@ impl<A: Array> SmallVec<A> {
             if num_added < lower_size_bound {
                 // Iterator provided fewer elements than the hint
                 ptr::copy(
-                    ptr.offset(lower_size_bound as isize),
-                    ptr.offset(num_added as isize),
+                    ptr.add(lower_size_bound),
+                    ptr.add(num_added),
                     old_len - index,
                 );
             }
@@ -957,11 +957,11 @@ impl<A: Array> SmallVec<A> {
 
         unsafe {
             for r in 1..len {
-                let p_r = ptr.offset(r as isize);
-                let p_wm1 = ptr.offset((w - 1) as isize);
+                let p_r = ptr.add(r);
+                let p_wm1 = ptr.add(w - 1);
                 if !same_bucket(&mut *p_r, &mut *p_wm1) {
                     if r != w {
-                        let p_w = p_wm1.offset(1);
+                        let p_w = p_wm1.add(1);
                         mem::swap(&mut *p_r, &mut *p_w);
                     }
                     w += 1;
@@ -1039,8 +1039,8 @@ impl<A: Array> SmallVec<A> {
     ///         // writing into the old `SmallVec`'s inline storage on the
     ///         // stack.
     ///         assert!(spilled);
-    ///         for i in 0..len as isize {
-    ///             ptr::write(p.offset(i), 4 + i);
+    ///         for i in 0..len {
+    ///             ptr::write(p.add(i), 4 + i);
     ///         }
     ///
     ///         // Put everything back together into a SmallVec with a different
@@ -1103,8 +1103,8 @@ where
 
         unsafe {
             let slice_ptr = slice.as_ptr();
-            let ptr = self.as_mut_ptr().offset(index as isize);
-            ptr::copy(ptr, ptr.offset(slice.len() as isize), len - index);
+            let ptr = self.as_mut_ptr().add(index);
+            ptr::copy(ptr, ptr.add(slice.len()), len - index);
             ptr::copy_nonoverlapping(slice_ptr, ptr, slice.len());
             self.set_len(len + slice.len());
         }
@@ -1156,8 +1156,8 @@ where
                 let (ptr, len_ptr, _) = v.triple_mut();
                 let mut local_len = SetLenOnDrop::new(len_ptr);
 
-                for i in 0..n as isize {
-                    ::core::ptr::write(ptr.offset(i), elem.clone());
+                for i in 0..n {
+                    ::core::ptr::write(ptr.add(i), elem.clone());
                     local_len.increment_len(1);
                 }
             }
@@ -1318,7 +1318,7 @@ where
     #[cfg(not(feature = "specialization"))]
     #[inline]
     fn from(slice: &'a [A::Item]) -> SmallVec<A> {
-        slice.into_iter().cloned().collect()
+        slice.iter().cloned().collect()
     }
 
     #[cfg(feature = "specialization")]
@@ -1384,7 +1384,7 @@ impl<A: Array> Extend<A::Item> for SmallVec<A> {
             let mut len = SetLenOnDrop::new(len_ptr);
             while len.get() < cap {
                 if let Some(out) = iter.next() {
-                    ptr::write(ptr.offset(len.get() as isize), out);
+                    ptr::write(ptr.add(len.get()), out);
                     len.increment_len(1);
                 } else {
                     return;
@@ -1463,10 +1463,6 @@ where
     fn eq(&self, other: &SmallVec<B>) -> bool {
         self[..] == other[..]
     }
-    #[inline]
-    fn ne(&self, other: &SmallVec<B>) -> bool {
-        self[..] != other[..]
-    }
 }
 
 impl<A: Array> Eq for SmallVec<A> where A::Item: Eq {}
@@ -1528,9 +1524,9 @@ impl<A: Array> Iterator for IntoIter<A> {
             None
         } else {
             unsafe {
-                let current = self.current as isize;
+                let current = self.current;
                 self.current += 1;
-                Some(ptr::read(self.data.as_ptr().offset(current)))
+                Some(ptr::read(self.data.as_ptr().add(current)))
             }
         }
     }
@@ -1550,7 +1546,7 @@ impl<A: Array> DoubleEndedIterator for IntoIter<A> {
         } else {
             unsafe {
                 self.end -= 1;
-                Some(ptr::read(self.data.as_ptr().offset(self.end as isize)))
+                Some(ptr::read(self.data.as_ptr().add(self.end)))
             }
         }
     }
@@ -1613,7 +1609,7 @@ impl<'a> SetLenOnDrop<'a> {
     fn new(len: &'a mut usize) -> Self {
         SetLenOnDrop {
             local_len: *len,
-            len: len,
+            len,
         }
     }
 
@@ -1649,7 +1645,7 @@ macro_rules! impl_array(
 impl_array!(
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 36, 0x40, 0x60, 0x80,
     0x100, 0x200, 0x400, 0x600, 0x800, 0x1000, 0x2000, 0x4000, 0x6000, 0x8000, 0x10000, 0x20000,
-    0x40000, 0x60000, 0x80000, 0x100000
+    0x40000, 0x60000, 0x80000, 0x10_0000
 );
 
 #[cfg(test)]
