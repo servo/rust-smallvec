@@ -1553,6 +1553,20 @@ impl<A: Array> DoubleEndedIterator for IntoIter<A> {
 impl<A: Array> ExactSizeIterator for IntoIter<A> {}
 impl<A: Array> FusedIterator for IntoIter<A> {}
 
+impl<A: Array> IntoIter<A> {
+    /// Returns the remaining items of this iterator as a slice.
+    pub fn as_slice(&self) -> &[A::Item] {
+        let len = self.end - self.current;
+        unsafe { core::slice::from_raw_parts(self.data.as_ptr().add(self.current), len) }
+    }
+
+    /// Returns the remaining items of this iterator as a mutable slice.
+    pub fn as_mut_slice(&mut self) -> &mut [A::Item] {
+        let len = self.end - self.current;
+        unsafe { core::slice::from_raw_parts_mut(self.data.as_mut_ptr().add(self.current), len) }
+    }
+}
+
 impl<A: Array> IntoIterator for SmallVec<A> {
     type IntoIter = IntoIter<A>;
     type Item = A::Item;
@@ -2223,6 +2237,20 @@ mod tests {
         assert_eq!(vec.clone().into_iter().len(), 3);
         assert_eq!(vec.drain(..2).len(), 2);
         assert_eq!(vec.into_iter().len(), 1);
+    }
+
+    #[test]
+    fn test_into_iter_as_slice() {
+        let vec = SmallVec::<[u32; 2]>::from(&[1, 2, 3][..]);
+        let mut iter = vec.clone().into_iter();
+        assert_eq!(iter.as_slice(), &[1, 2, 3]);
+        assert_eq!(iter.as_mut_slice(), &[1, 2, 3]);
+        iter.next();
+        assert_eq!(iter.as_slice(), &[2, 3]);
+        assert_eq!(iter.as_mut_slice(), &[2, 3]);
+        iter.next_back();
+        assert_eq!(iter.as_slice(), &[2]);
+        assert_eq!(iter.as_mut_slice(), &[2]);
     }
 
     #[test]
