@@ -15,7 +15,7 @@
 //! When this feature is enabled, `smallvec` depends on `std`.
 //!
 //! To depend on `smallvec` without `libstd`, use `default-features = false` in the `smallvec`
-//! section of Cargo.toml to disable its `"std"` feature.
+//! section of Cargo.toml to disable its `"write"` feature.
 //!
 //! ## `union` feature
 //!
@@ -1984,7 +1984,6 @@ mod tests {
         );
     }
 
-    #[cfg(all(feature = "std", not(miri)))] // Miri currently does not support unwinding
     #[test]
     // https://github.com/servo/rust-smallvec/issues/96
     fn test_insert_many_panic() {
@@ -2117,7 +2116,6 @@ mod tests {
         assert!(c > b);
     }
 
-    #[cfg(feature = "std")]
     #[test]
     fn test_hash() {
         use std::collections::hash_map::DefaultHasher;
@@ -2381,10 +2379,10 @@ mod tests {
         assert_eq!(v[..], [1, 0][..]);
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(feature = "write")]
     #[test]
     fn test_write() {
-        use io::Write;
+        use std::io::Write;
 
         let data = [1, 2, 3, 4, 5];
 
