@@ -9,7 +9,7 @@ description = "'Small vector' optimization: store up to a small number of items 
 keywords = ["small", "vec", "vector", "stack", "no_std"]
 categories = ["data-structures"]
 readme = "README.md"
-documentation = "https://doc.servo.org/smallvec/"
+documentation = "https://docs.rs/smallvec/"
 
 [features]
 write = []
