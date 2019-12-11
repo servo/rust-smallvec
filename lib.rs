@@ -37,6 +37,7 @@ extern crate alloc;
 #[cfg(any(test, feature = "write"))]
 extern crate std;
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::borrow::{Borrow, BorrowMut};
 use core::cmp;
@@ -891,6 +892,14 @@ impl<A: Array> SmallVec<A> {
         } else {
             self.into_iter().collect()
         }
+    }
+
+    /// Converts a `SmallVec` into a `Box<[T]>` without reallocating if the `SmallVec` has already spilled
+    /// onto the heap.
+    ///
+    /// Note that this will drop any excess capacity.
+    pub fn into_boxed_slice(self) -> Box<[A::Item]> {
+        self.into_vec().into_boxed_slice()
     }
 
     /// Convert the SmallVec into an `A` if possible. Otherwise return `Err(Self)`.
