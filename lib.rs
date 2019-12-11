@@ -14,9 +14,6 @@
 //! `write` feature implements the `std::io::Write` trait for vectors of `u8`.
 //! When this feature is enabled, `smallvec` depends on `std`.
 //!
-//! To depend on `smallvec` without `libstd`, use `default-features = false` in the `smallvec`
-//! section of Cargo.toml to disable its `"write"` feature.
-//!
 //! ## `union` feature
 //!
 //! When the `union` feature is enabled `smallvec` will track its state (inline or spilled)
