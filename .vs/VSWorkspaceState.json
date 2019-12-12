@@ -1,0 +1,12 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\benches",
+    "\\fuzz",
+    "\\fuzz\\fuzz_targets",
+    "\\fuzz\\in",
+    "\\scripts"
+  ],
+  "SelectedNode": "\\lib.rs",
+  "PreviewInSolutionExplorer": false
+}

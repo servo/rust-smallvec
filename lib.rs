@@ -1504,6 +1504,24 @@ pub struct IntoIter<A: Array> {
     end: usize,
 }
 
+impl<A: Array + Clone> Clone for IntoIter<A>
+where
+    A::Item: Copy,
+{
+    fn clone(&self) -> IntoIter<A> {
+        SmallVec::from_slice(self.as_slice()).into_iter()
+    }
+}
+
+/*impl<A: Array + Clone> Clone for IntoIter<A>
+where
+    A::Item: Clone,
+{
+    fn clone(&self) -> IntoIter<A> {
+        SmallVec::from(self.as_slice()).into_iter()
+    }
+}*/
+
 impl<A: Array> Drop for IntoIter<A> {
     fn drop(&mut self) {
         for _ in self {}
@@ -2246,6 +2264,37 @@ mod tests {
         iter.next_back();
         assert_eq!(iter.as_slice(), &[2]);
         assert_eq!(iter.as_mut_slice(), &[2]);
+    }
+
+    #[test]
+    fn test_into_iter_clone() {
+        // Test that the cloned iterator yields identical elements and that it owns its own copy
+        // (i.e. no use after move errors).
+        let mut iter = SmallVec::<[u8; 2]>::from_iter(0..3).into_iter();
+        let mut clone_iter = iter.clone();
+        while let Some(x) = iter.next() {
+            assert_eq!(x, clone_iter.next().unwrap());
+        }
+        assert_eq!(clone_iter.next(), None);
+    }
+
+    #[test]
+    fn test_into_iter_clone_partially_consumed_iterator() {
+        // Test that the cloned iterator only contains the remaining elements of the original iterator.
+        let mut iter = SmallVec::<[u8; 2]>::from_iter(0..3).into_iter().skip(1);
+        let mut clone_iter = iter.clone();
+        while let Some(x) = iter.next() {
+            assert_eq!(x, clone_iter.next().unwrap());
+        }
+        assert_eq!(clone_iter.next(), None);
+    }
+
+    #[test]
+    fn test_into_iter_clone_empty_smallvec() {
+        let mut iter = SmallVec::<[u8; 2]>::new().into_iter();
+        let mut clone_iter = iter.clone();
+        assert_eq!(iter.next(), None);
+        assert_eq!(clone_iter.next(), None);
     }
 
     #[test]
