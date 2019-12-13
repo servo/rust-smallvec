@@ -1504,15 +1504,6 @@ pub struct IntoIter<A: Array> {
     end: usize,
 }
 
-/*impl<A: Array + Clone> Clone for IntoIter<A>
-where
-    A::Item: Copy,
-{
-    fn clone(&self) -> IntoIter<A> {
-        SmallVec::from_slice(self.as_slice()).into_iter()
-    }
-}*/
-
 impl<A: Array + Clone> Clone for IntoIter<A>
 where
     A::Item: Clone,
