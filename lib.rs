@@ -251,6 +251,117 @@ impl<'a, T: 'a + Array> Drop for Drain<'a, T> {
     }
 }
 
+/// A splicing iterator for `SmallVec`.
+///
+/// This struct is created by the [`splice()`] method on [`SmallVec`]. See its
+/// documentation for more.
+pub struct Splice<'a, I: Iterator<Item = A::Item> + 'a, A: Array + 'a> {
+    drain: Drain<'a, A>,
+    replace_with: I,
+}
+
+impl<I: Iterator<Item = A::Item>, A: Array> Iterator for Splice<'_, I, A> {
+    type Item = I::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.drain.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.drain.size_hint()
+    }
+}
+
+impl<I: Iterator<Item = A::Item>, A: Array> DoubleEndedIterator for Splice<'_, I, A> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.drain.next_back()
+    }
+}
+
+impl<I: Iterator<Item = A::Item>, A: Array> ExactSizeIterator for Splice<'_, I, A> {}
+
+impl<I: Iterator<Item = A::Item>, A: Array> Drop for Splice<'_, I, A> {
+    fn drop(&mut self) {
+        self.drain.by_ref().for_each(drop);
+
+        unsafe {
+            if self.drain.tail_len == 0 {
+                self.drain.vec.as_mut().extend(self.replace_with.by_ref());
+                return;
+            }
+
+            // First fill the range left by drain().
+            if !self.drain.fill(&mut self.replace_with) {
+                return;
+            }
+
+            // There may be more elements. Use the lower bound as an estimate.
+            // FIXME: Is the upper bound a better guess? Or something else?
+            let (lower_bound, _upper_bound) = self.replace_with.size_hint();
+            if lower_bound > 0 {
+                self.drain.move_tail(lower_bound);
+                if !self.drain.fill(&mut self.replace_with) {
+                    return;
+                }
+            }
+
+            // Collect any remaining elements.
+            // This is a zero-length vector which does not allocate if `lower_bound` was exact.
+            let mut collected = self
+                .replace_with
+                .by_ref()
+                .collect::<Vec<I::Item>>()
+                .into_iter();
+            // Now we have an exact count.
+            if collected.len() > 0 {
+                self.drain.move_tail(collected.len());
+                let filled = self.drain.fill(&mut collected);
+                debug_assert!(filled);
+                debug_assert_eq!(collected.len(), 0);
+            }
+        }
+        // Let `Drain::drop` move the tail back if necessary and restore `vec.len`.
+    }
+}
+
+/// Private helper methods for `Splice::drop`
+impl<A: Array> Drain<'_, A> {
+    /// The range from `self.vec.len` to `self.tail_start` contains elements
+    /// that have been moved out.
+    /// Fill that range as much as possible with new elements from the `replace_with` iterator.
+    /// Returns `true` if we filled the entire range. (`replace_with.next()` didn't return `None`.)
+    unsafe fn fill<I: Iterator<Item = A::Item>>(&mut self, replace_with: &mut I) -> bool {
+        let vec = self.vec.as_mut();
+        let range_start = vec.len();
+        let range_end = self.tail_start;
+        let range_slice =
+            slice::from_raw_parts_mut(vec.as_mut_ptr().add(range_start), range_end - range_start);
+
+        for place in range_slice {
+            if let Some(new_item) = replace_with.next() {
+                ptr::write(place, new_item);
+                let len = vec.len();
+                vec.set_len(len + 1);
+            } else {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Makes room for inserting more elements before the tail.
+    unsafe fn move_tail(&mut self, extra_capacity: usize) {
+        let vec = self.vec.as_mut();
+        vec.reserve(extra_capacity);
+
+        let new_tail_start = self.tail_start + extra_capacity;
+        let src = vec.as_ptr().add(self.tail_start);
+        let dst = vec.as_mut_ptr().add(new_tail_start);
+        ptr::copy(src, dst, self.tail_len);
+        self.tail_start = new_tail_start;
+    }
+}
+
 #[cfg(feature = "union")]
 union SmallVecData<A: Array> {
     inline: MaybeUninit<A>,
@@ -577,6 +688,53 @@ impl<A: Array> SmallVec<A> {
     #[inline]
     pub fn spilled(&self) -> bool {
         self.capacity > A::size()
+    }
+
+    /// Creates a splicing iterator that replaces the specified range in the vector
+    /// with the given `replace_with` iterator and yields the removed items.
+    /// `replace_with` does not need to be the same length as `range`.
+    ///
+    /// The element range is removed even if the iterator is not consumed until the end.
+    ///
+    /// It is unspecified how many elements are removed from the vector
+    /// if the `Splice` value is leaked.
+    ///
+    /// The input iterator `replace_with` is only consumed when the `Splice` value is dropped.
+    ///
+    /// This is optimal if:
+    ///
+    /// * The tail (elements in the vector after `range`) is empty,
+    /// * or `replace_with` yields fewer elements than `range`'s length
+    /// * or the lower bound of its `size_hint()` is exact.
+    ///
+    /// Otherwise, a temporary vector is allocated and the tail is moved twice.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the starting point is greater than the end point or if
+    /// the end point is greater than the length of the vector.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smallvec::{SmallVec, smallvec};
+    ///
+    /// let mut v: SmallVec<[_; 1]> = smallvec![1, 2, 3];
+    /// let new = [7, 8];
+    /// let u: SmallVec<[_; 1]> = v.splice(..2, new.iter().cloned()).collect();
+    /// assert_eq!(&v[..], &[7, 8, 3]);
+    /// assert_eq!(&u[..], &[1, 2]);
+    /// ```
+    #[inline]
+    pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter, A>
+    where
+        R: RangeBounds<usize>,
+        I: IntoIterator<Item = A::Item>,
+    {
+        Splice {
+            drain: self.drain(range),
+            replace_with: replace_with.into_iter(),
+        }
     }
 
     /// Creates a draining iterator that removes the specified range in the vector
