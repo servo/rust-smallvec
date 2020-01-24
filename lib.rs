@@ -1513,6 +1513,15 @@ pub struct IntoIter<A: Array> {
     end: usize,
 }
 
+impl<A: Array> fmt::Debug for IntoIter<A>
+where
+    A::Item: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("IntoIter").field(&self.as_slice()).finish()
+    }
+}
+
 impl<A: Array + Clone> Clone for IntoIter<A>
 where
     A::Item: Clone,
