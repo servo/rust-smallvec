@@ -1,6 +1,6 @@
 [package]
 name = "smallvec"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2018"
 authors = ["Simon Sapin <simon.sapin@exyr.org>"]
 license = "MIT/Apache-2.0"
