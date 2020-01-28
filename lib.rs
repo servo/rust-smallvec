@@ -31,14 +31,14 @@
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 #![deny(missing_docs)]
 
-#[macro_use]
-extern crate alloc;
+#[doc(hidden)]
+pub extern crate alloc;
 
 #[cfg(any(test, feature = "write"))]
 extern crate std;
 
 use alloc::boxed::Box;
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 use core::borrow::{Borrow, BorrowMut};
 use core::cmp;
 use core::fmt;
@@ -116,7 +116,7 @@ macro_rules! smallvec {
             $(vec.push($x);)*
             vec
         } else {
-            $crate::SmallVec::from_vec(vec![$($x,)*])
+            $crate::SmallVec::from_vec($crate::alloc::vec![$($x,)*])
         }
     });
 }
@@ -1693,7 +1693,7 @@ mod tests {
     use alloc::borrow::ToOwned;
     use alloc::boxed::Box;
     use alloc::rc::Rc;
-    use alloc::vec::Vec;
+    use alloc::{vec, vec::Vec};
 
     #[test]
     pub fn test_zero() {
