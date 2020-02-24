@@ -1684,6 +1684,17 @@ impl_array!(
     0x40000, 0x60000, 0x80000, 0x10_0000
 );
 
+trait ToSmallVec<A:Array> {
+    fn to_smallvec(&self) -> SmallVec<A>;
+}
+
+impl<A:Array> ToSmallVec<A> for [A::Item]
+    where A::Item: Copy {
+    fn to_smallvec(&self) -> SmallVec<A> {
+        SmallVec::from_slice(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::SmallVec;
