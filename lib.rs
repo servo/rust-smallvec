@@ -1055,6 +1055,7 @@ impl<A: Array> SmallVec<A> {
     ///         assert_eq!(&*rebuilt, &[4, 5, 6]);
     ///     }
     /// }
+    #[inline]
     pub unsafe fn from_raw_parts(ptr: *mut A::Item, length: usize, capacity: usize) -> SmallVec<A> {
         assert!(capacity > A::size());
         SmallVec {
@@ -1372,6 +1373,7 @@ where
 }
 
 impl<A: Array> FromIterator<A::Item> for SmallVec<A> {
+    #[inline]
     fn from_iter<I: IntoIterator<Item = A::Item>>(iterable: I) -> SmallVec<A> {
         let mut v = SmallVec::new();
         v.extend(iterable);
@@ -1452,6 +1454,7 @@ impl<A: Array> Clone for SmallVec<A>
 where
     A::Item: Clone,
 {
+    #[inline]
     fn clone(&self) -> SmallVec<A> {
         let mut new_vector = SmallVec::with_capacity(self.len());
         for element in self.iter() {
@@ -1700,6 +1703,7 @@ trait ToSmallVec<A:Array> {
 
 impl<A:Array> ToSmallVec<A> for [A::Item]
     where A::Item: Copy {
+    #[inline]
     fn to_smallvec(&self) -> SmallVec<A> {
         SmallVec::from_slice(self)
     }
