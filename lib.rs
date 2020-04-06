@@ -1697,7 +1697,9 @@ impl_array!(
     0x40000, 0x60000, 0x80000, 0x10_0000
 );
 
-trait ToSmallVec<A:Array> {
+/// Convenience trait for constructing a `SmallVec`
+pub trait ToSmallVec<A:Array> {
+    /// Construct a new `SmallVec` from a slice.
     fn to_smallvec(&self) -> SmallVec<A>;
 }
 
