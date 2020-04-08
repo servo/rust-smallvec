@@ -14,7 +14,16 @@
 //! `write` feature implements the `std::io::Write` trait for vectors of `u8`.
 //! When this feature is enabled, `smallvec` depends on `std`.
 //!
-//! ## `union` feature
+//! ## Optional features
+//!
+//! ### `write`
+//!
+//! When this feature is enabled, `SmallVec<[u8; _]>` implements the `std::io::Write` trait.
+//! This feature is not compatible with `#![no_std]` programs.
+//!
+//! ### `union`
+//!
+//! **This feature is unstable and requires a nightly build of the Rust toolchain.**
 //!
 //! When the `union` feature is enabled `smallvec` will track its state (inline or spilled)
 //! without the use of an enum tag, reducing the size of the `smallvec` by one machine word.
@@ -24,6 +33,29 @@
 //!
 //! To use this feature add `features = ["union"]` in the `smallvec` section of Cargo.toml.
 //! Note that this feature requires a nightly compiler (for now).
+//!
+//! ### `const_generics`
+//!
+//! **This feature is unstable and requires a nightly build of the Rust toolchain.**
+//!
+//! When this feature is enabled, `SmallVec` works with any arrays of any size, not just a fixed
+//! list of sizes.
+//! 
+//! ### `specialization`
+//!
+//! **This feature is unstable and requires a nightly build of the Rust toolchain.**
+//!
+//! When this feature is enabled, `SmallVec::from(slice)` has improved performance for slices
+//! of `Copy` types.  (Without this feature, you can use `SmallVec::from_slice` to get optimal
+//! performance for `Copy` types.)
+//!
+//! ### `may_dangle`
+//!
+//! **This feature is unstable and requires a nightly build of the Rust toolchain.**
+//!
+//! This feature makes the Rust compiler less strict about use of vectors that contain borrowed
+//! references. For details, see the
+//! [Rustonomicon](https://doc.rust-lang.org/1.42.0/nomicon/dropck.html#an-escape-hatch).
 
 #![no_std]
 #![cfg_attr(feature = "union", feature(untagged_unions))]
@@ -1697,7 +1729,9 @@ impl_array!(
     0x40000, 0x60000, 0x80000, 0x10_0000
 );
 
-trait ToSmallVec<A:Array> {
+/// Convenience trait for constructing a `SmallVec`
+pub trait ToSmallVec<A:Array> {
+    /// Construct a new `SmallVec` from a slice.
     fn to_smallvec(&self) -> SmallVec<A>;
 }
 
