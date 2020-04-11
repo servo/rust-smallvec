@@ -865,6 +865,8 @@ impl<A: Array> SmallVec<A> {
 
     /// Insert multiple elements at position `index`, shifting all following elements toward the
     /// back.
+    ///
+    /// Note: when the iterator panics, this can leak memory.
     pub fn insert_many<I: IntoIterator<Item = A::Item>>(&mut self, index: usize, iterable: I) {
         let iter = iterable.into_iter();
         if index == self.len() {
@@ -2092,12 +2094,17 @@ mod tests {
             }
         }
 
+        // These boxes are leaked on purpose by panicking `insert_many`,
+        // so we clean them up manually to appease Miri's leak checker.
+        let mut box1 = Box::new(false);
+        let mut box2 = Box::new(false);
+
         let mut vec: SmallVec<[PanicOnDoubleDrop; 0]> = vec![
             PanicOnDoubleDrop {
-                dropped: Box::new(false),
+                dropped: unsafe { Box::from_raw(&mut *box1) },
             },
             PanicOnDoubleDrop {
-                dropped: Box::new(false),
+                dropped: unsafe { Box::from_raw(&mut *box2) },
             },
         ]
         .into();
@@ -2105,6 +2112,9 @@ mod tests {
             vec.insert_many(0, BadIter);
         });
         assert!(result.is_err());
+
+        drop(box1);
+        drop(box2);
     }
 
     #[test]
