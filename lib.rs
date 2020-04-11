@@ -865,6 +865,8 @@ impl<A: Array> SmallVec<A> {
 
     /// Insert multiple elements at position `index`, shifting all following elements toward the
     /// back.
+    ///
+    /// Note: when the iterator panics, this can leak memory.
     pub fn insert_many<I: IntoIterator<Item = A::Item>>(&mut self, index: usize, iterable: I) {
         let iter = iterable.into_iter();
         if index == self.len() {
