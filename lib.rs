@@ -750,22 +750,30 @@ impl<A: Array> SmallVec<A> {
                 self.data = SmallVecData::from_inline(MaybeUninit::uninit());
                 ptr::copy_nonoverlapping(ptr, self.data.inline_mut(), len);
                 self.capacity = len;
+                deallocate(ptr, cap);
             } else if new_cap != cap {
                 let layout = layout_array::<A::Item>(new_cap)?;
-                let new_alloc = NonNull::new(alloc::alloc::alloc(layout))
-                    .ok_or(CollectionAllocErr::AllocErr { layout })?
-                    .cast()
-                    .as_ptr();
-                ptr::copy_nonoverlapping(ptr, new_alloc, len);
+                let new_alloc;
+                if unspilled {
+                    new_alloc = NonNull::new(alloc::alloc::alloc(layout))
+                        .ok_or(CollectionAllocErr::AllocErr { layout })?
+                        .cast()
+                        .as_ptr();
+                    ptr::copy_nonoverlapping(ptr, new_alloc, len);
+                } else {
+                    // This should never fail since the same succeeded
+                    // when previously allocating `ptr`.
+                    let old_layout = layout_array::<A::Item>(cap)?;
+
+                    let new_ptr = alloc::alloc::realloc(ptr as *mut u8, old_layout, layout.size());
+                    new_alloc = NonNull::new(new_ptr)
+                        .ok_or(CollectionAllocErr::AllocErr { layout })?
+                        .cast()
+                        .as_ptr();
+                }
                 self.data = SmallVecData::from_heap(new_alloc, len);
                 self.capacity = new_cap;
-                if unspilled {
-                    return Ok(());
-                }
-            } else {
-                return Ok(());
             }
-            deallocate(ptr, cap);
             Ok(())
         }
     }
