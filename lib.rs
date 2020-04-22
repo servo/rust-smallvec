@@ -40,7 +40,7 @@
 //!
 //! When this feature is enabled, `SmallVec` works with any arrays of any size, not just a fixed
 //! list of sizes.
-//! 
+//!
 //! ### `specialization`
 //!
 //! **This feature is unstable and requires a nightly build of the Rust toolchain.**
@@ -71,6 +71,7 @@ pub extern crate alloc;
 #[cfg(any(test, feature = "write"))]
 extern crate std;
 
+use alloc::alloc::{Layout, LayoutErr};
 use alloc::boxed::Box;
 use alloc::{vec, vec::Vec};
 use core::borrow::{Borrow, BorrowMut};
@@ -200,9 +201,31 @@ impl<T: Clone> ExtendFromSlice<T> for Vec<T> {
     }
 }
 
+#[derive(Debug)]
+enum CollectionAllocErr {
+    CapacityOverflow,
+}
+
+impl From<LayoutErr> for CollectionAllocErr {
+    fn from(_: LayoutErr) -> Self {
+        CollectionAllocErr::CapacityOverflow
+    }
+}
+
+/// FIXME: use `Layout::array` when we require a Rust version where it’s stable
+/// https://github.com/rust-lang/rust/issues/55724
+fn layout_array<T>(n: usize) -> Result<Layout, CollectionAllocErr> {
+    let size = mem::size_of::<T>().checked_mul(n)
+        .ok_or(CollectionAllocErr::CapacityOverflow)?;
+    let align = mem::align_of::<T>();
+    Layout::from_size_align(size, align)
+        .map_err(|_| CollectionAllocErr::CapacityOverflow)
+}
+
 unsafe fn deallocate<T>(ptr: *mut T, capacity: usize) {
-    let _vec: Vec<T> = Vec::from_raw_parts(ptr, 0, capacity);
-    // Let it drop.
+    // This unwrap should succeed since the same did when allocating.
+    let layout = layout_array::<T>(capacity).unwrap();
+    alloc::alloc::dealloc(ptr as *mut u8, layout)
 }
 
 /// An iterator that removes the items from a `SmallVec` and yields them by value.
@@ -705,9 +728,12 @@ impl<A: Array> SmallVec<A> {
                 ptr::copy_nonoverlapping(ptr, self.data.inline_mut(), len);
                 self.capacity = len;
             } else if new_cap != cap {
-                let mut vec = Vec::with_capacity(new_cap);
-                let new_alloc = vec.as_mut_ptr();
-                mem::forget(vec);
+                // Panic on overflow
+                let layout = layout_array::<A::Item>(new_cap).unwrap();
+                let new_alloc = NonNull::new(alloc::alloc::alloc(layout))
+                    .unwrap_or_else(|| alloc::alloc::handle_alloc_error(layout))
+                    .cast()
+                    .as_ptr();
                 ptr::copy_nonoverlapping(ptr, new_alloc, len);
                 self.data = SmallVecData::from_heap(new_alloc, len);
                 self.capacity = new_cap;
