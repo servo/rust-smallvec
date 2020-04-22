@@ -201,14 +201,29 @@ impl<T: Clone> ExtendFromSlice<T> for Vec<T> {
     }
 }
 
+/// Error type for APIs with fallible heap allocation
 #[derive(Debug)]
-enum CollectionAllocErr {
+pub enum CollectionAllocErr {
+    /// Overflow `usize::MAX` or other error during size computation
     CapacityOverflow,
+    /// The allocator return an error
+    AllocErr {
+        /// The layout that was passed to the allocator
+        layout: Layout,
+    },
 }
 
 impl From<LayoutErr> for CollectionAllocErr {
     fn from(_: LayoutErr) -> Self {
         CollectionAllocErr::CapacityOverflow
+    }
+}
+
+fn infallible<T>(result: Result<T, CollectionAllocErr>) -> T {
+    match result {
+        Ok(x) => x,
+        Err(CollectionAllocErr::CapacityOverflow) => panic!("capacity overflow"),
+        Err(CollectionAllocErr::AllocErr { layout }) => alloc::alloc::handle_alloc_error(layout),
     }
 }
 
@@ -714,36 +729,44 @@ impl<A: Array> SmallVec<A> {
 
     /// Re-allocate to set the capacity to `max(new_cap, inline_size())`.
     ///
-    /// Panics if `new_cap` is less than the vector's length.
+    /// Panics if `new_cap` is less than the vector's length
+    /// or if the capacity computation overflows `usize`.
     pub fn grow(&mut self, new_cap: usize) {
+        infallible(self.try_grow(new_cap))
+    }
+
+    /// Re-allocate to set the capacity to `max(new_cap, inline_size())`.
+    ///
+    /// Panics if `new_cap` is less than the vector's length
+    pub fn try_grow(&mut self, new_cap: usize) -> Result<(), CollectionAllocErr> {
         unsafe {
             let (ptr, &mut len, cap) = self.triple_mut();
             let unspilled = !self.spilled();
             assert!(new_cap >= len);
             if new_cap <= self.inline_size() {
                 if unspilled {
-                    return;
+                    return Ok(());
                 }
                 self.data = SmallVecData::from_inline(MaybeUninit::uninit());
                 ptr::copy_nonoverlapping(ptr, self.data.inline_mut(), len);
                 self.capacity = len;
             } else if new_cap != cap {
-                // Panic on overflow
-                let layout = layout_array::<A::Item>(new_cap).unwrap();
+                let layout = layout_array::<A::Item>(new_cap)?;
                 let new_alloc = NonNull::new(alloc::alloc::alloc(layout))
-                    .unwrap_or_else(|| alloc::alloc::handle_alloc_error(layout))
+                    .ok_or(CollectionAllocErr::AllocErr { layout })?
                     .cast()
                     .as_ptr();
                 ptr::copy_nonoverlapping(ptr, new_alloc, len);
                 self.data = SmallVecData::from_heap(new_alloc, len);
                 self.capacity = new_cap;
                 if unspilled {
-                    return;
+                    return Ok(());
                 }
             } else {
-                return;
+                return Ok(());
             }
             deallocate(ptr, cap);
+            Ok(())
         }
     }
 
@@ -751,11 +774,16 @@ impl<A: Array> SmallVec<A> {
     ///
     /// May reserve more space to avoid frequent reallocations.
     ///
-    /// If the new capacity would overflow `usize` then it will be set to `usize::max_value()`
-    /// instead. (This means that inserting `additional` new elements is not guaranteed to be
-    /// possible after calling this function.)
+    /// Panics if the capacity computation overflows `usize`.
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
+        infallible(self.try_reserve(additional))
+    }
+
+    /// Reserve capacity for `additional` more elements to be inserted.
+    ///
+    /// May reserve more space to avoid frequent reallocations.
+    pub fn try_reserve(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
         // prefer triple_mut() even if triple() would work
         // so that the optimizer removes duplicated calls to it
         // from callers like insert()
@@ -764,8 +792,10 @@ impl<A: Array> SmallVec<A> {
             let new_cap = len
                 .checked_add(additional)
                 .and_then(usize::checked_next_power_of_two)
-                .unwrap_or(usize::max_value());
-            self.grow(new_cap);
+                .ok_or(CollectionAllocErr::CapacityOverflow)?;
+            self.try_grow(new_cap)
+        } else {
+            Ok(())
         }
     }
 
@@ -773,12 +803,19 @@ impl<A: Array> SmallVec<A> {
     ///
     /// Panics if the new capacity overflows `usize`.
     pub fn reserve_exact(&mut self, additional: usize) {
+        infallible(self.try_reserve_exact(additional))
+    }
+
+    /// Reserve the minimum capacity for `additional` more elements to be inserted.
+    pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
         let (_, &mut len, cap) = self.triple_mut();
         if cap - len < additional {
-            match len.checked_add(additional) {
-                Some(cap) => self.grow(cap),
-                None => panic!("reserve_exact overflow"),
-            }
+            let new_cap = len
+                .checked_add(additional)
+                .ok_or(CollectionAllocErr::CapacityOverflow)?;
+            self.try_grow(new_cap)
+        } else {
+            Ok(())
         }
     }
 
