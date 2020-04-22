@@ -98,7 +98,7 @@ use core::hint::unreachable_unchecked;
 use core::iter::{repeat, FromIterator, FusedIterator, IntoIterator};
 use core::mem;
 use core::mem::MaybeUninit;
-use core::ops::{self, RangeBounds};
+use core::ops::{self, Range, RangeBounds};
 use core::ptr::{self, NonNull};
 use core::slice::{self, SliceIndex};
 
@@ -975,8 +975,6 @@ impl<A: Array> SmallVec<A> {
 
     /// Insert multiple elements at position `index`, shifting all following elements toward the
     /// back.
-    ///
-    /// Note: when the iterator panics, this can leak memory.
     pub fn insert_many<I: IntoIterator<Item = A::Item>>(&mut self, index: usize, iterable: I) {
         let iter = iterable.into_iter();
         if index == self.len() {
@@ -991,13 +989,19 @@ impl<A: Array> SmallVec<A> {
         unsafe {
             let old_len = self.len();
             assert!(index <= old_len);
-            let mut ptr = self.as_mut_ptr().add(index);
+            let start = self.as_mut_ptr();
+            let mut ptr = start.add(index);
 
             // Move the trailing elements.
             ptr::copy(ptr, ptr.add(lower_size_bound), old_len - index);
 
             // In case the iterator panics, don't double-drop the items we just copied above.
-            self.set_len(index);
+            self.set_len(0);
+            let mut guard = DropOnPanic {
+                start,
+                skip: index..(index + lower_size_bound),
+                len: old_len + lower_size_bound,
+            };
 
             let mut num_added = 0;
             for element in iter {
@@ -1005,13 +1009,21 @@ impl<A: Array> SmallVec<A> {
                 if num_added >= lower_size_bound {
                     // Iterator provided more elements than the hint.  Move trailing items again.
                     self.reserve(1);
-                    ptr = self.as_mut_ptr().add(index);
+                    let start = self.as_mut_ptr();
+                    ptr = start.add(index);
                     cur = ptr.add(num_added);
                     ptr::copy(cur, cur.add(1), old_len - index);
+
+                    guard.start = start;
+                    guard.len += 1;
+                    guard.skip.end += 1;
                 }
                 ptr::write(cur, element);
+                guard.skip.start += 1;
                 num_added += 1;
             }
+            mem::forget(guard);
+
             if num_added < lower_size_bound {
                 // Iterator provided fewer elements than the hint
                 ptr::copy(
@@ -1022,6 +1034,24 @@ impl<A: Array> SmallVec<A> {
             }
 
             self.set_len(old_len + num_added);
+        }
+
+        struct DropOnPanic<T> {
+            start: *mut T,
+            skip: Range<usize>,
+            len: usize,
+        }
+
+        impl<T> Drop for DropOnPanic<T> {
+            fn drop(&mut self) {
+                for i in 0..self.len {
+                    if !self.skip.contains(&i) {
+                        unsafe {
+                            ptr::drop_in_place(self.start.add(i));
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1248,6 +1278,22 @@ impl<A: Array> SmallVec<A> {
             capacity,
             data: SmallVecData::from_heap(ptr, length),
         }
+    }
+
+    /// Returns a raw pointer to the vector's buffer.
+    pub fn as_ptr(&self) -> *const A::Item {
+        // We shadow the slice method of the same name to avoid going through
+        // `deref`, which creates an intermediate reference that may place
+        // additional safety constraints on the contents of the slice.
+        self.triple().0
+    }
+
+    /// Returns a raw mutable pointer to the vector's buffer.
+    pub fn as_mut_ptr(&mut self) -> *mut A::Item {
+        // We shadow the slice method of the same name to avoid going through
+        // `deref_mut`, which creates an intermediate reference that may place
+        // additional safety constraints on the contents of the slice.
+        self.triple_mut().0
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::{SmallVec, smallvec};
+use crate::{smallvec, SmallVec};
 
 use std::iter::FromIterator;
 
@@ -320,11 +320,21 @@ fn test_insert_many_long_hint() {
     );
 }
 
-#[test]
 // https://github.com/servo/rust-smallvec/issues/96
-fn test_insert_many_panic() {
+mod insert_many_panic {
+    use crate::{smallvec, SmallVec};
+    use alloc::boxed::Box;
+
     struct PanicOnDoubleDrop {
         dropped: Box<bool>,
+    }
+
+    impl PanicOnDoubleDrop {
+        fn new() -> Self {
+            Self {
+                dropped: Box::new(false),
+            }
+        }
     }
 
     impl Drop for PanicOnDoubleDrop {
@@ -334,38 +344,75 @@ fn test_insert_many_panic() {
         }
     }
 
-    struct BadIter;
+    /// Claims to yield `hint` items, but actually yields `count`, then panics.
+    struct BadIter {
+        hint: usize,
+        count: usize,
+    }
+
     impl Iterator for BadIter {
         type Item = PanicOnDoubleDrop;
         fn size_hint(&self) -> (usize, Option<usize>) {
-            (1, None)
+            (self.hint, None)
         }
         fn next(&mut self) -> Option<Self::Item> {
-            panic!()
+            if self.count == 0 {
+                panic!()
+            }
+            self.count -= 1;
+            Some(PanicOnDoubleDrop::new())
         }
     }
 
-    // These boxes are leaked on purpose by panicking `insert_many`,
-    // so we clean them up manually to appease Miri's leak checker.
-    let mut box1 = Box::new(false);
-    let mut box2 = Box::new(false);
+    #[test]
+    fn panic_early_at_start() {
+        let mut vec: SmallVec<[PanicOnDoubleDrop; 0]> =
+            smallvec![PanicOnDoubleDrop::new(), PanicOnDoubleDrop::new(),];
+        let result = ::std::panic::catch_unwind(move || {
+            vec.insert_many(0, BadIter { hint: 1, count: 0 });
+        });
+        assert!(result.is_err());
+    }
 
-    let mut vec: SmallVec<[PanicOnDoubleDrop; 0]> = vec![
-        PanicOnDoubleDrop {
-            dropped: unsafe { Box::from_raw(&mut *box1) },
-        },
-        PanicOnDoubleDrop {
-            dropped: unsafe { Box::from_raw(&mut *box2) },
-        },
-    ]
-    .into();
-    let result = ::std::panic::catch_unwind(move || {
-        vec.insert_many(0, BadIter);
-    });
-    assert!(result.is_err());
+    #[test]
+    fn panic_early_in_middle() {
+        let mut vec: SmallVec<[PanicOnDoubleDrop; 0]> =
+            smallvec![PanicOnDoubleDrop::new(), PanicOnDoubleDrop::new(),];
+        let result = ::std::panic::catch_unwind(move || {
+            vec.insert_many(1, BadIter { hint: 4, count: 2 });
+        });
+        assert!(result.is_err());
+    }
 
-    drop(box1);
-    drop(box2);
+    #[test]
+    fn panic_early_at_end() {
+        let mut vec: SmallVec<[PanicOnDoubleDrop; 0]> =
+            smallvec![PanicOnDoubleDrop::new(), PanicOnDoubleDrop::new(),];
+        let result = ::std::panic::catch_unwind(move || {
+            vec.insert_many(2, BadIter { hint: 3, count: 1 });
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn panic_late_at_start() {
+        let mut vec: SmallVec<[PanicOnDoubleDrop; 0]> =
+            smallvec![PanicOnDoubleDrop::new(), PanicOnDoubleDrop::new(),];
+        let result = ::std::panic::catch_unwind(move || {
+            vec.insert_many(0, BadIter { hint: 3, count: 5 });
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn panic_late_at_end() {
+        let mut vec: SmallVec<[PanicOnDoubleDrop; 0]> =
+            smallvec![PanicOnDoubleDrop::new(), PanicOnDoubleDrop::new(),];
+        let result = ::std::panic::catch_unwind(move || {
+            vec.insert_many(2, BadIter { hint: 3, count: 5 });
+        });
+        assert!(result.is_err());
+    }
 }
 
 #[test]
