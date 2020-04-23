@@ -40,7 +40,7 @@
 //!
 //! When this feature is enabled, `SmallVec` works with any arrays of any size, not just a fixed
 //! list of sizes.
-//! 
+//!
 //! ### `specialization`
 //!
 //! **This feature is unstable and requires a nightly build of the Rust toolchain.**
@@ -71,6 +71,7 @@ pub extern crate alloc;
 #[cfg(any(test, feature = "write"))]
 extern crate std;
 
+use alloc::alloc::{Layout, LayoutErr};
 use alloc::boxed::Box;
 use alloc::{vec, vec::Vec};
 use core::borrow::{Borrow, BorrowMut};
@@ -200,9 +201,46 @@ impl<T: Clone> ExtendFromSlice<T> for Vec<T> {
     }
 }
 
+/// Error type for APIs with fallible heap allocation
+#[derive(Debug)]
+pub enum CollectionAllocErr {
+    /// Overflow `usize::MAX` or other error during size computation
+    CapacityOverflow,
+    /// The allocator return an error
+    AllocErr {
+        /// The layout that was passed to the allocator
+        layout: Layout,
+    },
+}
+
+impl From<LayoutErr> for CollectionAllocErr {
+    fn from(_: LayoutErr) -> Self {
+        CollectionAllocErr::CapacityOverflow
+    }
+}
+
+fn infallible<T>(result: Result<T, CollectionAllocErr>) -> T {
+    match result {
+        Ok(x) => x,
+        Err(CollectionAllocErr::CapacityOverflow) => panic!("capacity overflow"),
+        Err(CollectionAllocErr::AllocErr { layout }) => alloc::alloc::handle_alloc_error(layout),
+    }
+}
+
+/// FIXME: use `Layout::array` when we require a Rust version where it’s stable
+/// https://github.com/rust-lang/rust/issues/55724
+fn layout_array<T>(n: usize) -> Result<Layout, CollectionAllocErr> {
+    let size = mem::size_of::<T>().checked_mul(n)
+        .ok_or(CollectionAllocErr::CapacityOverflow)?;
+    let align = mem::align_of::<T>();
+    Layout::from_size_align(size, align)
+        .map_err(|_| CollectionAllocErr::CapacityOverflow)
+}
+
 unsafe fn deallocate<T>(ptr: *mut T, capacity: usize) {
-    let _vec: Vec<T> = Vec::from_raw_parts(ptr, 0, capacity);
-    // Let it drop.
+    // This unwrap should succeed since the same did when allocating.
+    let layout = layout_array::<T>(capacity).unwrap();
+    alloc::alloc::dealloc(ptr as *mut u8, layout)
 }
 
 /// An iterator that removes the items from a `SmallVec` and yields them by value.
@@ -691,33 +729,52 @@ impl<A: Array> SmallVec<A> {
 
     /// Re-allocate to set the capacity to `max(new_cap, inline_size())`.
     ///
-    /// Panics if `new_cap` is less than the vector's length.
+    /// Panics if `new_cap` is less than the vector's length
+    /// or if the capacity computation overflows `usize`.
     pub fn grow(&mut self, new_cap: usize) {
+        infallible(self.try_grow(new_cap))
+    }
+
+    /// Re-allocate to set the capacity to `max(new_cap, inline_size())`.
+    ///
+    /// Panics if `new_cap` is less than the vector's length
+    pub fn try_grow(&mut self, new_cap: usize) -> Result<(), CollectionAllocErr> {
         unsafe {
             let (ptr, &mut len, cap) = self.triple_mut();
             let unspilled = !self.spilled();
             assert!(new_cap >= len);
             if new_cap <= self.inline_size() {
                 if unspilled {
-                    return;
+                    return Ok(());
                 }
                 self.data = SmallVecData::from_inline(MaybeUninit::uninit());
                 ptr::copy_nonoverlapping(ptr, self.data.inline_mut(), len);
                 self.capacity = len;
+                deallocate(ptr, cap);
             } else if new_cap != cap {
-                let mut vec = Vec::with_capacity(new_cap);
-                let new_alloc = vec.as_mut_ptr();
-                mem::forget(vec);
-                ptr::copy_nonoverlapping(ptr, new_alloc, len);
+                let layout = layout_array::<A::Item>(new_cap)?;
+                let new_alloc;
+                if unspilled {
+                    new_alloc = NonNull::new(alloc::alloc::alloc(layout))
+                        .ok_or(CollectionAllocErr::AllocErr { layout })?
+                        .cast()
+                        .as_ptr();
+                    ptr::copy_nonoverlapping(ptr, new_alloc, len);
+                } else {
+                    // This should never fail since the same succeeded
+                    // when previously allocating `ptr`.
+                    let old_layout = layout_array::<A::Item>(cap)?;
+
+                    let new_ptr = alloc::alloc::realloc(ptr as *mut u8, old_layout, layout.size());
+                    new_alloc = NonNull::new(new_ptr)
+                        .ok_or(CollectionAllocErr::AllocErr { layout })?
+                        .cast()
+                        .as_ptr();
+                }
                 self.data = SmallVecData::from_heap(new_alloc, len);
                 self.capacity = new_cap;
-                if unspilled {
-                    return;
-                }
-            } else {
-                return;
             }
-            deallocate(ptr, cap);
+            Ok(())
         }
     }
 
@@ -725,35 +782,47 @@ impl<A: Array> SmallVec<A> {
     ///
     /// May reserve more space to avoid frequent reallocations.
     ///
-    /// If the new capacity would overflow `usize` then it will be set to `usize::max_value()`
-    /// instead. (This means that inserting `additional` new elements is not guaranteed to be
-    /// possible after calling this function.)
+    /// Panics if the capacity computation overflows `usize`.
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
+        infallible(self.try_reserve(additional))
+    }
+
+    /// Reserve capacity for `additional` more elements to be inserted.
+    ///
+    /// May reserve more space to avoid frequent reallocations.
+    pub fn try_reserve(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
         // prefer triple_mut() even if triple() would work
         // so that the optimizer removes duplicated calls to it
         // from callers like insert()
         let (_, &mut len, cap) = self.triple_mut();
-        if cap - len < additional {
-            let new_cap = len
-                .checked_add(additional)
-                .and_then(usize::checked_next_power_of_two)
-                .unwrap_or(usize::max_value());
-            self.grow(new_cap);
+        if cap - len >= additional {
+            return Ok(());
         }
+        let new_cap = len
+            .checked_add(additional)
+            .and_then(usize::checked_next_power_of_two)
+            .ok_or(CollectionAllocErr::CapacityOverflow)?;
+        self.try_grow(new_cap)
     }
 
     /// Reserve the minimum capacity for `additional` more elements to be inserted.
     ///
     /// Panics if the new capacity overflows `usize`.
     pub fn reserve_exact(&mut self, additional: usize) {
+        infallible(self.try_reserve_exact(additional))
+    }
+
+    /// Reserve the minimum capacity for `additional` more elements to be inserted.
+    pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
         let (_, &mut len, cap) = self.triple_mut();
-        if cap - len < additional {
-            match len.checked_add(additional) {
-                Some(cap) => self.grow(cap),
-                None => panic!("reserve_exact overflow"),
-            }
+        if cap - len >= additional {
+            return Ok(());
         }
+        let new_cap = len
+            .checked_add(additional)
+            .ok_or(CollectionAllocErr::CapacityOverflow)?;
+        self.try_grow(new_cap)
     }
 
     /// Shrink the capacity of the vector as much as possible.
