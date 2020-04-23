@@ -796,15 +796,14 @@ impl<A: Array> SmallVec<A> {
         // so that the optimizer removes duplicated calls to it
         // from callers like insert()
         let (_, &mut len, cap) = self.triple_mut();
-        if cap - len < additional {
-            let new_cap = len
-                .checked_add(additional)
-                .and_then(usize::checked_next_power_of_two)
-                .ok_or(CollectionAllocErr::CapacityOverflow)?;
-            self.try_grow(new_cap)
-        } else {
-            Ok(())
+        if cap - len >= additional {
+            return Ok(());
         }
+        let new_cap = len
+            .checked_add(additional)
+            .and_then(usize::checked_next_power_of_two)
+            .ok_or(CollectionAllocErr::CapacityOverflow)?;
+        self.try_grow(new_cap)
     }
 
     /// Reserve the minimum capacity for `additional` more elements to be inserted.
@@ -817,14 +816,13 @@ impl<A: Array> SmallVec<A> {
     /// Reserve the minimum capacity for `additional` more elements to be inserted.
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
         let (_, &mut len, cap) = self.triple_mut();
-        if cap - len < additional {
-            let new_cap = len
-                .checked_add(additional)
-                .ok_or(CollectionAllocErr::CapacityOverflow)?;
-            self.try_grow(new_cap)
-        } else {
-            Ok(())
+        if cap - len >= additional {
+            return Ok(());
         }
+        let new_cap = len
+            .checked_add(additional)
+            .ok_or(CollectionAllocErr::CapacityOverflow)?;
+        self.try_grow(new_cap)
     }
 
     /// Shrink the capacity of the vector as much as possible.
