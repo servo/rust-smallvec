@@ -190,11 +190,14 @@ macro_rules! debug_unreachable {
 /// initialize(&mut small_vec);
 /// assert_eq!(&small_vec as &[_], b"Test!");
 /// ```
+#[doc(hidden)]
+#[deprecated]
 pub trait ExtendFromSlice<T> {
     /// Extends a collection from a slice of its element type
     fn extend_from_slice(&mut self, other: &[T]);
 }
 
+#[allow(deprecated)]
 impl<T: Clone> ExtendFromSlice<T> for Vec<T> {
     fn extend_from_slice(&mut self, other: &[T]) {
         Vec::extend_from_slice(self, other)
@@ -1466,6 +1469,7 @@ impl<A: Array, I: SliceIndex<[A::Item]>> ops::IndexMut<I> for SmallVec<A> {
     }
 }
 
+#[allow(deprecated)]
 impl<A: Array> ExtendFromSlice<A::Item> for SmallVec<A>
 where
     A::Item: Copy,
