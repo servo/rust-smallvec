@@ -205,7 +205,7 @@ impl<T: Clone> ExtendFromSlice<T> for Vec<T> {
 }
 
 /// Error type for APIs with fallible heap allocation
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum CollectionAllocErr {
     /// Overflow `usize::MAX` or other error during size computation
     CapacityOverflow,
@@ -221,12 +221,22 @@ impl From<LayoutErr> for CollectionAllocErr {
         CollectionAllocErr::CapacityOverflow
     }
 }
+impl CollectionAllocErr {
+    #[cold]
+    #[inline(never)]
+    fn bail(&self) -> ! {
+        match self {
+            CollectionAllocErr::CapacityOverflow => panic!("capacity overflow"),
+            CollectionAllocErr::AllocErr { layout } => alloc::alloc::handle_alloc_error(*layout),
+        }
+    }
+}
 
+#[inline]
 fn infallible<T>(result: Result<T, CollectionAllocErr>) -> T {
     match result {
         Ok(x) => x,
-        Err(CollectionAllocErr::CapacityOverflow) => panic!("capacity overflow"),
-        Err(CollectionAllocErr::AllocErr { layout }) => alloc::alloc::handle_alloc_error(layout),
+        Err(ref err) => err.bail(),
     }
 }
 
@@ -800,8 +810,19 @@ impl<A: Array> SmallVec<A> {
         // from callers like insert()
         let (_, &mut len, cap) = self.triple_mut();
         if cap - len >= additional {
-            return Ok(());
+            Ok(())
+        } else {
+            self.try_reserve_cold(len, additional)
         }
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn try_reserve_cold(
+        &mut self,
+        len: usize,
+        additional: usize,
+    ) -> Result<(), CollectionAllocErr> {
         let new_cap = len
             .checked_add(additional)
             .and_then(usize::checked_next_power_of_two)
@@ -817,11 +838,23 @@ impl<A: Array> SmallVec<A> {
     }
 
     /// Reserve the minimum capacity for `additional` more elements to be inserted.
+    #[inline]
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
         let (_, &mut len, cap) = self.triple_mut();
         if cap - len >= additional {
-            return Ok(());
+            Ok(())
+        } else {
+            self.try_reserve_exact_cold(len, additional)
         }
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn try_reserve_exact_cold(
+        &mut self,
+        len: usize,
+        additional: usize,
+    ) -> Result<(), CollectionAllocErr> {
         let new_cap = len
             .checked_add(additional)
             .ok_or(CollectionAllocErr::CapacityOverflow)?;
