@@ -1563,11 +1563,7 @@ where
 {
     #[inline]
     fn clone(&self) -> SmallVec<A> {
-        let mut new_vector = SmallVec::with_capacity(self.len());
-        for element in self.iter() {
-            new_vector.push((*element).clone())
-        }
-        new_vector
+        SmallVec::from(self.as_slice())
     }
 }
 
