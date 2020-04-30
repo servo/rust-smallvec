@@ -1093,6 +1093,48 @@ impl<A: Array> SmallVec<A> {
         self.dedup_by(|a, b| key(a) == key(b));
     }
 
+    /// Resizes the `SmallVec` in-place so that `len` is equal to `new_len`.
+    ///
+    /// If `new_len` is greater than `len`, the `SmallVec` is extended by the difference, with each
+    /// additional slot filled with the result of calling the closure `f`. The return values from `f`
+    //// will end up in the `SmallVec` in the order they have been generated.
+    ///
+    /// If `new_len` is less than `len`, the `SmallVec` is simply truncated.
+    ///
+    /// This method uses a closure to create new values on every push. If you'd rather `Clone` a given
+    /// value, use `resize`. If you want to use the `Default` trait to generate values, you can pass
+    /// `Default::default()` as the second argument.
+    ///
+    /// Added for std::vec::Vec compatibility (added in Rust 1.33.0)
+    ///
+    /// ```
+    /// # use smallvec::{smallvec, SmallVec};
+    /// let mut vec : SmallVec<[_; 4]> = smallvec![1, 2, 3];
+    /// vec.resize_with(5, Default::default);
+    /// assert_eq!(&*vec, &[1, 2, 3, 0, 0]);
+    ///
+    /// let mut vec : SmallVec<[_; 4]> = smallvec![];
+    /// let mut p = 1;
+    /// vec.resize_with(4, || { p *= 2; p });
+    /// assert_eq!(&*vec, &[2, 4, 8, 16]);
+    /// ```
+    pub fn resize_with<F>(&mut self, new_len: usize, f: F)
+    where
+        F: FnMut() -> A::Item,
+    {
+        let old_len = self.len();
+        if old_len < new_len {
+            let mut f = f;
+            let additional = new_len - old_len;
+            self.reserve(additional);
+            for _ in 0..additional {
+                self.push(f());
+            }
+        } else if old_len > new_len {
+            self.truncate(new_len);
+        }
+    }
+
     /// Creates a `SmallVec` directly from the raw components of another
     /// `SmallVec`.
     ///
