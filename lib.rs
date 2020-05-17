@@ -146,6 +146,7 @@ macro_rules! smallvec {
     });
     ($($x:expr),*$(,)*) => ({
         let count = 0usize $(+ $crate::smallvec!(@one $x))*;
+        #[allow(unused_mut)]
         let mut vec = $crate::SmallVec::new();
         if count <= vec.inline_size() {
             $(vec.push($x);)*
@@ -2707,5 +2708,10 @@ mod tests {
     #[test]
     fn const_generics() {
         let _v = SmallVec::<[i32; 987]>::default();
+    }
+
+    #[test]
+    fn empty_macro() {
+        let _v: SmallVec<[u8; 1]> = smallvec![];
     }
 }
