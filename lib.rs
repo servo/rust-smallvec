@@ -34,12 +34,16 @@
 //! To use this feature add `features = ["union"]` in the `smallvec` section of Cargo.toml.
 //! Note that this feature requires a nightly compiler (for now).
 //!
+//! Tracking issue: [rust-lang/rust#55149](https://github.com/rust-lang/rust/issues/55149)
+//!
 //! ### `const_generics`
 //!
 //! **This feature is unstable and requires a nightly build of the Rust toolchain.**
 //!
 //! When this feature is enabled, `SmallVec` works with any arrays of any size, not just a fixed
 //! list of sizes.
+//!
+//! Tracking issue: [rust-lang/rust#44580](https://github.com/rust-lang/rust/issues/44580)
 //!
 //! ### `specialization`
 //!
@@ -49,6 +53,8 @@
 //! of `Copy` types.  (Without this feature, you can use `SmallVec::from_slice` to get optimal
 //! performance for `Copy` types.)
 //!
+//! Tracking issue: [rust-lang/rust#31844](https://github.com/rust-lang/rust/issues/31844)
+//!
 //! ### `may_dangle`
 //!
 //! **This feature is unstable and requires a nightly build of the Rust toolchain.**
@@ -56,6 +62,8 @@
 //! This feature makes the Rust compiler less strict about use of vectors that contain borrowed
 //! references. For details, see the
 //! [Rustonomicon](https://doc.rust-lang.org/1.42.0/nomicon/dropck.html#an-escape-hatch).
+//!
+//! Tracking issue: [rust-lang/rust#34761](https://github.com/rust-lang/rust/issues/34761)
 
 #![no_std]
 #![cfg_attr(feature = "union", feature(untagged_unions))]
