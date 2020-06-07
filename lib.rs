@@ -16,6 +16,11 @@
 //!
 //! ## Optional features
 //!
+//! ### `serde`
+//!
+//! When this optional dependency is enabled, `SmallVec` implements the `serde::Serialize` and
+//! `serde::Deserialize` traits.
+//!
 //! ### `write`
 //!
 //! When this feature is enabled, `SmallVec<[u8; _]>` implements the `std::io::Write` trait.
