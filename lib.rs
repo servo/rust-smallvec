@@ -247,11 +247,11 @@ fn infallible<T>(result: Result<T, CollectionAllocErr>) -> T {
 /// FIXME: use `Layout::array` when we require a Rust version where it’s stable
 /// https://github.com/rust-lang/rust/issues/55724
 fn layout_array<T>(n: usize) -> Result<Layout, CollectionAllocErr> {
-    let size = mem::size_of::<T>().checked_mul(n)
+    let size = mem::size_of::<T>()
+        .checked_mul(n)
         .ok_or(CollectionAllocErr::CapacityOverflow)?;
     let align = mem::align_of::<T>();
-    Layout::from_size_align(size, align)
-        .map_err(|_| CollectionAllocErr::CapacityOverflow)
+    Layout::from_size_align(size, align).map_err(|_| CollectionAllocErr::CapacityOverflow)
 }
 
 unsafe fn deallocate<T>(ptr: *mut T, capacity: usize) {
@@ -1834,7 +1834,9 @@ impl<'a> Drop for SetLenOnDrop<'a> {
 #[cfg(feature = "const_generics")]
 unsafe impl<T, const N: usize> Array for [T; N] {
     type Item = T;
-    fn size() -> usize { N }
+    fn size() -> usize {
+        N
+    }
 }
 
 #[cfg(not(feature = "const_generics"))]
@@ -1857,13 +1859,15 @@ impl_array!(
 );
 
 /// Convenience trait for constructing a `SmallVec`
-pub trait ToSmallVec<A:Array> {
+pub trait ToSmallVec<A: Array> {
     /// Construct a new `SmallVec` from a slice.
     fn to_smallvec(&self) -> SmallVec<A>;
 }
 
-impl<A:Array> ToSmallVec<A> for [A::Item]
-    where A::Item: Copy {
+impl<A: Array> ToSmallVec<A> for [A::Item]
+where
+    A::Item: Copy,
+{
     #[inline]
     fn to_smallvec(&self) -> SmallVec<A> {
         SmallVec::from_slice(self)
