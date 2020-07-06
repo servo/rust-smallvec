@@ -462,8 +462,8 @@ unsafe impl<A: Array + Sync> Sync for SmallVecData<A> {}
 /// ```
 pub struct SmallVec<A: Array> {
     // The capacity field is used to determine which of the storage variants is active:
-    // If capacity <= A::size() then the inline variant is used and capacity holds the current length of the vector (number of elements actually in use).
-    // If capacity > A::size() then the heap variant is used and capacity holds the size of the memory allocation.
+    // If capacity <= Self::inline_capacity() then the inline variant is used and capacity holds the current length of the vector (number of elements actually in use).
+    // If capacity > Self::inline_capacity() then the heap variant is used and capacity holds the size of the memory allocation.
     capacity: usize,
     data: SmallVecData<A>,
 }
@@ -506,7 +506,7 @@ impl<A: Array> SmallVec<A> {
 
     /// Construct a new `SmallVec` from a `Vec<A::Item>`.
     ///
-    /// Elements will be copied to the inline buffer if vec.capacity() <= A::size().
+    /// Elements will be copied to the inline buffer if vec.capacity() <= Self::inline_capacity().
     ///
     /// ```rust
     /// use smallvec::SmallVec;
@@ -518,7 +518,7 @@ impl<A: Array> SmallVec<A> {
     /// ```
     #[inline]
     pub fn from_vec(mut vec: Vec<A::Item>) -> SmallVec<A> {
-        if vec.capacity() <= A::size() {
+        if vec.capacity() <= Self::inline_capacity() {
             unsafe {
                 let mut data = SmallVecData::<A>::from_inline(MaybeUninit::uninit());
                 let len = vec.len();
@@ -613,8 +613,28 @@ impl<A: Array> SmallVec<A> {
 
     /// The maximum number of elements this vector can hold inline
     #[inline]
+    fn inline_capacity() -> usize {
+        if mem::size_of::<A::Item>() > 0 {
+            A::size()
+        } else {
+            // For zero-size items code like `ptr.add(offset)` always returns the same pointer.
+            // Therefore all items are at the same address,
+            // and any array size has capacity for infinitely many items.
+            // The capacity is limited by the bit width of the length field.
+            //
+            // `Vec` also does this:
+            // https://github.com/rust-lang/rust/blob/1.44.0/src/liballoc/raw_vec.rs#L186
+            //
+            // In our case, this also ensures that a smallvec of zero-size items never spills,
+            // and we never try to allocate zero bytes which `std::alloc::alloc` disallows.
+            core::usize::MAX
+        }
+    }
+
+    /// The maximum number of elements this vector can hold inline
+    #[inline]
     pub fn inline_size(&self) -> usize {
-        A::size()
+        Self::inline_capacity()
     }
 
     /// The number of elements stored in the vector
@@ -644,7 +664,7 @@ impl<A: Array> SmallVec<A> {
                 let (ptr, len) = self.data.heap();
                 (ptr, len, self.capacity)
             } else {
-                (self.data.inline(), self.capacity, A::size())
+                (self.data.inline(), self.capacity, Self::inline_capacity())
             }
         }
     }
@@ -657,7 +677,7 @@ impl<A: Array> SmallVec<A> {
                 let &mut (ptr, ref mut len_ptr) = self.data.heap_mut();
                 (ptr, len_ptr, self.capacity)
             } else {
-                (self.data.inline_mut(), &mut self.capacity, A::size())
+                (self.data.inline_mut(), &mut self.capacity, Self::inline_capacity())
             }
         }
     }
@@ -665,7 +685,7 @@ impl<A: Array> SmallVec<A> {
     /// Returns `true` if the data has spilled into a separate heap-allocated buffer.
     #[inline]
     pub fn spilled(&self) -> bool {
-        self.capacity > A::size()
+        self.capacity > Self::inline_capacity()
     }
 
     /// Creates a draining iterator that removes the specified range in the vector
@@ -770,6 +790,7 @@ impl<A: Array> SmallVec<A> {
                 deallocate(ptr, cap);
             } else if new_cap != cap {
                 let layout = layout_array::<A::Item>(new_cap)?;
+                debug_assert!(layout.size() > 0);
                 let new_alloc;
                 if unspilled {
                     new_alloc = NonNull::new(alloc::alloc::alloc(layout))
@@ -1029,7 +1050,7 @@ impl<A: Array> SmallVec<A> {
     /// This method returns `Err(Self)` if the SmallVec is too short (and the `A` contains uninitialized elements),
     /// or if the SmallVec is too long (and all the elements were spilled to the heap).
     pub fn into_inner(self) -> Result<A, Self> {
-        if self.spilled() || self.len() != A::size() {
+        if self.spilled() || self.len() != A::size() { // Note: A::size, not Self::inline_capacity
             Err(self)
         } else {
             unsafe {
@@ -1219,7 +1240,7 @@ impl<A: Array> SmallVec<A> {
     /// }
     #[inline]
     pub unsafe fn from_raw_parts(ptr: *mut A::Item, length: usize, capacity: usize) -> SmallVec<A> {
-        assert!(capacity > A::size());
+        assert!(capacity > Self::inline_capacity());
         SmallVec {
             capacity,
             data: SmallVecData::from_heap(ptr, length),
@@ -1236,7 +1257,7 @@ where
     /// For slices of `Copy` types, this is more efficient than `SmallVec::from(slice)`.
     pub fn from_slice(slice: &[A::Item]) -> Self {
         let len = slice.len();
-        if len <= A::size() {
+        if len <= Self::inline_capacity() {
             SmallVec {
                 capacity: len,
                 data: SmallVecData::from_inline(unsafe {
@@ -1317,7 +1338,7 @@ where
     /// assert_eq!(v, SmallVec::from_buf(['d', 'd']));
     /// ```
     pub fn from_elem(elem: A::Item, n: usize) -> Self {
-        if n > A::size() {
+        if n > Self::inline_capacity() {
             vec![elem; n].into()
         } else {
             let mut v = SmallVec::<A>::new();
@@ -2730,5 +2751,10 @@ mod tests {
     #[test]
     fn empty_macro() {
         let _v: SmallVec<[u8; 1]> = smallvec![];
+    }
+
+    #[test]
+    fn zero_size_items() {
+        SmallVec::<[(); 0]>::new().push(());
     }
 }
