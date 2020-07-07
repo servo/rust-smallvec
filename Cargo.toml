@@ -18,10 +18,6 @@ union = []
 specialization = []
 may_dangle = []
 
-[lib]
-name = "smallvec"
-path = "lib.rs"
-
 [dependencies]
 serde = { version = "1", optional = true, default-features = false }
 
