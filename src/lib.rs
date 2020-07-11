@@ -680,7 +680,11 @@ impl<A: Array> SmallVec<A> {
                 let &mut (ptr, ref mut len_ptr) = self.data.heap_mut();
                 (ptr, len_ptr, self.capacity)
             } else {
-                (self.data.inline_mut(), &mut self.capacity, Self::inline_capacity())
+                (
+                    self.data.inline_mut(),
+                    &mut self.capacity,
+                    Self::inline_capacity(),
+                )
             }
         }
     }
@@ -1083,7 +1087,8 @@ impl<A: Array> SmallVec<A> {
     /// This method returns `Err(Self)` if the SmallVec is too short (and the `A` contains uninitialized elements),
     /// or if the SmallVec is too long (and all the elements were spilled to the heap).
     pub fn into_inner(self) -> Result<A, Self> {
-        if self.spilled() || self.len() != A::size() { // Note: A::size, not Self::inline_capacity
+        if self.spilled() || self.len() != A::size() {
+            // Note: A::size, not Self::inline_capacity
             Err(self)
         } else {
             unsafe {
