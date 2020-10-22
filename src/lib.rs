@@ -771,6 +771,24 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
+    /// Moves all the elements of `other` into `self`, leaving `other` empty.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use smallvec::{SmallVec, smallvec};
+    /// let mut v0: SmallVec<[u8; 16]> = smallvec![1, 2, 3];
+    /// let mut v1: SmallVec<[u8; 32]> = smallvec![4, 5, 6];
+    /// v0.append(&mut v1);
+    /// assert_eq!(*v0, [1, 2, 3, 4, 5, 6]);
+    /// assert_eq!(*v1, []);
+    /// ```
+    pub fn append<B>(&mut self, other: &mut SmallVec<B>)
+    where B: Array<Item = A::Item>
+    {
+        self.extend(other.drain(..))
+    }
+
     /// Re-allocate to set the capacity to `max(new_cap, inline_size())`.
     ///
     /// Panics if `new_cap` is less than the vector's length
