@@ -233,6 +233,12 @@ pub enum CollectionAllocErr {
     },
 }
 
+impl fmt::Display for CollectionAllocErr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Allocation error: {:?}", self)
+    }
+}
+
 impl From<LayoutErr> for CollectionAllocErr {
     fn from(_: LayoutErr) -> Self {
         CollectionAllocErr::CapacityOverflow
@@ -1543,8 +1549,10 @@ where
     where
         B: SeqAccess<'de>,
     {
+        use serde::de::Error;
         let len = seq.size_hint().unwrap_or(0);
-        let mut values = SmallVec::with_capacity(len);
+        let mut values = SmallVec::new();
+        values.try_reserve(len).map_err(B::Error::custom)?;
 
         while let Some(value) = seq.next_element()? {
             values.push(value);
