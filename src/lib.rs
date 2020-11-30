@@ -753,13 +753,15 @@ impl<A: Array> SmallVec<A> {
     #[inline]
     pub fn push(&mut self, value: A::Item) {
         unsafe {
-            let (_, &mut len, cap) = self.triple_mut();
-            if len == cap {
+            let (mut ptr, mut len, cap) = self.triple_mut();
+            if *len == cap {
                 self.reserve(1);
+                let &mut (heap_ptr, ref mut heap_len) = self.data.heap_mut();
+                ptr = heap_ptr;
+                len = heap_len;
             }
-            let (ptr, len_ptr, _) = self.triple_mut();
-            *len_ptr = len + 1;
-            ptr::write(ptr.add(len), value);
+            ptr::write(ptr.add(*len), value);
+            *len += 1;
         }
     }
 
