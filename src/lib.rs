@@ -86,6 +86,7 @@ extern crate std;
 #[cfg(test)]
 mod tests;
 
+#[allow(deprecated)]
 use alloc::alloc::{Layout, LayoutErr};
 use alloc::boxed::Box;
 use alloc::{vec, vec::Vec};
@@ -238,6 +239,7 @@ impl fmt::Display for CollectionAllocErr {
     }
 }
 
+#[allow(deprecated)]
 impl From<LayoutErr> for CollectionAllocErr {
     fn from(_: LayoutErr) -> Self {
         CollectionAllocErr::CapacityOverflow
