@@ -28,7 +28,7 @@
 //!
 //! ### `union`
 //!
-//! **This feature requires Rust 1.50.**
+//! **This feature requires Rust 1.49.**
 //!
 //! When the `union` feature is enabled `smallvec` will track its state (inline or spilled)
 //! without the use of an enum tag, reducing the size of the `smallvec` by one machine word.
@@ -37,7 +37,7 @@
 //! machine words.
 //!
 //! To use this feature add `features = ["union"]` in the `smallvec` section of Cargo.toml.
-//! Note that this feature requires Rust 1.50.
+//! Note that this feature requires Rust 1.49.
 //!
 //! Tracking issue: [rust-lang/rust#55149](https://github.com/rust-lang/rust/issues/55149)
 //!

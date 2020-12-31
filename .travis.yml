@@ -24,7 +24,7 @@ script: |
   cargo test --verbose &&
   cargo test --verbose --features serde &&
   ([ $TRAVIS_RUST_VERSION != nightly ] || cargo check --verbose --no-default-features) &&
-  ([ $TRAVIS_RUST_VERSION != nightly ] || cargo test --verbose --features union) &&
+  ([ $TRAVIS_RUST_VERSION != beta ] || cargo test --verbose --features union) &&
   ([ $TRAVIS_RUST_VERSION != nightly ] || cargo test --verbose --all-features) &&
   ([ $TRAVIS_RUST_VERSION != nightly ] || cargo bench --verbose bench) &&
   ([ $TRAVIS_RUST_VERSION != nightly ] || bash ./scripts/run_miri.sh) &&
