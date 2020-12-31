@@ -28,7 +28,7 @@
 //!
 //! ### `union`
 //!
-//! **This feature is unstable and requires a nightly build of the Rust toolchain.**
+//! **This feature requires Rust 1.50.**
 //!
 //! When the `union` feature is enabled `smallvec` will track its state (inline or spilled)
 //! without the use of an enum tag, reducing the size of the `smallvec` by one machine word.
@@ -37,7 +37,7 @@
 //! machine words.
 //!
 //! To use this feature add `features = ["union"]` in the `smallvec` section of Cargo.toml.
-//! Note that this feature requires a nightly compiler (for now).
+//! Note that this feature requires Rust 1.50.
 //!
 //! Tracking issue: [rust-lang/rust#55149](https://github.com/rust-lang/rust/issues/55149)
 //!
@@ -71,7 +71,6 @@
 //! Tracking issue: [rust-lang/rust#34761](https://github.com/rust-lang/rust/issues/34761)
 
 #![no_std]
-#![cfg_attr(feature = "union", feature(untagged_unions))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization))]
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
@@ -352,7 +351,7 @@ impl<'a, T: 'a + Array> Drop for Drain<'a, T> {
 
 #[cfg(feature = "union")]
 union SmallVecData<A: Array> {
-    inline: MaybeUninit<A>,
+    inline: core::mem::ManuallyDrop<MaybeUninit<A>>,
     heap: (*mut A::Item, usize),
 }
 
@@ -368,11 +367,13 @@ impl<A: Array> SmallVecData<A> {
     }
     #[inline]
     fn from_inline(inline: MaybeUninit<A>) -> SmallVecData<A> {
-        SmallVecData { inline }
+        SmallVecData {
+            inline: core::mem::ManuallyDrop::new(inline),
+        }
     }
     #[inline]
     unsafe fn into_inline(self) -> MaybeUninit<A> {
-        self.inline
+        core::mem::ManuallyDrop::into_inner(self.inline)
     }
     #[inline]
     unsafe fn heap(&self) -> (*mut A::Item, usize) {
@@ -793,7 +794,8 @@ impl<A: Array> SmallVec<A> {
     /// assert_eq!(*v1, []);
     /// ```
     pub fn append<B>(&mut self, other: &mut SmallVec<B>)
-    where B: Array<Item = A::Item>
+    where
+        B: Array<Item = A::Item>,
     {
         self.extend(other.drain(..))
     }
@@ -1957,10 +1959,9 @@ macro_rules! impl_array(
 
 #[cfg(not(feature = "const_generics"))]
 impl_array!(
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-    21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 36, 0x40, 0x60, 0x80,
-    0x100, 0x200, 0x400, 0x600, 0x800, 0x1000, 0x2000, 0x4000, 0x6000, 0x8000, 0x10000, 0x20000,
-    0x40000, 0x60000, 0x80000, 0x10_0000
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+    26, 27, 28, 29, 30, 31, 32, 36, 0x40, 0x60, 0x80, 0x100, 0x200, 0x400, 0x600, 0x800, 0x1000,
+    0x2000, 0x4000, 0x6000, 0x8000, 0x10000, 0x20000, 0x40000, 0x60000, 0x80000, 0x10_0000
 );
 
 /// Convenience trait for constructing a `SmallVec`
