@@ -1041,14 +1041,24 @@ impl<A: Array> SmallVec<A> {
                 let mut cur = ptr.add(num_added);
                 if num_added >= lower_size_bound {
                     // Iterator provided more elements than the hint.  Move trailing items again.
+
+                    // `reserve` needs `len` to be accurate.
+                    self.set_len(old_len + num_added);
+                    let guard_len = guard.len;
+                    guard.len = 0; // in case `reserve` panics, don't double-free in guard.drop().
+
+                    // Grow the vector by 1.
                     self.reserve(1);
+
                     let start = self.as_mut_ptr();
                     ptr = start.add(index);
                     cur = ptr.add(num_added);
                     ptr::copy(cur, cur.add(1), old_len - index);
 
+                    // Restore the guard.
+                    self.set_len(0);
                     guard.start = start;
-                    guard.len += 1;
+                    guard.len = guard_len + 1;
                     guard.skip.end += 1;
                 }
                 ptr::write(cur, element);
