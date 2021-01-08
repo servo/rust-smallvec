@@ -1009,7 +1009,7 @@ impl<A: Array> SmallVec<A> {
     /// Insert multiple elements at position `index`, shifting all following elements toward the
     /// back.
     pub fn insert_many<I: IntoIterator<Item = A::Item>>(&mut self, index: usize, iterable: I) {
-        let iter = iterable.into_iter();
+        let mut iter = iterable.into_iter();
         if index == self.len() {
             return self.extend(iter);
         }
@@ -1017,13 +1017,16 @@ impl<A: Array> SmallVec<A> {
         let (lower_size_bound, _) = iter.size_hint();
         assert!(lower_size_bound <= core::isize::MAX as usize); // Ensure offset is indexable
         assert!(index + lower_size_bound >= index); // Protect against overflow
-        self.reserve(lower_size_bound);
+
+        let mut num_added = 0;
+        let old_len = self.len();
+        assert!(index <= old_len);
 
         unsafe {
-            let old_len = self.len();
-            assert!(index <= old_len);
+            // Reserve space for `lower_size_bound` elements.
+            self.reserve(lower_size_bound);
             let start = self.as_mut_ptr();
-            let mut ptr = start.add(index);
+            let ptr = start.add(index);
 
             // Move the trailing elements.
             ptr::copy(ptr, ptr.add(lower_size_bound), old_len - index);
@@ -1036,42 +1039,39 @@ impl<A: Array> SmallVec<A> {
                 len: old_len + lower_size_bound,
             };
 
-            let mut num_added = 0;
-            for element in iter {
-                let mut cur = ptr.add(num_added);
-                if num_added >= lower_size_bound {
-                    // Iterator provided more elements than the hint.  Move trailing items again.
-                    self.reserve(1);
-                    let start = self.as_mut_ptr();
-                    ptr = start.add(index);
-                    cur = ptr.add(num_added);
-                    ptr::copy(cur, cur.add(1), old_len - index);
-
-                    guard.start = start;
-                    guard.len += 1;
-                    guard.skip.end += 1;
-                }
+            while num_added < lower_size_bound {
+                let element = match iter.next() {
+                    Some(x) => x,
+                    None => break,
+                };
+                let cur = ptr.add(num_added);
                 ptr::write(cur, element);
                 guard.skip.start += 1;
                 num_added += 1;
             }
-            mem::forget(guard);
 
             if num_added < lower_size_bound {
-                // Iterator provided fewer elements than the hint
+                // Iterator provided fewer elements than the hint. Move the tail backward.
                 ptr::copy(
                     ptr.add(lower_size_bound),
                     ptr.add(num_added),
                     old_len - index,
                 );
             }
-
+            // There are no more duplicate or uninitialized slots, so the guard is not needed.
             self.set_len(old_len + num_added);
+            mem::forget(guard);
+        }
+
+        // Insert any remaining elements one-by-one.
+        for element in iter {
+            self.insert(index + num_added, element);
+            num_added += 1;
         }
 
         struct DropOnPanic<T> {
             start: *mut T,
-            skip: Range<usize>,
+            skip: Range<usize>, // Space we copied-out-of, but haven't written-to yet.
             len: usize,
         }
 
