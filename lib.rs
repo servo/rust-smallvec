@@ -823,7 +823,7 @@ impl<A: Array> SmallVec<A> {
     /// Insert multiple elements at position `index`, shifting all following elements toward the
     /// back.
     pub fn insert_many<I: IntoIterator<Item=A::Item>>(&mut self, index: usize, iterable: I) {
-        let iter = iterable.into_iter();
+        let mut iter = iterable.into_iter();
         if index == self.len() {
             return self.extend(iter);
         }
@@ -832,11 +832,12 @@ impl<A: Array> SmallVec<A> {
         assert!(lower_size_bound <= std::isize::MAX as usize);  // Ensure offset is indexable
         assert!(index + lower_size_bound >= index);  // Protect against overflow
         self.reserve(lower_size_bound);
+        let mut num_added = 0;
 
         unsafe {
             let old_len = self.len();
             assert!(index <= old_len);
-            let mut ptr = self.as_mut_ptr().offset(index as isize);
+            let ptr = self.as_mut_ptr().offset(index as isize);
 
             // Move the trailing elements.
             ptr::copy(ptr, ptr.offset(lower_size_bound as isize), old_len - index);
@@ -844,16 +845,12 @@ impl<A: Array> SmallVec<A> {
             // In case the iterator panics, don't double-drop the items we just copied above.
             self.set_len(index);
 
-            let mut num_added = 0;
-            for element in iter {
-                let mut cur = ptr.offset(num_added as isize);
-                if num_added >= lower_size_bound {
-                    // Iterator provided more elements than the hint.  Move trailing items again.
-                    self.reserve(1);
-                    ptr = self.as_mut_ptr().offset(index as isize);
-                    cur = ptr.offset(num_added as isize);
-                    ptr::copy(cur, cur.offset(1), old_len - index);
-                }
+            while num_added < lower_size_bound {
+                let element = match iter.next() {
+                    Some(x) => x,
+                    None => break,
+                };
+                let cur = ptr.offset(num_added as isize);
                 ptr::write(cur, element);
                 num_added += 1;
             }
@@ -861,8 +858,13 @@ impl<A: Array> SmallVec<A> {
                 // Iterator provided fewer elements than the hint
                 ptr::copy(ptr.offset(lower_size_bound as isize), ptr.offset(num_added as isize), old_len - index);
             }
-
             self.set_len(old_len + num_added);
+        }
+
+        // If the iterator has more than `lower_size_bound` elements, insert the rest one-by-one.
+        for element in iter {
+            self.insert(index + num_added, element);
+            num_added += 1;
         }
     }
 
@@ -2370,5 +2372,18 @@ mod tests {
         v.grow(4);
         assert_eq!(v.capacity(), 4);
         assert_eq!(v[..], [0, 1, 2]);
+    }
+
+    #[test]
+    fn test_insert_many_overflow() {
+        let mut v: SmallVec<[u8; 1]> = SmallVec::new();
+        v.push(123);
+
+        // Prepare an iterator with small lower bound
+        let iter = (0u8..5).filter(|n| n % 2 == 0);
+        assert_eq!(iter.size_hint().0, 0);
+
+        v.insert_many(0, iter);
+        assert_eq!(&*v, &[0, 2, 4, 123]);
     }
 }
