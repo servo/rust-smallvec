@@ -43,12 +43,10 @@
 //!
 //! ### `const_generics`
 //!
-//! **This feature is unstable and requires a nightly build of the Rust toolchain.**
+//! **This feature requires Rust 1.51.**
 //!
 //! When this feature is enabled, `SmallVec` works with any arrays of any size, not just a fixed
 //! list of sizes.
-//!
-//! Tracking issue: [rust-lang/rust#44580](https://github.com/rust-lang/rust/issues/44580)
 //!
 //! ### `specialization`
 //!
