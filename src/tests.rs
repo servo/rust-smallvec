@@ -424,6 +424,13 @@ fn test_invalid_grow() {
 }
 
 #[test]
+#[should_panic]
+fn drain_overflow() {
+    let mut v: SmallVec<[u8; 8]> = smallvec![0];
+    v.drain(..=std::usize::MAX);
+}
+
+#[test]
 fn test_insert_from_slice() {
     let mut v: SmallVec<[u8; 8]> = SmallVec::new();
     for x in 0..4 {

@@ -725,11 +725,11 @@ impl<A: Array> SmallVec<A> {
         let len = self.len();
         let start = match range.start_bound() {
             Included(&n) => n,
-            Excluded(&n) => n + 1,
+            Excluded(&n) => n.checked_add(1).expect("Range start out of bounds"),
             Unbounded => 0,
         };
         let end = match range.end_bound() {
-            Included(&n) => n + 1,
+            Included(&n) => n.checked_add(1).expect("Range end out of bounds"),
             Excluded(&n) => n,
             Unbounded => len,
         };
