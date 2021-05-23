@@ -1725,6 +1725,21 @@ where
     fn clone(&self) -> SmallVec<A> {
         SmallVec::from(self.as_slice())
     }
+
+    fn clone_from(&mut self, source: &Self) {
+        // Inspired from `impl Clone for Vec`.
+
+        // drop anything that will not be overwritten
+        self.truncate(source.len());
+
+        // self.len <= other.len due to the truncate above, so the
+        // slices here are always in-bounds.
+        let (init, tail) = source.split_at(self.len());
+
+        // reuse the contained values' allocations/resources.
+        self.clone_from_slice(init);
+        self.extend(tail.iter().cloned());
+    }
 }
 
 impl<A: Array, B: Array> PartialEq<SmallVec<B>> for SmallVec<A>
