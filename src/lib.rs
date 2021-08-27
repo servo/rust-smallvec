@@ -481,7 +481,7 @@ impl<A: Array> SmallVec<A> {
     /// Construct an empty vector
     #[inline]
     pub fn new() -> SmallVec<A> {
-        // Try to detect invalid custom implementations of `Array`. Hopefuly,
+        // Try to detect invalid custom implementations of `Array`. Hopefully,
         // this check should be optimized away entirely for valid ones.
         assert!(
             mem::size_of::<A>() == A::size() * mem::size_of::<A::Item>()
