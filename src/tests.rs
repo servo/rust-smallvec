@@ -903,6 +903,16 @@ fn const_generics() {
     let _v = SmallVec::<[i32; 987]>::default();
 }
 
+#[cfg(feature = "const_new")]
+#[test]
+fn const_new() {
+    let _v = const_new_inner();
+}
+#[cfg(feature = "const_new")]
+const fn const_new_inner() -> SmallVec<[i32; 4]> {
+    unsafe { SmallVec::<[i32; 4]>::new_const() }
+}
+
 #[test]
 fn empty_macro() {
     let _v: SmallVec<[u8; 1]> = smallvec![];

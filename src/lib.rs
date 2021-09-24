@@ -67,11 +67,22 @@
 //! [Rustonomicon](https://doc.rust-lang.org/1.42.0/nomicon/dropck.html#an-escape-hatch).
 //!
 //! Tracking issue: [rust-lang/rust#34761](https://github.com/rust-lang/rust/issues/34761)
+//!
+//! ### `const_new`
+//!
+//! **This feature is unstable and requires a nightly build of the Rust toolchain.**
+//!
+//! This feature exposes the function [`SmallVec::new_const`] which is a `const fn` so the `SmallVec` may be used from a const context.
+//! For details, see the
+//! [Rust Reference](https://doc.rust-lang.org/reference/const_eval.html#const-functions).
+//!
+//! Tracking issue: [rust-lang/rust#57563](https://github.com/rust-lang/rust/issues/57563)
 
 #![no_std]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization))]
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
+#![cfg_attr(feature = "const_new", feature(const_fn_trait_bound))]
 #![deny(missing_docs)]
 
 #[doc(hidden)]
@@ -353,6 +364,16 @@ union SmallVecData<A: Array> {
     heap: (*mut A::Item, usize),
 }
 
+#[cfg(all(feature = "union", feature = "const_new"))]
+impl<A: Array> SmallVecData<A> {
+    #[inline]
+    const fn from_const(inline: MaybeUninit<A>) -> SmallVecData<A> {
+        SmallVecData {
+            inline: core::mem::ManuallyDrop::new(inline),
+        }
+    }
+}
+
 #[cfg(feature = "union")]
 impl<A: Array> SmallVecData<A> {
     #[inline]
@@ -391,6 +412,14 @@ impl<A: Array> SmallVecData<A> {
 enum SmallVecData<A: Array> {
     Inline(MaybeUninit<A>),
     Heap((*mut A::Item, usize)),
+}
+
+#[cfg(all(not(feature = "union"), feature = "const_new"))]
+impl<A: Array> SmallVecData<A> {
+    #[inline]
+    const fn from_const(inline: MaybeUninit<A>) -> SmallVecData<A> {
+        SmallVecData::Inline(inline)
+    }
 }
 
 #[cfg(not(feature = "union"))]
@@ -1326,6 +1355,26 @@ impl<A: Array> SmallVec<A> {
         // `deref_mut`, which creates an intermediate reference that may place
         // additional safety constraints on the contents of the slice.
         self.triple_mut().0
+    }
+}
+
+#[cfg(feature = "const_new")]
+impl<A: Array> SmallVec<A> {
+    /// Construct an empty vector.
+    ///
+    /// # Safety
+    /// No size validation is attempted for this function.
+    /// Invalid custom implementations of [`Array`] normally panics during [`new`].
+    /// `new_const` will still initialize which may cause undefined behavior (such as segmentation errors) when used with invalid implementations.
+    ///
+    /// [`Array`]: crate::Array
+    /// [`new`]: crate::SmallVec::new
+    #[inline]
+    pub const unsafe fn new_const() -> SmallVec<A> {
+        SmallVec {
+            capacity: 0,
+            data: SmallVecData::from_const(MaybeUninit::uninit()),
+        }
     }
 }
 

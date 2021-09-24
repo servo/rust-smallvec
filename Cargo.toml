@@ -13,6 +13,7 @@ documentation = "https://docs.rs/smallvec/"
 
 [features]
 const_generics = []
+const_new = []
 write = []
 union = []
 specialization = []
