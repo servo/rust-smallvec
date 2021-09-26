@@ -921,7 +921,7 @@ fn const_new() {
 }
 #[cfg(feature = "const_new")]
 const fn const_new_inner() -> SmallVec<[i32; 4]> {
-    unsafe { SmallVec::<[i32; 4]>::new_const() }
+    SmallVec::<[i32; 4]>::new_const()
 }
 #[cfg(feature = "const_new")]
 const fn const_new_inline_sized() -> SmallVec<[i32; 4]> {

@@ -48,6 +48,14 @@
 //! When this feature is enabled, `SmallVec` works with any arrays of any size, not just a fixed
 //! list of sizes.
 //!
+//! ### `const_new`
+//!
+//! **This feature requires Rust 1.51.**
+//!
+//! This feature exposes the functions [`SmallVec::new_const`], [`SmallVec::from_const`], and [`smallvec_inline`] which enables the `SmallVec` to be initialized from a const context.
+//! For details, see the
+//! [Rust Reference](https://doc.rust-lang.org/reference/const_eval.html#const-functions).
+//!
 //! ### `specialization`
 //!
 //! **This feature is unstable and requires a nightly build of the Rust toolchain.**
@@ -67,23 +75,12 @@
 //! [Rustonomicon](https://doc.rust-lang.org/1.42.0/nomicon/dropck.html#an-escape-hatch).
 //!
 //! Tracking issue: [rust-lang/rust#34761](https://github.com/rust-lang/rust/issues/34761)
-//!
-//! ### `const_new`
-//!
-//! **This feature is unstable and requires a nightly build of the Rust toolchain.**
-//!
-//! This feature exposes the functions [`SmallVec::new_const`] and [`SmallVec::from_const`] which enables the `SmallVec` to be initialized from a const context.
-//! For details, see the
-//! [Rust Reference](https://doc.rust-lang.org/reference/const_eval.html#const-functions).
-//!
-//! Tracking issue: [rust-lang/rust#57563](https://github.com/rust-lang/rust/issues/57563)
 
 #![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization))]
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
-#![cfg_attr(feature = "const_new", feature(const_fn_trait_bound))]
 #![deny(missing_docs)]
 
 #[doc(hidden)]
@@ -413,10 +410,10 @@ union SmallVecData<A: Array> {
 }
 
 #[cfg(all(feature = "union", feature = "const_new"))]
-impl<A: Array> SmallVecData<A> {
+impl<T, const N: usize> SmallVecData<[T; N]> {
     #[cfg_attr(docsrs, doc(cfg(feature = "const_new")))]
     #[inline]
-    const fn from_const(inline: MaybeUninit<A>) -> SmallVecData<A> {
+    const fn from_const(inline: MaybeUninit<[T; N]>) -> Self {
         SmallVecData {
             inline: core::mem::ManuallyDrop::new(inline),
         }
@@ -464,10 +461,10 @@ enum SmallVecData<A: Array> {
 }
 
 #[cfg(all(not(feature = "union"), feature = "const_new"))]
-impl<A: Array> SmallVecData<A> {
+impl<T, const N: usize> SmallVecData<[T; N]> {
     #[cfg_attr(docsrs, doc(cfg(feature = "const_new")))]
     #[inline]
-    const fn from_const(inline: MaybeUninit<A>) -> SmallVecData<A> {
+    const fn from_const(inline: MaybeUninit<[T; N]>) -> Self {
         SmallVecData::Inline(inline)
     }
 }
@@ -1408,27 +1405,6 @@ impl<A: Array> SmallVec<A> {
     }
 }
 
-#[cfg(feature = "const_new")]
-impl<A: Array> SmallVec<A> {
-    /// Construct an empty vector. This is currently gated behind the feature `const_new`.
-    ///
-    /// # Safety
-    /// No size validation is attempted for this function.
-    /// Invalid custom implementations of [`Array`] normally panics during [`new`].
-    /// `new_const` will still initialize which may cause undefined behavior (such as segmentation errors) when used with invalid implementations.
-    ///
-    /// [`Array`]: crate::Array
-    /// [`new`]: crate::SmallVec::new
-    #[cfg_attr(docsrs, doc(cfg(feature = "const_new")))]
-    #[inline]
-    pub const unsafe fn new_const() -> SmallVec<A> {
-        SmallVec {
-            capacity: 0,
-            data: SmallVecData::from_const(MaybeUninit::uninit()),
-        }
-    }
-}
-
 impl<A: Array> SmallVec<A>
 where
     A::Item: Copy,
@@ -2055,11 +2031,24 @@ impl<'a> Drop for SetLenOnDrop<'a> {
 
 #[cfg(feature = "const_new")]
 impl<T, const N: usize> SmallVec<[T; N]> {
+    /// Construct an empty vector.
+    /// 
+    /// This is a `const` version of [`SmallVec::new`] that is enabled by the feature `const_new`, with the limitation that it only works for arrays.
+    #[cfg_attr(docsrs, doc(cfg(feature = "const_new")))]
+    #[inline]
+    pub const fn new_const() -> Self {
+        SmallVec {
+            capacity: 0,
+            data: SmallVecData::from_const(MaybeUninit::uninit()),
+        }
+    }
+
     /// The array passed as an argument is moved to be an inline version of `SmallVec`.
+    /// 
     /// This is a `const` version of [`SmallVec::from_buf`] that is enabled by the feature `const_new`, with the limitation that it only works for arrays.
     #[cfg_attr(docsrs, doc(cfg(feature = "const_new")))]
     #[inline]
-    pub const fn from_const(items: [T; N]) -> SmallVec<[T; N]> {
+    pub const fn from_const(items: [T; N]) -> Self {
         SmallVec {
             capacity: N,
             data: SmallVecData::from_const(MaybeUninit::new(items)),
