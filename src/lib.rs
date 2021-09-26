@@ -179,7 +179,6 @@ macro_rules! smallvec {
     });
 }
 
-
 /// Creates an inline [`SmallVec`] containing the arguments. This macro is enabled by the feature `const_new`.
 ///
 /// `smallvec_inline!` allows `SmallVec`s to be defined with the same syntax as array expressions in `const` contexts.
@@ -2032,7 +2031,7 @@ impl<'a> Drop for SetLenOnDrop<'a> {
 #[cfg(feature = "const_new")]
 impl<T, const N: usize> SmallVec<[T; N]> {
     /// Construct an empty vector.
-    /// 
+    ///
     /// This is a `const` version of [`SmallVec::new`] that is enabled by the feature `const_new`, with the limitation that it only works for arrays.
     #[cfg_attr(docsrs, doc(cfg(feature = "const_new")))]
     #[inline]
@@ -2044,7 +2043,7 @@ impl<T, const N: usize> SmallVec<[T; N]> {
     }
 
     /// The array passed as an argument is moved to be an inline version of `SmallVec`.
-    /// 
+    ///
     /// This is a `const` version of [`SmallVec::from_buf`] that is enabled by the feature `const_new`, with the limitation that it only works for arrays.
     #[cfg_attr(docsrs, doc(cfg(feature = "const_new")))]
     #[inline]
