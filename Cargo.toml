@@ -13,6 +13,7 @@ documentation = "https://docs.rs/smallvec/"
 
 [features]
 const_generics = []
+const_new = ["const_generics"]
 write = []
 union = []
 specialization = []
@@ -23,3 +24,7 @@ serde = { version = "1", optional = true, default-features = false }
 
 [dev_dependencies]
 bincode = "1.0.1"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

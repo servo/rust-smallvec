@@ -903,6 +903,35 @@ fn const_generics() {
     let _v = SmallVec::<[i32; 987]>::default();
 }
 
+#[cfg(feature = "const_new")]
+#[test]
+fn const_new() {
+    let v = const_new_inner();
+    assert_eq!(v.capacity(), 4);
+    assert_eq!(v.len(), 0);
+    let v = const_new_inline_sized();
+    assert_eq!(v.capacity(), 4);
+    assert_eq!(v.len(), 4);
+    assert_eq!(v[0], 1);
+    let v = const_new_inline_args();
+    assert_eq!(v.capacity(), 2);
+    assert_eq!(v.len(), 2);
+    assert_eq!(v[0], 1);
+    assert_eq!(v[1], 4);
+}
+#[cfg(feature = "const_new")]
+const fn const_new_inner() -> SmallVec<[i32; 4]> {
+    SmallVec::<[i32; 4]>::new_const()
+}
+#[cfg(feature = "const_new")]
+const fn const_new_inline_sized() -> SmallVec<[i32; 4]> {
+    crate::smallvec_inline![1; 4]
+}
+#[cfg(feature = "const_new")]
+const fn const_new_inline_args() -> SmallVec<[i32; 2]> {
+    crate::smallvec_inline![1, 4]
+}
+
 #[test]
 fn empty_macro() {
     let _v: SmallVec<[u8; 1]> = smallvec![];
