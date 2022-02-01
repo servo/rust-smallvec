@@ -392,8 +392,11 @@ impl<'a, T: 'a + Array> Drop for Drain<'a, T> {
                 let start = source_vec.len();
                 let tail = self.tail_start;
                 if tail != start {
-                    let src = source_vec.as_ptr().add(tail);
-                    let dst = source_vec.as_mut_ptr().add(start);
+                    // as_mut_ptr creates a &mut, invalidating other pointers.
+                    // This pattern avoids calling it with a pointer already present.
+                    let ptr = source_vec.as_mut_ptr();
+                    let src = ptr.add(tail);
+                    let dst = ptr.add(start);
                     ptr::copy(src, dst, self.tail_len);
                 }
                 source_vec.set_len(start + self.tail_len);
@@ -813,13 +816,14 @@ impl<A: Array> SmallVec<A> {
         unsafe {
             self.set_len(start);
 
-            let range_slice = slice::from_raw_parts_mut(self.as_mut_ptr().add(start), end - start);
+            let range_slice = slice::from_raw_parts(self.as_ptr().add(start), end - start);
 
             Drain {
                 tail_start: end,
                 tail_len: len - end,
                 iter: range_slice.iter(),
-                vec: NonNull::from(self),
+                // Since self is a &mut, passing it to a function would invalidate the slice iterator.
+                vec: NonNull::new_unchecked(self as *mut _),
             }
         }
     }
@@ -1111,6 +1115,10 @@ impl<A: Array> SmallVec<A> {
                 skip: index..(index + lower_size_bound),
                 len: old_len + lower_size_bound,
             };
+
+            // The set_len above invalidates the previous pointers, so we must re-create them.
+            let start = self.as_mut_ptr();
+            let ptr = start.add(index);
 
             while num_added < lower_size_bound {
                 let element = match iter.next() {
