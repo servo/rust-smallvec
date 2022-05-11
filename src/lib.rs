@@ -385,8 +385,8 @@ impl<'a, T: 'a + Array> Drop for Drain<'a, T> {
         self.for_each(drop);
 
         if self.tail_len > 0 {
-            unsafe {
-                let source_vec = self.vec.as_mut();
+            
+                let source_vec = unsafe { self.vec.as_mut() };
 
                 // memmove back untouched tail, update to new length
                 let start = source_vec.len();
@@ -395,12 +395,12 @@ impl<'a, T: 'a + Array> Drop for Drain<'a, T> {
                     // as_mut_ptr creates a &mut, invalidating other pointers.
                     // This pattern avoids calling it with a pointer already present.
                     let ptr = source_vec.as_mut_ptr();
-                    let src = ptr.add(tail);
-                    let dst = ptr.add(start);
-                    ptr::copy(src, dst, self.tail_len);
+                    let src = unsafe { ptr.add(tail) };
+                    let dst = unsafe { ptr.add(start) };
+                    unsafe { ptr::copy(src, dst, self.tail_len) };
                 }
-                source_vec.set_len(start + self.tail_len);
-            }
+                unsafe { source_vec.set_len(start + self.tail_len) };
+            
         }
     }
 }
@@ -606,17 +606,17 @@ impl<A: Array> SmallVec<A> {
     #[inline]
     pub fn from_vec(mut vec: Vec<A::Item>) -> SmallVec<A> {
         if vec.capacity() <= Self::inline_capacity() {
-            unsafe {
+            
                 let mut data = SmallVecData::<A>::from_inline(MaybeUninit::uninit());
                 let len = vec.len();
-                vec.set_len(0);
-                ptr::copy_nonoverlapping(vec.as_ptr(), data.inline_mut(), len);
+                unsafe { vec.set_len(0) };
+                unsafe { ptr::copy_nonoverlapping(vec.as_ptr(), data.inline_mut(), len) };
 
                 SmallVec {
                     capacity: len,
                     data,
                 }
-            }
+            
         } else {
             let (ptr, cap, len) = (vec.as_mut_ptr(), vec.capacity(), vec.len());
             mem::forget(vec);
@@ -831,31 +831,31 @@ impl<A: Array> SmallVec<A> {
     /// Append an item to the vector.
     #[inline]
     pub fn push(&mut self, value: A::Item) {
-        unsafe {
+        
             let (mut ptr, mut len, cap) = self.triple_mut();
             if *len == cap {
                 self.reserve(1);
-                let &mut (heap_ptr, ref mut heap_len) = self.data.heap_mut();
+                let &mut (heap_ptr, ref mut heap_len) = unsafe { self.data.heap_mut() };
                 ptr = heap_ptr;
                 len = heap_len;
             }
-            ptr::write(ptr.add(*len), value);
+            unsafe { ptr::write(ptr.add(*len), value) };
             *len += 1;
-        }
+        
     }
 
     /// Remove an item from the end of the vector and return it, or None if empty.
     #[inline]
     pub fn pop(&mut self) -> Option<A::Item> {
-        unsafe {
+        
             let (ptr, len_ptr, _) = self.triple_mut();
             if *len_ptr == 0 {
                 return None;
             }
             let last_index = *len_ptr - 1;
             *len_ptr = last_index;
-            Some(ptr::read(ptr.add(last_index)))
-        }
+            Some(unsafe { ptr::read(ptr.add(last_index)) })
+        
     }
 
     /// Moves all the elements of `other` into `self`, leaving `other` empty.
@@ -889,7 +889,7 @@ impl<A: Array> SmallVec<A> {
     ///
     /// Panics if `new_cap` is less than the vector's length
     pub fn try_grow(&mut self, new_cap: usize) -> Result<(), CollectionAllocErr> {
-        unsafe {
+        
             let (ptr, &mut len, cap) = self.triple_mut();
             let unspilled = !self.spilled();
             assert!(new_cap >= len);
@@ -898,25 +898,25 @@ impl<A: Array> SmallVec<A> {
                     return Ok(());
                 }
                 self.data = SmallVecData::from_inline(MaybeUninit::uninit());
-                ptr::copy_nonoverlapping(ptr, self.data.inline_mut(), len);
+                unsafe { ptr::copy_nonoverlapping(ptr, self.data.inline_mut(), len) };
                 self.capacity = len;
-                deallocate(ptr, cap);
+                unsafe { deallocate(ptr, cap) };
             } else if new_cap != cap {
                 let layout = layout_array::<A::Item>(new_cap)?;
                 debug_assert!(layout.size() > 0);
                 let new_alloc;
                 if unspilled {
-                    new_alloc = NonNull::new(alloc::alloc::alloc(layout))
+                    new_alloc = NonNull::new(unsafe { alloc::alloc::alloc(layout) })
                         .ok_or(CollectionAllocErr::AllocErr { layout })?
                         .cast()
                         .as_ptr();
-                    ptr::copy_nonoverlapping(ptr, new_alloc, len);
+                    unsafe { ptr::copy_nonoverlapping(ptr, new_alloc, len) };
                 } else {
                     // This should never fail since the same succeeded
                     // when previously allocating `ptr`.
                     let old_layout = layout_array::<A::Item>(cap)?;
 
-                    let new_ptr = alloc::alloc::realloc(ptr as *mut u8, old_layout, layout.size());
+                    let new_ptr = unsafe { alloc::alloc::realloc(ptr as *mut u8, old_layout, layout.size()) };
                     new_alloc = NonNull::new(new_ptr)
                         .ok_or(CollectionAllocErr::AllocErr { layout })?
                         .cast()
@@ -926,7 +926,7 @@ impl<A: Array> SmallVec<A> {
                 self.capacity = new_cap;
             }
             Ok(())
-        }
+    
     }
 
     /// Reserve capacity for `additional` more elements to be inserted.
@@ -1006,14 +1006,14 @@ impl<A: Array> SmallVec<A> {
     /// This does not re-allocate.  If you want the vector's capacity to shrink, call
     /// `shrink_to_fit` after truncating.
     pub fn truncate(&mut self, len: usize) {
-        unsafe {
+        
             let (ptr, len_ptr, _) = self.triple_mut();
             while len < *len_ptr {
                 let last_index = *len_ptr - 1;
                 *len_ptr = last_index;
-                ptr::drop_in_place(ptr.add(last_index));
+                unsafe { ptr::drop_in_place(ptr.add(last_index)) };
             }
-        }
+        
     }
 
     /// Extracts a slice containing the entire vector.
@@ -1054,16 +1054,16 @@ impl<A: Array> SmallVec<A> {
     ///
     /// Panics if `index` is out of bounds.
     pub fn remove(&mut self, index: usize) -> A::Item {
-        unsafe {
+        
             let (mut ptr, len_ptr, _) = self.triple_mut();
             let len = *len_ptr;
             assert!(index < len);
             *len_ptr = len - 1;
-            ptr = ptr.add(index);
-            let item = ptr::read(ptr);
-            ptr::copy(ptr.add(1), ptr, len - index - 1);
+            ptr = unsafe { ptr.add(index) };
+            let item = unsafe { ptr::read(ptr) };
+            unsafe { ptr::copy(ptr.add(1), ptr, len - index - 1) };
             item
-        }
+        
     }
 
     /// Insert an element at position `index`, shifting all elements after it to the right.
@@ -1072,15 +1072,15 @@ impl<A: Array> SmallVec<A> {
     pub fn insert(&mut self, index: usize, element: A::Item) {
         self.reserve(1);
 
-        unsafe {
+        
             let (mut ptr, len_ptr, _) = self.triple_mut();
             let len = *len_ptr;
             assert!(index <= len);
             *len_ptr = len + 1;
-            ptr = ptr.add(index);
-            ptr::copy(ptr, ptr.add(1), len - index);
-            ptr::write(ptr, element);
-        }
+            ptr = unsafe { ptr.add(index) };
+            unsafe { ptr::copy(ptr, ptr.add(1), len - index) };
+            unsafe { ptr::write(ptr, element) };
+        
     }
 
     /// Insert multiple elements at position `index`, shifting all following elements toward the
@@ -1917,11 +1917,11 @@ impl<A: Array> Iterator for IntoIter<A> {
         if self.current == self.end {
             None
         } else {
-            unsafe {
+            
                 let current = self.current;
                 self.current += 1;
-                Some(ptr::read(self.data.as_ptr().add(current)))
-            }
+                Some(unsafe { ptr::read(self.data.as_ptr().add(current)) })
+            
         }
     }
 
@@ -1938,10 +1938,10 @@ impl<A: Array> DoubleEndedIterator for IntoIter<A> {
         if self.current == self.end {
             None
         } else {
-            unsafe {
+            
                 self.end -= 1;
-                Some(ptr::read(self.data.as_ptr().add(self.end)))
-            }
+                Some(unsafe { ptr::read(self.data.as_ptr().add(self.end)) })
+            
         }
     }
 }
@@ -1967,16 +1967,16 @@ impl<A: Array> IntoIterator for SmallVec<A> {
     type IntoIter = IntoIter<A>;
     type Item = A::Item;
     fn into_iter(mut self) -> Self::IntoIter {
-        unsafe {
+        
             // Set SmallVec len to zero as `IntoIter` drop handles dropping of the elements
             let len = self.len();
-            self.set_len(0);
+            unsafe { self.set_len(0) };
             IntoIter {
                 data: self,
                 current: 0,
                 end: len,
             }
-        }
+        
     }
 }
 
