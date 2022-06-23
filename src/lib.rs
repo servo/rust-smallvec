@@ -1068,17 +1068,22 @@ impl<A: Array> SmallVec<A> {
 
     /// Insert an element at position `index`, shifting all elements after it to the right.
     ///
-    /// Panics if `index` is out of bounds.
+    /// Panics if `index > len`.
     pub fn insert(&mut self, index: usize, element: A::Item) {
         self.reserve(1);
 
         unsafe {
             let (mut ptr, len_ptr, _) = self.triple_mut();
             let len = *len_ptr;
-            assert!(index <= len);
-            *len_ptr = len + 1;
             ptr = ptr.add(index);
-            ptr::copy(ptr, ptr.add(1), len - index);
+            if index < len {
+                ptr::copy(ptr, ptr.add(1), len - index);
+            } else if index == len {
+                // No elements need shifting.
+            } else {
+                panic!("index exceeds length");
+            }
+            *len_ptr = len + 1;
             ptr::write(ptr, element);
         }
     }
