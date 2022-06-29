@@ -1,6 +1,6 @@
 [package]
 name = "smallvec"
-version = "1.8.1"
+version = "1.9.0"
 edition = "2018"
 authors = ["The Servo Project Developers"]
 license = "MIT OR Apache-2.0"
