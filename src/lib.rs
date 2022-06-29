@@ -1232,6 +1232,15 @@ impl<A: Array> SmallVec<A> {
         self.truncate(len - del);
     }
 
+    /// Retains only the elements specified by the predicate.
+    ///
+    /// This method is identical in behaviour to [`retain`]; it is included only
+    /// to maintain api-compatability with `std::Vec`, where the methods are
+    /// separate for historical reasons.
+    pub fn retain_mut<F: FnMut(&mut A::Item) -> bool>(&mut self, f: F) {
+        self.retain(f)
+    }
+
     /// Removes consecutive duplicate elements.
     pub fn dedup(&mut self)
     where
