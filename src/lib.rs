@@ -75,6 +75,7 @@ use core::mem::ManuallyDrop;
 use core::mem::MaybeUninit;
 use core::ptr::addr_of;
 use core::ptr::addr_of_mut;
+use core::ptr::copy;
 use core::ptr::copy_nonoverlapping;
 
 use core::marker::PhantomData;
@@ -349,7 +350,7 @@ impl<'a, T: 'a, const N: usize> Drop for Drain<'a, T, N> {
                     let ptr = source_vec.as_mut_ptr();
                     let src = ptr.add(tail);
                     let dst = ptr.add(start);
-                    core::ptr::copy(src, dst, self.tail_len);
+                    copy(src, dst, self.tail_len);
                 }
                 source_vec.set_len(start + self.tail_len);
             }
@@ -864,7 +865,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             let ptr = self.as_mut_ptr();
             let ith = ptr.add(index);
             let ith_item = ith.read();
-            core::ptr::copy(ith.add(1), ith, new_len - index);
+            copy(ith.add(1), ith, new_len - index);
             ith_item
         }
     }
@@ -877,7 +878,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         let ptr = self.as_mut_ptr();
         unsafe {
             if index < len {
-                core::ptr::copy(ptr.add(index), ptr.add(index + 1), len - index);
+                copy(ptr.add(index), ptr.add(index + 1), len - index);
             }
             ptr.add(index).write(value);
             self.set_len(len + 1);
@@ -1114,7 +1115,7 @@ impl<T: Copy, const N: usize> SmallVec<T, N> {
             let base_ptr = self.as_mut_ptr();
             let ith_ptr = base_ptr.add(index);
             let shifted_ptr = base_ptr.add(index + other_len);
-            core::ptr::copy(ith_ptr, shifted_ptr, len - index);
+            copy(ith_ptr, shifted_ptr, len - index);
             copy_nonoverlapping(slice.as_ptr(), ith_ptr, other_len);
             self.set_len(len + other_len);
         }
@@ -1180,7 +1181,7 @@ impl<T> Drop for DropShiftGuard<T> {
     fn drop(&mut self) {
         unsafe {
             core::ptr::slice_from_raw_parts_mut(self.ptr, self.len).drop_in_place();
-            core::ptr::copy(self.shifted_ptr, self.ptr, self.shifted_len);
+            copy(self.shifted_ptr, self.ptr, self.shifted_len);
         }
     }
 }
@@ -1206,7 +1207,7 @@ unsafe fn insert_many_batch_phase<T, I: Iterator<Item = T>>(
     iter: &mut I,
 ) -> usize {
     // shift elements to the right to make space for the initial elements from the iterator
-    core::ptr::copy(ptr.add(index), ptr.add(index + lower_bound), len - index);
+    copy(ptr.add(index), ptr.add(index + lower_bound), len - index);
     let ptr_ith = ptr.add(index);
     let mut guard = DropShiftGuard {
         ptr: ptr_ith,
@@ -1222,7 +1223,7 @@ unsafe fn insert_many_batch_phase<T, I: Iterator<Item = T>>(
     core::mem::forget(guard);
 
     if count < lower_bound {
-        core::ptr::copy(ptr_ith.add(lower_bound), ptr_ith.add(count), len - index);
+        copy(ptr_ith.add(lower_bound), ptr_ith.add(count), len - index);
     }
     count
 }
