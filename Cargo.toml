@@ -12,16 +12,12 @@ readme = "README.md"
 documentation = "https://docs.rs/smallvec/"
 
 [features]
-const_generics = []
-const_new = ["const_generics"]
 write = []
-union = []
 specialization = []
 may_dangle = []
 
 [dependencies]
 serde = { version = "1", optional = true, default-features = false }
-arbitrary = { version = "1", optional = true }
 
 [dev_dependencies]
 bincode = "1.0.1"

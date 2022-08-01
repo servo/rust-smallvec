@@ -565,17 +565,12 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    const fn inline_capacity() -> usize {
+    pub const fn inline_size() -> usize {
         if Self::is_zst() {
             usize::MAX
         } else {
             N
         }
-    }
-
-    #[inline]
-    pub const fn inline_size(&self) -> usize {
-        Self::inline_capacity()
     }
 
     #[inline]
@@ -594,7 +589,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         if self.len.on_heap(Self::is_zst()) {
             unsafe { self.raw.heap.1 }
         } else {
-            self.inline_size()
+            Self::inline_size()
         }
     }
 
@@ -694,7 +689,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         let len = self.len();
         assert!(new_capacity >= len);
 
-        if new_capacity > self.inline_size() {
+        if new_capacity > Self::inline_size() {
             let result = unsafe { self.raw.try_grow(self.len, new_capacity) };
             if result.is_ok() {
                 unsafe { self.set_on_heap() };
@@ -779,7 +774,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             return;
         }
         let len = self.len();
-        if len <= self.inline_size() {
+        if len <= Self::inline_size() {
             let (ptr, capacity) = unsafe { self.raw.heap };
             self.raw = RawSmallVec::new_inline(MaybeUninit::uninit());
             unsafe { copy_nonoverlapping(ptr, self.raw.as_mut_ptr_inline(), len) };
@@ -1128,7 +1123,7 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn from_elem(elem: T, n: usize) -> Self {
-        if n > Self::inline_capacity() {
+        if n > Self::inline_size() {
             Self::from_vec(vec![elem; n])
         } else {
             let mut v = Self::new();
@@ -1380,7 +1375,7 @@ macro_rules! smallvec {
         let count = 0usize $(+ $crate::smallvec!(@one $x))*;
         #[allow(unused_mut)]
         let mut vec = $crate::SmallVec::new();
-        if count <= vec.inline_size() {
+        if count <= vec.capacity() {
             $(vec.push($x);)*
             vec
         } else {
