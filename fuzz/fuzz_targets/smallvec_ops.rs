@@ -31,8 +31,8 @@ fn black_box_mut_slice(s: &mut [u8]) {
     black_box_iter((s as &[u8]).iter().copied())
 }
 
-fn do_test<A: smallvec::Array<Item = u8>>(data: &[u8]) -> SmallVec<A> {
-    let mut v = SmallVec::<A>::new();
+fn do_test<const N: usize>(data: &[u8]) -> SmallVec<u8, N> {
+    let mut v = SmallVec::<u8, N>::new();
 
     let mut bytes = data.iter().copied();
 
@@ -170,11 +170,11 @@ fn do_test<A: smallvec::Array<Item = u8>>(data: &[u8]) -> SmallVec<A> {
 }
 
 fn do_test_all(data: &[u8]) {
-    do_test::<[u8; 0]>(data);
-    do_test::<[u8; 1]>(data);
-    do_test::<[u8; 2]>(data);
-    do_test::<[u8; 7]>(data);
-    do_test::<[u8; 8]>(data);
+    do_test::<0>(data);
+    do_test::<1>(data);
+    do_test::<2>(data);
+    do_test::<7>(data);
+    do_test::<8>(data);
 }
 
 #[cfg(feature = "afl")]
