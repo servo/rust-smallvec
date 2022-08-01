@@ -47,6 +47,10 @@
 //! Tracking issue: [rust-lang/rust#34761](https://github.com/rust-lang/rust/issues/34761)
 
 #![no_std]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(feature = "specialization", allow(incomplete_features))]
+#![cfg_attr(feature = "specialization", feature(specialization))]
+#![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 
 #[doc(hidden)]
 pub extern crate alloc;
@@ -73,8 +77,8 @@ use core::ptr::addr_of;
 use core::ptr::addr_of_mut;
 use core::ptr::copy_nonoverlapping;
 
-#[cfg(feature = "serde")]
 use core::marker::PhantomData;
+
 #[cfg(feature = "serde")]
 use serde::{
     de::{Deserialize, Deserializer, SeqAccess, Visitor},
@@ -279,6 +283,7 @@ impl TaggedLen {
 pub struct SmallVec<T, const N: usize> {
     len: TaggedLen,
     raw: RawSmallVec<T, N>,
+    _marker: PhantomData<T>,
 }
 
 /// An iterator that removes the items from a `SmallVec` and yields them by value.
@@ -361,6 +366,7 @@ pub struct IntoIter<T, const N: usize> {
     raw: RawSmallVec<T, N>,
     begin: usize,
     end: TaggedLen,
+    _marker: PhantomData<T>,
 }
 
 impl<T, const N: usize> IntoIter<T, N> {
@@ -468,13 +474,16 @@ impl<T, const N: usize> SmallVec<T, N> {
         Self {
             len: TaggedLen::new(0, false, Self::is_zst()),
             raw: RawSmallVec::new(),
+            _marker: PhantomData,
         }
     }
 
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
         let mut this = Self::new();
-        this.reserve_exact(capacity);
+        if capacity > Self::inline_size() {
+            this.grow(capacity);
+        }
         this
     }
 
@@ -494,6 +503,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             Self {
                 len: TaggedLen::new(len, false, Self::is_zst()),
                 raw: RawSmallVec::new(),
+                _marker: PhantomData,
             }
         } else {
             let mut vec = ManuallyDrop::new(vec);
@@ -504,6 +514,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             Self {
                 len: TaggedLen::new(len, true, Self::is_zst()),
                 raw: RawSmallVec::new_heap(ptr, cap),
+                _marker: PhantomData,
             }
         }
     }
@@ -513,6 +524,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         Self {
             len: TaggedLen::new(N, false, Self::is_zst()),
             raw: RawSmallVec::new_inline(MaybeUninit::new(buf)),
+            _marker: PhantomData,
         }
     }
 
@@ -522,6 +534,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         let mut vec = Self {
             len: TaggedLen::new(len, false, Self::is_zst()),
             raw: RawSmallVec::new_inline(MaybeUninit::new(buf)),
+            _marker: PhantomData,
         };
         // Deallocate the remaining elements so no memory is leaked.
         unsafe {
@@ -545,6 +558,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         Self {
             len: TaggedLen::new(len, false, Self::is_zst()),
             raw: RawSmallVec::new_inline(buf),
+            _marker: PhantomData,
         }
     }
 
@@ -684,7 +698,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         infallible(self.try_grow(new_capacity));
     }
 
-    #[inline]
+    #[cold]
     pub fn try_grow(&mut self, new_capacity: usize) -> Result<(), CollectionAllocErr> {
         let len = self.len();
         assert!(new_capacity >= len);
@@ -1043,6 +1057,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         SmallVec {
             len: TaggedLen::new(length, true, Self::is_zst()),
             raw: RawSmallVec::new_heap(ptr, capacity),
+            _marker: PhantomData,
         }
     }
 
@@ -1070,14 +1085,23 @@ impl<T: Copy, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn from_slice(slice: &[T]) -> Self {
         let len = slice.len();
-
-        let mut this = Self::with_capacity(len);
-        let ptr = this.as_mut_ptr();
-        unsafe {
-            copy_nonoverlapping(slice.as_ptr(), ptr, len);
-            this.set_len(len);
+        if len <= Self::inline_size() {
+            let mut this = Self::new();
+            unsafe {
+                let ptr = this.raw.as_mut_ptr_inline();
+                copy_nonoverlapping(slice.as_ptr(), ptr, len);
+                this.set_len(len);
+            }
+            this
+        } else {
+            let mut this = Vec::with_capacity(len);
+            unsafe {
+                let ptr = this.as_mut_ptr();
+                copy_nonoverlapping(slice.as_ptr(), ptr, len);
+                this.set_len(len);
+            }
+            Self::from_vec(this)
         }
-        this
     }
 
     #[inline]
@@ -1250,6 +1274,29 @@ impl Drop for DropDealloc {
     }
 }
 
+#[cfg(feature = "may_dangle")]
+unsafe impl<#[may_dangle] T, const N: usize> Drop for SmallVec<T, N> {
+    fn drop(&mut self) {
+        let on_heap = self.spilled();
+        let len = self.len();
+        let ptr = self.as_mut_ptr();
+        unsafe {
+            let _drop_dealloc = if on_heap {
+                let capacity = self.capacity();
+                Some(DropDealloc {
+                    ptr: ptr as *mut u8,
+                    size_bytes: capacity * size_of::<T>(),
+                    align: align_of::<T>(),
+                })
+            } else {
+                None
+            };
+            core::ptr::slice_from_raw_parts_mut(ptr, len).drop_in_place();
+        }
+    }
+}
+
+#[cfg(not(feature = "may_dangle"))]
 impl<T, const N: usize> Drop for SmallVec<T, N> {
     fn drop(&mut self) {
         let on_heap = self.spilled();
@@ -1318,6 +1365,36 @@ impl<T, const N: usize> core::iter::FromIterator<T> for SmallVec<T, N> {
     }
 }
 
+#[cfg(feature = "specialization")]
+trait SpecFrom {
+    type Element;
+    fn spec_from(slice: &[Self::Element]) -> Self;
+}
+
+#[cfg(feature = "specialization")]
+impl<T: Clone, const N: usize> SpecFrom for SmallVec<T, N> {
+    type Element = T;
+
+    default fn spec_from(slice: &[Self::Element]) -> Self {
+        slice.iter().cloned().collect()
+    }
+}
+
+#[cfg(feature = "specialization")]
+impl<T: Copy, const N: usize> SpecFrom for SmallVec<T, N> {
+    fn spec_from(slice: &[Self::Element]) -> Self {
+        Self::from_slice(slice)
+    }
+}
+
+#[cfg(feature = "specialization")]
+impl<'a, T: Clone, const N: usize> From<&'a [T]> for SmallVec<T, N> {
+    fn from(slice: &'a [T]) -> Self {
+        <Self as SpecFrom>::spec_from(slice)
+    }
+}
+
+#[cfg(not(feature = "specialization"))]
 impl<'a, T: Clone, const N: usize> From<&'a [T]> for SmallVec<T, N> {
     fn from(slice: &'a [T]) -> Self {
         slice.iter().cloned().collect()
@@ -1408,6 +1485,7 @@ impl<T, const N: usize> IntoIterator for SmallVec<T, N> {
                 raw: (&this.raw as *const RawSmallVec<T, N>).read(),
                 begin: 0,
                 end: this.len,
+                _marker: PhantomData,
             }
         }
     }
