@@ -11,7 +11,6 @@ use smallvec::SmallVec;
 const VEC_SIZE: usize = 16;
 const SPILLED_SIZE: usize = 100;
 
-
 trait Vector<T>: for<'a> From<&'a [T]> + Extend<T> {
     fn new() -> Self;
     fn push(&mut self, val: T);
@@ -114,6 +113,8 @@ make_benches! {
         bench_remove_small => gen_remove(VEC_SIZE as _),
         bench_extend => gen_extend(SPILLED_SIZE as _),
         bench_extend_small => gen_extend(VEC_SIZE as _),
+        bench_extend_filtered => gen_extend_filtered(SPILLED_SIZE as _),
+        bench_extend_filtered_small => gen_extend_filtered(VEC_SIZE as _),
         bench_from_iter => gen_from_iter(SPILLED_SIZE as _),
         bench_from_iter_small => gen_from_iter(VEC_SIZE as _),
         bench_from_slice => gen_from_slice(SPILLED_SIZE as _),
@@ -138,6 +139,8 @@ make_benches! {
         bench_remove_vec_small => gen_remove(VEC_SIZE as _),
         bench_extend_vec => gen_extend(SPILLED_SIZE as _),
         bench_extend_vec_small => gen_extend(VEC_SIZE as _),
+        bench_extend_vec_filtered => gen_extend_filtered(SPILLED_SIZE as _),
+        bench_extend_vec_filtered_small => gen_extend_filtered(VEC_SIZE as _),
         bench_from_iter_vec => gen_from_iter(SPILLED_SIZE as _),
         bench_from_iter_vec_small => gen_from_iter(VEC_SIZE as _),
         bench_from_slice_vec => gen_from_slice(SPILLED_SIZE as _),
@@ -217,6 +220,14 @@ fn gen_extend<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     b.iter(|| {
         let mut vec = V::new();
         vec.extend(0..n);
+        vec
+    });
+}
+
+fn gen_extend_filtered<V: Vector<u64>>(n: u64, b: &mut Bencher) {
+    b.iter(|| {
+        let mut vec = V::new();
+        vec.extend((0..n).filter(|i| i % 2 == 0));
         vec
     });
 }

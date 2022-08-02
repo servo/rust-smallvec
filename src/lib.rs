@@ -77,6 +77,7 @@ use core::ptr::addr_of;
 use core::ptr::addr_of_mut;
 use core::ptr::copy;
 use core::ptr::copy_nonoverlapping;
+use core::ptr::NonNull;
 
 use core::marker::PhantomData;
 
@@ -113,7 +114,7 @@ impl core::fmt::Display for CollectionAllocErr {
 #[repr(C)]
 pub union RawSmallVec<T, const N: usize> {
     inline: ManuallyDrop<MaybeUninit<[T; N]>>,
-    heap: (*const T, usize),
+    heap: (*const T, usize), // this pointer is never null
 }
 
 #[inline]
@@ -162,76 +163,81 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         (unsafe { addr_of_mut!(self.inline) }) as *mut T
     }
 
+    /// # Safety
+    ///
+    /// The vector must be on the heap
     #[inline]
     const unsafe fn as_ptr_heap(&self) -> *const T {
         self.heap.0
     }
 
+    /// # Safety
+    ///
+    /// The vector must be on the heap
     #[inline]
     unsafe fn as_mut_ptr_heap(&mut self) -> *mut T {
         self.heap.0 as *mut T
     }
 
-    unsafe fn try_grow(
+    /// # Safety
+    ///
+    /// `new_capacity` must be non zero, and greater or equal to the length.
+    /// T must not be a ZST.
+    unsafe fn try_grow_raw(
         &mut self,
         len: TaggedLen,
         new_capacity: usize,
     ) -> Result<(), CollectionAllocErr> {
         use alloc::alloc::{alloc, realloc};
+        debug_assert!(!Self::is_zst());
         debug_assert!(new_capacity > 0);
+        debug_assert!(new_capacity >= len.value(Self::is_zst()));
 
-        if Self::is_zst() {
-            debug_assert_eq!(len.value(Self::is_zst()), usize::MAX);
-            Err(CollectionAllocErr::CapacityOverflow)
+        let was_on_heap = len.on_heap(Self::is_zst());
+        let ptr = if was_on_heap {
+            self.as_mut_ptr_heap()
         } else {
-            let was_on_heap = len.on_heap(Self::is_zst());
-            let ptr = if was_on_heap {
-                self.as_mut_ptr_heap()
-            } else {
-                self.as_mut_ptr_inline()
-            };
-            let len = len.value(Self::is_zst());
+            self.as_mut_ptr_inline()
+        };
+        let len = len.value(Self::is_zst());
 
-            let new_layout = Layout::array::<T>(new_capacity)
-                .map_err(|_| CollectionAllocErr::CapacityOverflow)?;
-            if new_layout.size() > isize::MAX as usize {
-                return Err(CollectionAllocErr::CapacityOverflow);
+        let new_layout =
+            Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
+        if new_layout.size() > isize::MAX as usize {
+            return Err(CollectionAllocErr::CapacityOverflow);
+        }
+
+        if len == 0 || !was_on_heap {
+            // get a fresh allocation
+
+            // layout has non zero size
+            let new_ptr = alloc(new_layout) as *mut T;
+            if new_ptr.is_null() {
+                Err(CollectionAllocErr::AllocErr { layout: new_layout })
+            } else {
+                copy_nonoverlapping(ptr, new_ptr, len);
+                *self = Self::new_heap(new_ptr, new_capacity);
+                Ok(())
             }
+        } else {
+            // use realloc
 
-            if len == 0 || !was_on_heap {
-                // get a fresh allocation
+            // this can't overflow since we already constructed an equivalent layout during
+            // the previous allocation
+            let old_layout =
+                Layout::from_size_align_unchecked(self.heap.1 * size_of::<T>(), align_of::<T>());
 
-                // layout has non zero size
-                let new_ptr = alloc(new_layout) as *mut T;
-                if new_ptr.is_null() {
-                    Err(CollectionAllocErr::AllocErr { layout: new_layout })
-                } else {
-                    copy_nonoverlapping(ptr, new_ptr, len);
-                    *self = Self::new_heap(new_ptr, new_capacity);
-                    Ok(())
-                }
+            // SAFETY: ptr was allocated with this allocator
+            // old_layout is the same as the layout used to allocate the previous memory block
+            // new_layout.size() is greater than zero
+            // does not overflow when rounded up to alignment. since it was constructed
+            // with Layout::array
+            let new_ptr = realloc(ptr as *mut u8, old_layout, new_layout.size()) as *mut T;
+            if new_ptr.is_null() {
+                Err(CollectionAllocErr::AllocErr { layout: new_layout })
             } else {
-                // use realloc
-
-                // this can't overflow since we already constructed an equivalent layout during
-                // the previous allocation
-                let old_layout = Layout::from_size_align_unchecked(
-                    self.heap.1 * size_of::<T>(),
-                    align_of::<T>(),
-                );
-
-                // SAFETY: ptr was allocated with this allocator
-                // old_layout is the same as the layout used to allocate the previous memory block
-                // new_layout.size() is greater than zero
-                // does not overflow when rounded up to alignment. since it was constructed
-                // with Layout::array
-                let new_ptr = realloc(ptr as *mut u8, old_layout, new_layout.size()) as *mut T;
-                if new_ptr.is_null() {
-                    Err(CollectionAllocErr::AllocErr { layout: new_layout })
-                } else {
-                    *self = Self::new_heap(new_ptr, new_capacity);
-                    Ok(())
-                }
+                *self = Self::new_heap(new_ptr, new_capacity);
+                Ok(())
             }
         }
     }
@@ -293,6 +299,13 @@ pub struct SmallVec<T, const N: usize> {
 ///
 /// [1]: struct.SmallVec.html#method.drain
 pub struct Drain<'a, T: 'a, const N: usize> {
+    // `vec` points to a valid object within its lifetime.
+    // This is ensured by the fact that we're holding an iterator to its items.
+    //
+    // # Safety
+    //
+    // Members in vec[tail_start..tail_start + tail_len] are initialized
+    // even though vec has length < tail_start
     tail_start: usize,
     tail_len: usize,
     iter: core::slice::Iter<'a, T>,
@@ -304,6 +317,8 @@ impl<'a, T: 'a, const N: usize> Iterator for Drain<'a, T, N> {
 
     #[inline]
     fn next(&mut self) -> Option<T> {
+        // SAFETY: we shrunk the length of the vector so it no longer owns these items, and we can
+        // take ownership of them.
         self.iter
             .next()
             .map(|reference| unsafe { core::ptr::read(reference) })
@@ -318,6 +333,7 @@ impl<'a, T: 'a, const N: usize> Iterator for Drain<'a, T, N> {
 impl<'a, T: 'a, const N: usize> DoubleEndedIterator for Drain<'a, T, N> {
     #[inline]
     fn next_back(&mut self) -> Option<T> {
+        // SAFETY: see above
         self.iter
             .next_back()
             .map(|reference| unsafe { core::ptr::read(reference) })
@@ -335,13 +351,16 @@ impl<'a, T, const N: usize> core::iter::FusedIterator for Drain<'a, T, N> {}
 
 impl<'a, T: 'a, const N: usize> Drop for Drain<'a, T, N> {
     fn drop(&mut self) {
-        self.for_each(drop);
+        if core::mem::needs_drop::<T>() {
+            self.for_each(drop);
+        }
 
         if self.tail_len > 0 {
+            // SAFETY: we're copying initialized members back to the end of the vector
+            // then updating its length
             unsafe {
                 let source_vec = self.vec.as_mut();
 
-                // memmove back untouched tail, update to new length
                 let start = source_vec.len();
                 let tail = self.tail_start;
                 if tail != start {
@@ -364,6 +383,11 @@ impl<'a, T: 'a, const N: usize> Drop for Drain<'a, T, N> {
 ///
 /// [1]: struct.SmallVec.html#method.into_iter
 pub struct IntoIter<T, const N: usize> {
+    // # Safety
+    //
+    // `end` decides whether the data lives on the heap or not
+    //
+    // The members from begin..end are initialized
     raw: RawSmallVec<T, N>,
     begin: usize,
     end: TaggedLen,
@@ -380,6 +404,7 @@ impl<T, const N: usize> IntoIter<T, N> {
     const fn as_ptr(&self) -> *const T {
         let on_heap = self.end.on_heap(Self::is_zst());
         if on_heap {
+            // SAFETY: vector is on the heap
             unsafe { self.raw.as_ptr_heap() }
         } else {
             self.raw.as_ptr_inline()
@@ -390,6 +415,7 @@ impl<T, const N: usize> IntoIter<T, N> {
     fn as_mut_ptr(&mut self) -> *mut T {
         let on_heap = self.end.on_heap(Self::is_zst());
         if on_heap {
+            // SAFETY: vector is on the heap
             unsafe { self.raw.as_mut_ptr_heap() }
         } else {
             self.raw.as_mut_ptr_inline()
@@ -398,6 +424,8 @@ impl<T, const N: usize> IntoIter<T, N> {
 
     #[inline]
     pub fn as_slice(&self) -> &[T] {
+        // SAFETY: The members in self.begin..self.end.value() are all initialized
+        // So the pointer arithmetic is valid, and so is the construction of the slice
         unsafe {
             let ptr = self.as_ptr();
             core::slice::from_raw_parts(
@@ -409,6 +437,7 @@ impl<T, const N: usize> IntoIter<T, N> {
 
     #[inline]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
+        // SAFETY: see above
         unsafe {
             let ptr = self.as_mut_ptr();
             core::slice::from_raw_parts_mut(
@@ -427,6 +456,7 @@ impl<T, const N: usize> Iterator for IntoIter<T, N> {
         if self.begin == self.end.value(Self::is_zst()) {
             None
         } else {
+            // SAFETY: see above
             unsafe {
                 let ptr = self.as_mut_ptr();
                 let value = ptr.add(self.begin).read();
@@ -450,6 +480,7 @@ impl<T, const N: usize> DoubleEndedIterator for IntoIter<T, N> {
         if self.begin == end {
             None
         } else {
+            // SAFETY: see above
             unsafe {
                 let ptr = self.as_mut_ptr();
                 let on_heap = self.end.on_heap(Self::is_zst());
@@ -522,6 +553,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub const fn from_buf(buf: [T; N]) -> Self {
+        // SAFETY: all the members in 0..N are initialized
         Self {
             len: TaggedLen::new(N, false, Self::is_zst()),
             raw: RawSmallVec::new_inline(MaybeUninit::new(buf)),
@@ -532,6 +564,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn from_buf_and_len(buf: [T; N], len: usize) -> Self {
         assert!(len <= N);
+        // SAFETY: all the members in 0..len are initialized
         let mut vec = Self {
             len: TaggedLen::new(len, false, Self::is_zst()),
             raw: RawSmallVec::new_inline(MaybeUninit::new(buf)),
@@ -540,7 +573,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         // Deallocate the remaining elements so no memory is leaked.
         unsafe {
             // SAFETY: both the input and output pointers are in range of the stack allocation
-            let remainder_ptr = addr_of_mut!(vec.raw.inline).add(len);
+            let remainder_ptr = vec.raw.as_mut_ptr_inline().add(len);
             let remainder_len = N - len;
 
             // SAFETY: the values are initialized, so dropping them here is fine.
@@ -553,6 +586,25 @@ impl<T, const N: usize> SmallVec<T, N> {
         vec
     }
 
+    /// Constructs a new SmallVec on the stack from an A without copying elements. Also sets the length. The user is responsible for ensuring that len <= A::size().
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smallvec::SmallVec;
+    /// use std::mem::MaybeUninit;
+    ///
+    /// let buf = [1, 2, 3, 4, 5, 0, 0, 0];
+    /// let small_vec = unsafe {
+    ///     SmallVec::from_buf_and_len_unchecked(MaybeUninit::new(buf), 5)
+    /// };
+    ///
+    /// assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
+    /// ```
+    ///
+    /// # Safety
+    ///
+    /// `len <= N`, and all the elements in `buf[..len]` must be initialized
     #[inline]
     pub const unsafe fn from_buf_and_len_unchecked(buf: MaybeUninit<[T; N]>, len: usize) -> Self {
         debug_assert!(len <= N);
@@ -563,15 +615,35 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 
+    /// Sets the tag to be on the heap
+    ///
+    /// # Safety
+    ///
+    /// The active union member must be the self.raw.heap
     #[inline]
     unsafe fn set_on_heap(&mut self) {
         self.len = TaggedLen::new(self.len(), true, Self::is_zst());
     }
+
+    /// Sets the tag to be inline
+    ///
+    /// # Safety
+    ///
+    /// The active union member must be the self.raw.inline
     #[inline]
     unsafe fn set_inline(&mut self) {
         self.len = TaggedLen::new(self.len(), false, Self::is_zst());
     }
 
+    /// Sets the length of a vector.
+    ///
+    /// This will explicitly set the size of the vector, without actually modifying its buffers, so
+    /// it is up to the caller to ensure that the vector is actually the specified size.
+    ///
+    /// # Safety
+    ///
+    /// `new_len <= self.capacity()` must be true, and all the elements in the range `..self.len`
+    /// must be initialized.
     #[inline]
     pub unsafe fn set_len(&mut self, new_len: usize) {
         debug_assert!(new_len <= self.capacity());
@@ -602,6 +674,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub const fn capacity(&self) -> usize {
         if self.len.on_heap(Self::is_zst()) {
+            // SAFETY: raw.heap is active
             unsafe { self.raw.heap.1 }
         } else {
             Self::inline_size()
@@ -635,10 +708,13 @@ impl<T, const N: usize> SmallVec<T, N> {
         assert!(end <= len);
 
         unsafe {
+            // SAFETY: `start <= len`
             self.set_len(start);
 
+            // SAFETY: all the elements in `start..end` are initialized
             let range_slice = core::slice::from_raw_parts(self.as_ptr().add(start), end - start);
 
+            // SAFETY: all the elements in `end..len` are initialized
             Drain {
                 tail_start: end,
                 tail_len: len - end,
@@ -664,6 +740,20 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
+    unsafe fn push_heap(&mut self, value: T) {
+        // SAFETY: see above
+        debug_assert!(self.spilled());
+        let len = self.len();
+        let (ptr, cap) = self.raw.heap;
+        let ptr = ptr as *mut T;
+        if len == cap {
+            self.reserve(1);
+        }
+        ptr.add(len).write(value);
+        self.set_len(len + 1)
+    }
+
+    #[inline]
     pub fn pop(&mut self) -> Option<T> {
         if self.is_empty() {
             None
@@ -671,6 +761,8 @@ impl<T, const N: usize> SmallVec<T, N> {
             let len = self.len() - 1;
             // SAFETY: len < old_len since this can't overflow, because the old length is non zero
             unsafe { self.set_len(len) };
+            // SAFETY: this element was initialized and we just gave up ownership of it, so we can
+            // give it away
             let value = unsafe { self.as_mut_ptr().add(len).read() };
             Some(value)
         }
@@ -688,10 +780,10 @@ impl<T, const N: usize> SmallVec<T, N> {
 
         // SAFETY: see `Self::push`
         let ptr = unsafe { self.as_mut_ptr().add(len) };
+        unsafe { other.set_len(0) }
         // SAFETY: we have a mutable reference to each vector and each uniquely owns its memory.
         // so the ranges can't overlap
         unsafe { copy_nonoverlapping(other.as_ptr(), ptr, other_len) };
-        unsafe { other.set_len(0) }
     }
 
     #[inline]
@@ -701,27 +793,38 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[cold]
     pub fn try_grow(&mut self, new_capacity: usize) -> Result<(), CollectionAllocErr> {
+        if Self::is_zst() {
+            return Ok(());
+        }
+
         let len = self.len();
         assert!(new_capacity >= len);
 
         if new_capacity > Self::inline_size() {
-            let result = unsafe { self.raw.try_grow(self.len, new_capacity) };
+            // SAFETY: we checked all the preconditions
+            let result = unsafe { self.raw.try_grow_raw(self.len, new_capacity) };
+
             if result.is_ok() {
+                // SAFETY: the allocation succeeded, so self.raw.heap is now active
                 unsafe { self.set_on_heap() };
             }
             result
         } else {
+            // new_capacity <= Self::inline_size()
             if self.spilled() {
                 unsafe {
+                    // SAFETY: heap member is active
                     let (ptr, old_cap) = self.raw.heap;
+                    // inline member is now active
+
+                    // SAFETY: len <= new_capacity <= Self::inline_size()
+                    // so the copy is within bounds of the inline member
                     copy_nonoverlapping(ptr, self.raw.as_mut_ptr_inline(), len);
-                    {
-                        let _drop_dealloc = DropDealloc {
-                            ptr: ptr as *mut u8,
-                            size_bytes: old_cap * size_of::<T>(),
-                            align: align_of::<T>(),
-                        };
-                    }
+                    drop(DropDealloc {
+                        ptr: NonNull::new_unchecked(ptr as *mut u8),
+                        size_bytes: old_cap * size_of::<T>(),
+                        align: align_of::<T>(),
+                    });
                     self.set_inline();
                 }
             }
@@ -790,18 +893,22 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
         let len = self.len();
         if len <= Self::inline_size() {
-            let (ptr, capacity) = unsafe { self.raw.heap };
-            self.raw = RawSmallVec::new_inline(MaybeUninit::uninit());
-            unsafe { copy_nonoverlapping(ptr, self.raw.as_mut_ptr_inline(), len) };
-            unsafe { self.set_inline() };
+            // SAFETY: self.spilled() is true, so we're on the heap
             unsafe {
+                let (ptr, capacity) = self.raw.heap;
+                self.raw = RawSmallVec::new_inline(MaybeUninit::uninit());
+                copy_nonoverlapping(ptr, self.raw.as_mut_ptr_inline(), len);
+                self.set_inline();
                 alloc::alloc::dealloc(
                     ptr as *mut T as *mut u8,
                     Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>()),
-                )
-            };
+                );
+            }
         } else if len < self.capacity() {
-            self.grow(len);
+            // SAFETY: len > Self::inline_size() >= 0
+            // so new capacity is non zero, it is equal to the length
+            // T can't be a ZST because SmallVec<ZST, N> is never spilled.
+            unsafe { infallible(self.raw.try_grow_raw(self.len, len)) };
         }
     }
 
@@ -809,6 +916,8 @@ impl<T, const N: usize> SmallVec<T, N> {
     pub fn truncate(&mut self, len: usize) {
         let old_len = self.len();
         if len < old_len {
+            // SAFETY: we set `len` to a smaller value
+            // then we drop the previously initialized elements
             unsafe {
                 self.set_len(len);
                 core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(
@@ -823,6 +932,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     pub fn as_slice(&self) -> &[T] {
         let len = self.len();
         let ptr = self.as_ptr();
+        // SAFETY: all the elements in `..len` are initialized
         unsafe { core::slice::from_raw_parts(ptr, len) }
     }
 
@@ -830,6 +940,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         let len = self.len();
         let ptr = self.as_mut_ptr();
+        // SAFETY: see above
         unsafe { core::slice::from_raw_parts_mut(ptr, len) }
     }
 
@@ -837,14 +948,22 @@ impl<T, const N: usize> SmallVec<T, N> {
     pub fn swap_remove(&mut self, index: usize) -> T {
         let len = self.len();
         assert!(index < len);
+        // This can't overflow since `len > index >= 0`
         let new_len = len - 1;
         unsafe {
+            // SAFETY: we set len to a smaller value
             self.set_len(new_len);
             let ptr = self.as_mut_ptr();
             let last = ptr.add(new_len);
             let ith = ptr.add(index);
+            // This item is initialized since it was in the vector just before
             let last_item = last.read();
+            // This item is initialized since index < len
             let ith_item = ith.read();
+
+            // Note that these may be the same element.
+            // This is fine since in this case we just write it back to the pointer past the end of
+            // the vector, so the vector no longer owns it
             ith.write(last_item);
             ith_item
         }
@@ -861,9 +980,11 @@ impl<T, const N: usize> SmallVec<T, N> {
         assert!(index < len);
         let new_len = len - 1;
         unsafe {
+            // SAFETY: new_len < len
             self.set_len(new_len);
             let ptr = self.as_mut_ptr();
             let ith = ptr.add(index);
+            // This item is initialized since index < len
             let ith_item = ith.read();
             copy(ith.add(1), ith, new_len - index);
             ith_item
@@ -877,26 +998,34 @@ impl<T, const N: usize> SmallVec<T, N> {
         self.reserve(1);
         let ptr = self.as_mut_ptr();
         unsafe {
+            // the elements at `index + 1..len + 1` are now initialized
             if index < len {
                 copy(ptr.add(index), ptr.add(index + 1), len - index);
             }
+            // the element at `index` is now initialized
             ptr.add(index).write(value);
+
+            // SAFETY: all the elements are initialized
             self.set_len(len + 1);
         }
     }
 
-    fn insert_many_impl<I: Iterator<Item = T>>(&mut self, mut index: usize, mut iter: I) {
+    fn insert_many_impl<I: Iterator<Item = T>>(&mut self, mut index: usize, iter: I) {
         let len = self.len();
         if index == len {
             return self.extend(iter);
         }
 
+        let mut iter = iter.fuse();
         let (lower_bound, _) = iter.size_hint();
         self.reserve(lower_bound);
 
         let count = unsafe {
             let ptr = self.as_mut_ptr();
-            let count = insert_many_batch_phase(ptr, index, lower_bound, len, &mut iter);
+            // SAFETY: ptr is valid for `lower_bound` writes since we just reserved that much
+            let count = insert_many_batch(ptr, index, lower_bound, len, &mut iter);
+            // SAFETY: insert_many_batch_phase returns the number of elements it initialized, and
+            // leaves the vector in a valid state, without setting the new length
             self.set_len(len + count);
             count
         };
@@ -914,6 +1043,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub const fn as_ptr(&self) -> *const T {
         if self.len.on_heap(Self::is_zst()) {
+            // SAFETY: heap member is active
             unsafe { self.raw.as_ptr_heap() }
         } else {
             self.raw.as_ptr_inline()
@@ -923,6 +1053,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut T {
         if self.len.on_heap(Self::is_zst()) {
+            // SAFETY: see above
             unsafe { self.raw.as_mut_ptr_heap() }
         } else {
             self.raw.as_mut_ptr_inline()
@@ -935,6 +1066,9 @@ impl<T, const N: usize> SmallVec<T, N> {
         if !self.spilled() {
             let mut vec = Vec::with_capacity(len);
             let this = ManuallyDrop::new(self);
+            // SAFETY: we create a new vector with sufficient capacity, copy our elements into it
+            // to transfer ownership and then set the length
+            // we don't drop the elements we previously held
             unsafe {
                 copy_nonoverlapping(this.raw.as_ptr_inline(), vec.as_mut_ptr(), len);
                 vec.set_len(len);
@@ -942,6 +1076,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             vec
         } else {
             let this = ManuallyDrop::new(self);
+            // SAFETY: ptr was created with the global allocator
             unsafe {
                 let (ptr, cap) = this.raw.heap;
                 Vec::from_raw_parts(ptr as *mut T, len, cap)
@@ -959,8 +1094,14 @@ impl<T, const N: usize> SmallVec<T, N> {
         if self.len() != N {
             Err(self)
         } else {
-            let this = ManuallyDrop::new(self);
+            // when `this` is dropped, the memory is released if it's on the heap.
+            let mut this = self;
+            // SAFETY: we release ownership of the elements we hold
+            unsafe {
+                this.set_len(0);
+            }
             let ptr = this.as_ptr() as *const [T; N];
+            // SAFETY: these elements are initialized since the length was `N`
             unsafe { Ok(ptr.read()) }
         }
     }
@@ -968,13 +1109,15 @@ impl<T, const N: usize> SmallVec<T, N> {
     pub fn retain<F: FnMut(&mut T) -> bool>(&mut self, mut f: F) {
         let mut del = 0;
         let len = self.len();
+        let ptr = self.as_mut_ptr();
         for i in 0..len {
+            // SAFETY: all the pointers are in bounds
+            // `i - del` never overflows since `del <= i` is a maintained invariant
             unsafe {
-                let ptr = self.as_mut_ptr().add(i);
-                if !f(&mut *ptr) {
+                if !f(&mut *ptr.add(i)) {
                     del += 1;
                 } else if del > 0 {
-                    core::mem::swap(&mut *ptr, &mut *ptr.sub(del));
+                    core::mem::swap(&mut *ptr.add(i), &mut *ptr.add(i - del));
                 }
             }
         }
@@ -1052,6 +1195,61 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 
+    /// Creates a SmallVec directly from the raw components of another SmallVec.
+    ///
+    /// # Safety
+    ///
+    /// This is highly unsafe, due to the number of invariants that aren’t checked:
+    ///
+    /// - ptr needs to have been previously allocated via SmallVec from its spilled storage (at least, it’s highly likely to be incorrect if it wasn’t).
+    /// - ptr’s A::Item type needs to be the same size and alignment that it was allocated with
+    /// - length needs to be less than or equal to capacity.
+    /// - capacity needs to be the capacity that the pointer was allocated with.
+    ///
+    /// Violating these may cause problems like corrupting the allocator’s internal data structures.
+    ///
+    /// Additionally, capacity must be greater than the amount of inline storage A has; that is, the new SmallVec must need to spill over into heap allocated storage. This condition is asserted against.
+    ///
+    /// The ownership of ptr is effectively transferred to the SmallVec which may then deallocate, reallocate or change the contents of memory pointed to by the pointer at will. Ensure that nothing else uses the pointer after calling this function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::mem;
+    /// use std::ptr;
+    /// use smallvec::{SmallVec, smallvec};
+    ///
+    /// fn main() {
+    ///     let mut v: SmallVec<_, 1> = smallvec![1, 2, 3];
+    ///
+    ///     // Pull out the important parts of `v`.
+    ///     let p = v.as_mut_ptr();
+    ///     let len = v.len();
+    ///     let cap = v.capacity();
+    ///     let spilled = v.spilled();
+    ///
+    ///     unsafe {
+    ///         // Forget all about `v`. The heap allocation that stored the
+    ///         // three values won't be deallocated.
+    ///         mem::forget(v);
+    ///
+    ///         // Overwrite memory with [4, 5, 6].
+    ///         //
+    ///         // This is only safe if `spilled` is true! Otherwise, we are
+    ///         // writing into the old `SmallVec`'s inline storage on the
+    ///         // stack.
+    ///         assert!(spilled);
+    ///         for i in 0..len {
+    ///             ptr::write(p.add(i), 4 + i);
+    ///         }
+    ///
+    ///         // Put everything back together into a SmallVec with a different
+    ///         // amount of inline storage, but which is still less than `cap`.
+    ///         let rebuilt = SmallVec::<_, 2>::from_raw_parts(p, len, cap);
+    ///         assert_eq!(&*rebuilt, &[4, 5, 6]);
+    ///     }
+    /// }
+    /// ```
     #[inline]
     pub unsafe fn from_raw_parts(ptr: *mut T, length: usize, capacity: usize) -> SmallVec<T, N> {
         assert!(!Self::is_zst());
@@ -1062,16 +1260,43 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 
-    fn extend_impl<I: Iterator<Item = T>>(&mut self, mut iter: I) {
+    fn extend_impl<I: Iterator<Item = T>>(&mut self, iter: I) {
+        let mut iter = iter.fuse();
         let len = self.len();
         let (lower_bound, _) = iter.size_hint();
         self.reserve(lower_bound);
+        let capacity = self.capacity();
         unsafe {
             let ptr = self.as_mut_ptr();
-            let count = extend_batch_phase(ptr, lower_bound, len, &mut iter);
+            // SAFETY: ptr is valid for `capacity - len` writes
+            let count = extend_batch(ptr, capacity - len, len, &mut iter);
             self.set_len(len + count);
         }
-        iter.for_each(|item| self.push(item));
+
+        if let Some(item) = iter.next() {
+            self.push(item);
+        } else {
+            return;
+        }
+
+        // either we ran out of items, in which case this loop doesn't get executed. or we still
+        // have items to push, and in that case we must be on the heap, since we filled up the
+        // capacity and then pushed one item
+        unsafe {
+            loop {
+                if let Some(item) = iter.next() {
+                    self.push_heap(item);
+                } else {
+                    break;
+                }
+                let len = self.len();
+                let (ptr, capacity) = self.raw.heap;
+                let ptr = ptr as *mut T;
+                // SAFETY: ptr is valid for `capacity - len` writes
+                let count = extend_batch(ptr, capacity - len, len, &mut iter);
+                self.set_len(len + count);
+            }
+        }
     }
 }
 
@@ -1115,8 +1340,12 @@ impl<T: Copy, const N: usize> SmallVec<T, N> {
             let base_ptr = self.as_mut_ptr();
             let ith_ptr = base_ptr.add(index);
             let shifted_ptr = base_ptr.add(index + other_len);
+            // elements at `index + other_len..len + other_len` are now initialized
             copy(ith_ptr, shifted_ptr, len - index);
+            // elements at `index..index + other_len` are now initialized
             copy_nonoverlapping(slice.as_ptr(), ith_ptr, other_len);
+
+            // SAFETY: all the elements are initialized
             self.set_len(len + other_len);
         }
     }
@@ -1126,6 +1355,7 @@ impl<T: Copy, const N: usize> SmallVec<T, N> {
         let len = self.len();
         let other_len = slice.len();
         self.reserve(other_len);
+        // SAFETY: see above
         unsafe {
             let base_ptr = self.as_mut_ptr();
             let end_ptr = base_ptr.add(len);
@@ -1154,15 +1384,16 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
             let mut v = Self::new();
 
             unsafe {
-                let ptr = v.as_mut_ptr();
+                let ptr = v.raw.as_mut_ptr_inline();
                 let mut guard = DropGuard { ptr, len: 0 };
 
-                // assume T is expensive to clone
+                // SAFETY: `n <= Self::inline_size()` so we can write `n` elements
                 for i in 0..n {
                     guard.len = i;
                     ptr.add(i).write(elem.clone());
                 }
                 core::mem::forget(guard);
+                // SAFETY: we just initialized `n` elements in the vector
                 v.set_len(n);
             }
             v
@@ -1199,7 +1430,11 @@ impl<T> Drop for DropGuard<T> {
     }
 }
 
-unsafe fn insert_many_batch_phase<T, I: Iterator<Item = T>>(
+// Safety:
+//
+// `ptr..ptr + lower_bound` must be valid for writes
+#[inline]
+unsafe fn insert_many_batch<T, I: Iterator<Item = T>>(
     ptr: *mut T,
     index: usize,
     lower_bound: usize,
@@ -1228,9 +1463,11 @@ unsafe fn insert_many_batch_phase<T, I: Iterator<Item = T>>(
     count
 }
 
-unsafe fn extend_batch_phase<T, I: Iterator<Item = T>>(
+// `ptr..ptr + remaining_capacity` must be valid for writes
+#[inline]
+unsafe fn extend_batch<T, I: Iterator<Item = T>>(
     ptr: *mut T,
-    lower_bound: usize,
+    remaining_capacity: usize,
     len: usize,
     iter: &mut I,
 ) -> usize {
@@ -1239,10 +1476,12 @@ unsafe fn extend_batch_phase<T, I: Iterator<Item = T>>(
         ptr: ptr_end,
         len: 0,
     };
-    iter.take(lower_bound).enumerate().for_each(|(i, item)| {
-        ptr_end.add(i).write(item);
-        guard.len = i + 1;
-    });
+    iter.take(remaining_capacity)
+        .enumerate()
+        .for_each(|(i, item)| {
+            ptr_end.add(i).write(item);
+            guard.len = i + 1;
+        });
     let count = guard.len;
     core::mem::forget(guard);
     count
@@ -1256,7 +1495,7 @@ impl<T, const N: usize> Extend<T> for SmallVec<T, N> {
 }
 
 struct DropDealloc {
-    ptr: *mut u8,
+    ptr: NonNull<u8>,
     size_bytes: usize,
     align: usize,
 }
@@ -1267,7 +1506,7 @@ impl Drop for DropDealloc {
         unsafe {
             if self.size_bytes > 0 {
                 alloc::alloc::dealloc(
-                    self.ptr,
+                    self.ptr.as_ptr(),
                     Layout::from_size_align_unchecked(self.size_bytes, self.align),
                 );
             }
@@ -1281,11 +1520,13 @@ unsafe impl<#[may_dangle] T, const N: usize> Drop for SmallVec<T, N> {
         let on_heap = self.spilled();
         let len = self.len();
         let ptr = self.as_mut_ptr();
+        // SAFETY: we first drop the elements, then `_drop_dealloc` is dropped, releasing memory we
+        // used to own
         unsafe {
             let _drop_dealloc = if on_heap {
                 let capacity = self.capacity();
                 Some(DropDealloc {
-                    ptr: ptr as *mut u8,
+                    ptr: NonNull::new_unchecked(ptr as *mut u8),
                     size_bytes: capacity * size_of::<T>(),
                     align: align_of::<T>(),
                 })
@@ -1303,11 +1544,12 @@ impl<T, const N: usize> Drop for SmallVec<T, N> {
         let on_heap = self.spilled();
         let len = self.len();
         let ptr = self.as_mut_ptr();
+        // SAFETY: see above
         unsafe {
             let _drop_dealloc = if on_heap {
                 let capacity = self.capacity();
                 Some(DropDealloc {
-                    ptr: ptr as *mut u8,
+                    ptr: NonNull::new_unchecked(ptr as *mut u8),
                     size_bytes: capacity * size_of::<T>(),
                     align: align_of::<T>(),
                 })
@@ -1321,6 +1563,7 @@ impl<T, const N: usize> Drop for SmallVec<T, N> {
 
 impl<T, const N: usize> Drop for IntoIter<T, N> {
     fn drop(&mut self) {
+        // SAFETY: see above
         unsafe {
             let is_zst = size_of::<T>() == 0;
             let on_heap = self.end.on_heap(is_zst);
@@ -1330,7 +1573,7 @@ impl<T, const N: usize> Drop for IntoIter<T, N> {
             let _drop_dealloc = if on_heap {
                 let capacity = self.raw.heap.1;
                 Some(DropDealloc {
-                    ptr: ptr as *mut u8,
+                    ptr: NonNull::new_unchecked(ptr as *mut u8),
                     size_bytes: capacity * size_of::<T>(),
                     align: align_of::<T>(),
                 })
@@ -1424,7 +1667,7 @@ impl<T: Clone, const N: usize> Clone for SmallVec<T, N> {
         // drop anything that will not be overwritten
         self.truncate(source.len());
 
-        // self.len <= other.len due to the truncate above, so the
+        // SAFETY: self.len <= other.len due to the truncate above, so the
         // slices here are always in-bounds.
         let init = unsafe { source.get_unchecked(..self.len()) };
         let tail = unsafe { source.get_unchecked(self.len()..) };
@@ -1479,6 +1722,8 @@ impl<T, const N: usize> IntoIterator for SmallVec<T, N> {
     type IntoIter = IntoIter<T, N>;
     type Item = T;
     fn into_iter(self) -> Self::IntoIter {
+        // SAFETY: we move out of this.raw by reading the value at its address, which is fine since
+        // we don't drop it
         unsafe {
             // Set SmallVec len to zero as `IntoIter` drop handles dropping of the elements
             let this = ManuallyDrop::new(self);
