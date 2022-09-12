@@ -12,6 +12,7 @@ jobs:
     strategy:
       matrix:
         toolchain: ["stable", "beta", "nightly", "1.36.0"]
+        os: [ubuntu-latest]
         include:
           - toolchain: stable
             env:
