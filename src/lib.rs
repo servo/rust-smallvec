@@ -2089,6 +2089,7 @@ impl<T, const N: usize> SmallVec<[T; N]> {
 #[cfg_attr(docsrs, doc(cfg(feature = "const_generics")))]
 unsafe impl<T, const N: usize> Array for [T; N] {
     type Item = T;
+    #[inline]
     fn size() -> usize {
         N
     }
@@ -2100,6 +2101,7 @@ macro_rules! impl_array(
         $(
             unsafe impl<T> Array for [T; $size] {
                 type Item = T;
+                #[inline]
                 fn size() -> usize { $size }
             }
         )+
