@@ -43,9 +43,11 @@ jobs:
         run: cargo build --verbose
 
       - name: Cargo test
+        if: matrix.toolchain != '1.36.0'
         run: cargo test --verbose
 
       - name: Cargo test w/ serde
+        if: matrix.toolchain != '1.36.0'
         run: cargo test --verbose --features serde
 
       - name: Cargo check w/o default features
