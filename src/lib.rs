@@ -410,6 +410,33 @@ impl<'a, T: 'a + Array> Drop for Drain<'a, T> {
     }
 }
 
+/// An iterator which uses a closure to determine if an element should be removed.
+///
+/// Returned from [`SmallVec::drain`][1].
+/// 
+/// [1]: struct.SmallVec.html#method.drain_filter
+pub struct DrainFilter<'a, T, F,>
+where
+    F: FnMut(&mut T::Item) -> bool,
+    T: Array,
+{
+    vec: &'a mut SmallVec<T>,
+    /// The index of the item that will be inspected by the next call to `next`.
+    idx: usize,
+    /// The number of items that have been drained (removed) thus far.
+    del: usize,
+    /// The original length of `vec` prior to draining.
+    old_len: usize,
+    /// The filter test predicate.
+    pred: F,
+    /// A flag that indicates a panic has occurred in the filter test predicate.
+    /// This is used as a hint in the drop implementation to prevent consumption
+    /// of the remainder of the `DrainFilter`. Any unprocessed items will be
+    /// backshifted in the `vec`, but no further items will be dropped or
+    /// tested by the filter predicate.
+    panic_flag: bool,
+}
+
 #[cfg(feature = "union")]
 union SmallVecData<A: Array> {
     inline: core::mem::ManuallyDrop<MaybeUninit<A>>,
