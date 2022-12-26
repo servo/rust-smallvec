@@ -412,10 +412,10 @@ impl<'a, T: 'a + Array> Drop for Drain<'a, T> {
 
 /// An iterator which uses a closure to determine if an element should be removed.
 ///
-/// Returned from [`SmallVec::drain`][1].
+/// Returned from [`SmallVec::drain_filter`][1].
 /// 
 /// [1]: struct.SmallVec.html#method.drain_filter
-pub struct DrainFilter<'a, T, F,>
+pub struct DrainFilter<'a, T, F>
 where
     F: FnMut(&mut T::Item) -> bool,
     T: Array,
@@ -481,6 +481,10 @@ where
             None
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.old_len - self.idx))
+}
 }
 
 #[cfg(feature = "union")]
