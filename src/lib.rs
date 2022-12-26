@@ -484,7 +484,57 @@ where
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         (0, Some(self.old_len - self.idx))
+    }
 }
+
+impl <T, F> Drop for DrainFilter<'_, T, F>
+where
+    F: FnMut(&mut T::Item) -> bool,
+    T: Array,
+{
+    fn drop(&mut self) {
+        struct BackshiftOnDrop<'a, 'b, T, F>
+        where
+            F: FnMut(&mut T::Item) -> bool,
+            T: Array
+        {
+            drain: &'b mut DrainFilter<'a, T, F>,
+        }
+
+        impl<'a, 'b, T, F> Drop for BackshiftOnDrop<'a, 'b, T, F>
+        where
+            F: FnMut(&mut T::Item) -> bool,
+            T: Array
+        {
+            fn drop(&mut self) {
+                unsafe {
+                    if self.drain.idx < self.drain.old_len && self.drain.del > 0 {
+                        // This is a pretty messed up state, and there isn't really an
+                        // obviously right thing to do. We don't want to keep trying
+                        // to execute `pred`, so we just backshift all the unprocessed
+                        // elements and tell the vec that they still exist. The backshift
+                        // is required to prevent a double-drop of the last successfully
+                        // drained item prior to a panic in the predicate.
+                        let ptr = self.drain.vec.as_mut_ptr();
+                        let src = ptr.add(self.drain.idx);
+                        let dst = src.sub(self.drain.del);
+                        let tail_len = self.drain.old_len - self.drain.idx;
+                        src.copy_to(dst, tail_len);
+                    }
+                    self.drain.vec.set_len(self.drain.old_len - self.drain.del);
+                }
+            }
+        }
+
+        let backshift = BackshiftOnDrop { drain: self };
+
+        // Attempt to consume any remaining elements if the filter predicate
+        // has not yet panicked. We'll backshift any remaining elements
+        // whether we've already panicked or if the consumption here panics.
+        if !backshift.drain.panic_flag {
+            backshift.drain.for_each(drop);
+        }
+    }
 }
 
 #[cfg(feature = "union")]
@@ -965,7 +1015,7 @@ impl<A: Array> SmallVec<A> {
     /// let odds = numbers;
     ///
     /// assert_eq!(evens, SmallVec::<[i32; 16]>::from_slice(&[2i32, 4, 6, 8, 14]));
-    /// //assert_eq!(odds, SmallVec::<[i32; 16]>::from_slice(&[1i32, 3, 5, 9, 11, 13, 15]));
+    /// assert_eq!(odds, SmallVec::<[i32; 16]>::from_slice(&[1i32, 3, 5, 9, 11, 13, 15]));
     /// ```
     pub fn drain_filter<F>(&mut self, filter: F) -> DrainFilter<'_, A, F,>
     where
