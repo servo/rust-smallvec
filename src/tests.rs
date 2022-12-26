@@ -990,10 +990,10 @@ fn test_size() {
     assert_eq!(24, size_of::<SmallVec<[u8; 8]>>());
 }
 
-// #[cfg(feature("drain_filter"))]
+#[cfg(feature = "drain_filter")]
 #[test]
 fn drain_filter() {
-    let mut a: SmallVec<[u8; 2]> = SmallVec::from_slice(&[1u8, 2, 3, 4, 5, 6, 7, 8]);
+    let mut a: SmallVec<[u8; 2]> = smallvec![1u8, 2, 3, 4, 5, 6, 7, 8];
 
     let b: SmallVec<[u8; 2]> = a.drain_filter(|x| *x % 3 == 0).collect();
 

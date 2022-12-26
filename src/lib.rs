@@ -410,6 +410,7 @@ impl<'a, T: 'a + Array> Drop for Drain<'a, T> {
     }
 }
 
+#[cfg(feature = "drain_filter")]
 /// An iterator which uses a closure to determine if an element should be removed.
 ///
 /// Returned from [`SmallVec::drain_filter`][1].
@@ -437,6 +438,7 @@ where
     panic_flag: bool,
 }
 
+#[cfg(feature = "drain_filter")]
 impl <T, F> fmt::Debug for DrainFilter<'_, T, F>
 where
     F: FnMut(&mut T::Item) -> bool,
@@ -448,6 +450,7 @@ where
     }
 }
 
+#[cfg(feature = "drain_filter")]
 impl <T, F> Iterator for DrainFilter<'_, T, F>
 where
     F: FnMut(&mut T::Item) -> bool,
@@ -487,6 +490,7 @@ where
     }
 }
 
+#[cfg(feature = "drain_filter")]
 impl <T, F> Drop for DrainFilter<'_, T, F>
 where
     F: FnMut(&mut T::Item) -> bool,
@@ -974,6 +978,8 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
+    
+    #[cfg(feature = "drain_filter")]
     /// Creates an iterator which uses a closure to determine if an element should be removed.
     /// 
     /// If the closure returns true, the element is removed and yielded. If the closure returns
