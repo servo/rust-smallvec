@@ -989,3 +989,14 @@ fn test_size() {
     use core::mem::size_of;
     assert_eq!(24, size_of::<SmallVec<[u8; 8]>>());
 }
+
+// #[cfg(feature("drain_filter"))]
+#[test]
+fn drain_filter() {
+    let mut a: SmallVec<[u8; 2]> = SmallVec::from_slice(&[1u8, 2, 3, 4, 5, 6, 7, 8]);
+
+    let b: SmallVec<[u8; 2]> = a.drain_filter(|x| *x % 3 == 0).collect();
+
+    assert_eq!(a, SmallVec::<[u8; 2]>::from_slice(&[1u8, 2, 4, 5, 7, 8]));
+    assert_eq!(b, SmallVec::<[u8; 2]>::from_slice(&[3u8, 6]));
+}
