@@ -924,6 +924,63 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
+    /// Creates an iterator which uses a closure to determine if an element should be removed.
+    /// 
+    /// If the closure returns true, the element is removed and yielded. If the closure returns
+    /// false, the element will remain in the vector and will not be yielded by the iterator.
+    /// 
+    /// Using this method is equivalent to the following code:
+    /// ```
+    /// # use smallvec::SmallVec;
+    /// # let some_predicate = |x: &mut i32| { *x == 2 || *x == 3 || *x == 6 };
+    /// # let mut vec: SmallVec<[i32; 8]> = SmallVec::from_slice(&[1i32, 2, 3, 4, 5, 6]);
+    /// let mut i = 0;
+    /// while i < vec.len() {
+    ///     if some_predicate(&mut vec[i]) {
+    ///         let val = vec.remove(i);
+    ///         // your code here
+    ///     } else {
+    ///         i += 1;
+    ///     }
+    /// }
+    /// 
+    /// # assert_eq!(vec, SmallVec::<[i32; 8]>::from_slice(&[1i32, 4, 5]));
+    /// ```
+    /// ///
+    /// But `drain_filter` is easier to use. `drain_filter` is also more efficient,
+    /// because it can backshift the elements of the array in bulk.
+    ///
+    /// Note that `drain_filter` also lets you mutate every element in the filter closure,
+    /// regardless of whether you choose to keep or remove it.
+    ///
+    /// # Examples
+    ///
+    /// Splitting an array into evens and odds, reusing the original allocation:
+    ///
+    /// ```
+    /// # use smallvec::SmallVec;
+    /// let mut numbers: SmallVec<[i32; 16]> = SmallVec::from_slice(&[1i32, 2, 3, 4, 5, 6, 8, 9, 11, 13, 14, 15]);
+    ///
+    /// let evens = numbers.drain_filter(|x| *x % 2 == 0).collect::<SmallVec<[i32; 16]>>();
+    /// let odds = numbers;
+    ///
+    /// assert_eq!(evens, SmallVec::<[i32; 16]>::from_slice(&[2i32, 4, 6, 8, 14]));
+    /// //assert_eq!(odds, SmallVec::<[i32; 16]>::from_slice(&[1i32, 3, 5, 9, 11, 13, 15]));
+    /// ```
+    pub fn drain_filter<F>(&mut self, filter: F) -> DrainFilter<'_, A, F,>
+    where
+        F: FnMut(&mut A::Item) -> bool,
+    {
+        let old_len = self.len();
+
+        // Guard against us getting leaked (leak amplification)
+        unsafe {
+            self.set_len(0);
+        }
+
+        DrainFilter { vec: self, idx: 0, del: 0, old_len, pred: filter, panic_flag: false }
+    }
+
     /// Append an item to the vector.
     #[inline]
     pub fn push(&mut self, value: A::Item) {
