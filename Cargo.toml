@@ -19,6 +19,7 @@ union = []
 specialization = []
 may_dangle = []
 drain_filter = []
+drain_keep_rest = ["drain_filter"]
 
 # UNSTABLE FEATURES (requires Rust nightly)
 # Enable to use the #[debugger_visualizer] attribute.

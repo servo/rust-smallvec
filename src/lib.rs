@@ -125,6 +125,9 @@ use core::marker::PhantomData;
 #[cfg(feature = "write")]
 use std::io;
 
+#[cfg(feature = "drain_keep_rest")]
+use core::mem::ManuallyDrop;
+
 /// Creates a [`SmallVec`] containing the arguments.
 ///
 /// `smallvec!` allows `SmallVec`s to be defined with the same syntax as array expressions.
@@ -541,12 +544,31 @@ where
     }
 }
 
-#[cfg(feature = "drain_filter")]
+#[cfg(feature = "drain_keep_rest")]
 impl <T, F> DrainFilter<'_, T, F>
 where
-    F: FnMut(T::Item) -> bool,
+    F: FnMut(&mut T::Item) -> bool,
     T: Array
 {
+    /// Keep unyielded elements in the source `Vec`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use smallvec::{smallvec, SmallVec};
+    ///
+    /// let mut vec: SmallVec<[char; 2]> = smallvec!['a', 'b', 'c'];
+    /// let mut drain = vec.drain_filter(|_| true);
+    ///
+    /// assert_eq!(drain.next().unwrap(), 'a');
+    ///
+    /// // This call keeps 'b' and 'c' in the vec.
+    /// drain.keep_rest();
+    ///
+    /// // If we wouldn't call `keep_rest()`,
+    /// // `vec` would be empty.
+    /// assert_eq!(vec, SmallVec::<[char; 2]>::from_slice(&['b', 'c']));
+    /// ```
     pub fn keep_rest(self)
     {
         // At this moment layout looks like this:
