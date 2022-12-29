@@ -26,7 +26,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install packages
         if: matrix.os == 'ubuntu-latest'
@@ -98,4 +98,3 @@ jobs:
       - name: Mark the job as unsuccessful
         run: exit 1
         if: "!success()"
-
