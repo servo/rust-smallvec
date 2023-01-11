@@ -91,7 +91,7 @@
 #[doc(hidden)]
 pub extern crate alloc;
 
-#[cfg(any(test, feature = "write"))]
+#[cfg(any(test, feature = "write", feature = "abomonation"))]
 extern crate std;
 
 #[cfg(test)]
@@ -2130,3 +2130,6 @@ where
         SmallVec::from_slice(self)
     }
 }
+
+#[cfg(feature = "abomonation")]
+mod abomonation;
