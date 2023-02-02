@@ -26,6 +26,7 @@ debugger_visualizer = []
 [dependencies]
 serde = { version = "1", optional = true, default-features = false }
 arbitrary = { version = "1", optional = true }
+bincode2 = { package = "bincode", version = "2.0.0-rc", optional = true, default-features = false }
 
 [dev_dependencies]
 bincode = "1.0.1"

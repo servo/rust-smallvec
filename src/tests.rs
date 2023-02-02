@@ -983,3 +983,27 @@ fn test_clone_from() {
     b.clone_from(&c);
     assert_eq!(&*b, &[20, 21, 22]);
 }
+
+#[cfg(feature = "bincode2")]
+#[test]
+fn test_bincode2() {
+    let config = bincode2::config::standard();
+    let mut small_vec: SmallVec<[i32; 2]> = SmallVec::new();
+    let mut buffer = [0u8; 128];
+    small_vec.push(1);
+    let bytes_written = bincode2::encode_into_slice(&small_vec, &mut buffer, config).unwrap();
+    let (decoded, bytes_read) =
+        bincode2::decode_from_slice::<SmallVec<[i32; 2]>, _>(&buffer, config).unwrap();
+    assert_eq!(bytes_written, bytes_read);
+    assert_eq!(small_vec, decoded);
+    small_vec.push(2);
+    // Spill the vec
+    small_vec.push(3);
+    small_vec.push(4);
+    // Check again after spilling.
+    let bytes_written = bincode2::encode_into_slice(&small_vec, &mut buffer, config).unwrap();
+    let (decoded, bytes_read) =
+        bincode2::decode_from_slice::<SmallVec<[i32; 2]>, _>(&buffer, config).unwrap();
+    assert_eq!(bytes_written, bytes_read);
+    assert_eq!(small_vec, decoded);
+}

@@ -21,6 +21,11 @@
 //! When this optional dependency is enabled, `SmallVec` implements the `serde::Serialize` and
 //! `serde::Deserialize` traits.
 //!
+//! ### `bincode2`
+//!
+//! When this optional dependency is enabled, `SmallVec` implements the `bincode::Encode`,
+//! `bincode::Decode` and `bincode::BorrowDecode` traits from Bincode 2.
+//!
 //! ### `write`
 //!
 //! When this feature is enabled, `SmallVec<[u8; _]>` implements the `std::io::Write` trait.
@@ -117,6 +122,14 @@ use core::slice::{self, SliceIndex};
 use serde::{
     de::{Deserialize, Deserializer, SeqAccess, Visitor},
     ser::{Serialize, SerializeSeq, Serializer},
+};
+
+#[cfg(feature = "bincode2")]
+use bincode2::{
+    de::{BorrowDecoder, Decode, Decoder},
+    enc::{Encode, Encoder},
+    error::{DecodeError, EncodeError},
+    BorrowDecode,
 };
 
 #[cfg(feature = "serde")]
@@ -1667,6 +1680,63 @@ where
         }
 
         Ok(values)
+    }
+}
+
+#[cfg(feature = "bincode2")]
+impl<A> Decode for SmallVec<A>
+where
+    A: Array,
+    A::Item: Decode,
+{
+    fn decode<D: Decoder>(decoder: &mut D) -> Result<Self, DecodeError> {
+        let len = usize::decode(decoder)?;
+        decoder.claim_container_read::<A::Item>(len)?;
+
+        let mut vec = SmallVec::with_capacity(len);
+        for _ in 0..len {
+            // See the documentation on `unclaim_bytes_read` as to why we're doing this here
+            decoder.unclaim_bytes_read(core::mem::size_of::<A::Item>());
+
+            vec.push(A::Item::decode(decoder)?);
+        }
+        Ok(vec)
+    }
+}
+
+#[cfg(feature = "bincode2")]
+impl<'de, A> BorrowDecode<'de> for SmallVec<A>
+where
+    A: Array,
+    A::Item: BorrowDecode<'de>,
+{
+    fn borrow_decode<D: BorrowDecoder<'de>>(decoder: &mut D) -> Result<Self, DecodeError> {
+        let len = usize::decode(decoder)?;
+        decoder.claim_container_read::<A::Item>(len)?;
+
+        let mut vec = SmallVec::with_capacity(len);
+        for _ in 0..len {
+            // See the documentation on `unclaim_bytes_read` as to why we're doing this here
+            decoder.unclaim_bytes_read(core::mem::size_of::<A::Item>());
+
+            vec.push(A::Item::borrow_decode(decoder)?);
+        }
+        Ok(vec)
+    }
+}
+
+#[cfg(feature = "bincode2")]
+impl<A> Encode for SmallVec<A>
+where
+    A: Array,
+    A::Item: Encode,
+{
+    fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
+        self.len().encode(encoder)?;
+        for item in self.iter() {
+            item.encode(encoder)?;
+        }
+        Ok(())
     }
 }
 
