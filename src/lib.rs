@@ -293,6 +293,9 @@ pub struct SmallVec<T, const N: usize> {
     _marker: PhantomData<T>,
 }
 
+unsafe impl<T: Send, const N: usize> Send for SmallVec<T, N> {}
+unsafe impl<T: Sync, const N: usize> Sync for SmallVec<T, N> {}
+
 /// An iterator that removes the items from a `SmallVec` and yields them by value.
 ///
 /// Returned from [`SmallVec::drain`][1].
