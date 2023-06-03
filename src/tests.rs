@@ -983,3 +983,9 @@ fn test_clone_from() {
     b.clone_from(&c);
     assert_eq!(&*b, &[20, 21, 22]);
 }
+
+#[test]
+fn test_size() {
+    use core::mem::size_of;
+    assert_eq!(24, size_of::<SmallVec<[u8; 8]>>());
+}

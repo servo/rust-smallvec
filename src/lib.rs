@@ -237,10 +237,10 @@ macro_rules! debug_unreachable {
         debug_unreachable!("entered unreachable code")
     };
     ($e:expr) => {
-        if cfg!(not(debug_assertions)) {
-            unreachable_unchecked();
-        } else {
+        if cfg!(debug_assertions) {
             panic!($e);
+        } else {
+            unreachable_unchecked();
         }
     };
 }
@@ -321,10 +321,10 @@ fn layout_array<T>(n: usize) -> Result<Layout, CollectionAllocErr> {
     Layout::from_size_align(size, align).map_err(|_| CollectionAllocErr::CapacityOverflow)
 }
 
-unsafe fn deallocate<T>(ptr: *mut T, capacity: usize) {
+unsafe fn deallocate<T>(ptr: NonNull<T>, capacity: usize) {
     // This unwrap should succeed since the same did when allocating.
     let layout = layout_array::<T>(capacity).unwrap();
-    alloc::alloc::dealloc(ptr as *mut u8, layout)
+    alloc::alloc::dealloc(ptr.as_ptr() as *mut u8, layout)
 }
 
 /// An iterator that removes the items from a `SmallVec` and yields them by value.
@@ -413,7 +413,7 @@ impl<'a, T: 'a + Array> Drop for Drain<'a, T> {
 #[cfg(feature = "union")]
 union SmallVecData<A: Array> {
     inline: core::mem::ManuallyDrop<MaybeUninit<A>>,
-    heap: (*mut A::Item, usize),
+    heap: (NonNull<A::Item>, usize),
 }
 
 #[cfg(all(feature = "union", feature = "const_new"))]
@@ -430,12 +430,12 @@ impl<T, const N: usize> SmallVecData<[T; N]> {
 #[cfg(feature = "union")]
 impl<A: Array> SmallVecData<A> {
     #[inline]
-    unsafe fn inline(&self) -> *const A::Item {
-        self.inline.as_ptr() as *const A::Item
+    unsafe fn inline(&self) -> ConstNonNull<A::Item> {
+        ConstNonNull::new(self.inline.as_ptr() as *const A::Item).unwrap()
     }
     #[inline]
-    unsafe fn inline_mut(&mut self) -> *mut A::Item {
-        self.inline.as_mut_ptr() as *mut A::Item
+    unsafe fn inline_mut(&mut self) -> NonNull<A::Item> {
+        NonNull::new(self.inline.as_mut_ptr() as *mut A::Item).unwrap()
     }
     #[inline]
     fn from_inline(inline: MaybeUninit<A>) -> SmallVecData<A> {
@@ -448,15 +448,16 @@ impl<A: Array> SmallVecData<A> {
         core::mem::ManuallyDrop::into_inner(self.inline)
     }
     #[inline]
-    unsafe fn heap(&self) -> (*mut A::Item, usize) {
-        self.heap
+    unsafe fn heap(&self) -> (ConstNonNull<A::Item>, usize) {
+        (ConstNonNull(self.heap.0), self.heap.1)
     }
     #[inline]
-    unsafe fn heap_mut(&mut self) -> &mut (*mut A::Item, usize) {
-        &mut self.heap
+    unsafe fn heap_mut(&mut self) -> (NonNull<A::Item>, &mut usize) {
+        let h = &mut self.heap;
+        (h.0, &mut h.1)
     }
     #[inline]
-    fn from_heap(ptr: *mut A::Item, len: usize) -> SmallVecData<A> {
+    fn from_heap(ptr: NonNull<A::Item>, len: usize) -> SmallVecData<A> {
         SmallVecData { heap: (ptr, len) }
     }
 }
@@ -464,7 +465,15 @@ impl<A: Array> SmallVecData<A> {
 #[cfg(not(feature = "union"))]
 enum SmallVecData<A: Array> {
     Inline(MaybeUninit<A>),
-    Heap((*mut A::Item, usize)),
+    // Using NonNull and NonZero here allows to reduce size of `SmallVec`.
+    Heap {
+        // Since we never allocate on heap
+        // unless our capacity is bigger than inline capacity
+        // heap capacity cannot be less than 1.
+        // Therefore, pointer cannot be null too.
+        ptr: NonNull<A::Item>,
+        len: usize,
+    },
 }
 
 #[cfg(all(not(feature = "union"), feature = "const_new"))]
@@ -479,16 +488,16 @@ impl<T, const N: usize> SmallVecData<[T; N]> {
 #[cfg(not(feature = "union"))]
 impl<A: Array> SmallVecData<A> {
     #[inline]
-    unsafe fn inline(&self) -> *const A::Item {
+    unsafe fn inline(&self) -> ConstNonNull<A::Item> {
         match self {
-            SmallVecData::Inline(a) => a.as_ptr() as *const A::Item,
+            SmallVecData::Inline(a) => ConstNonNull::new(a.as_ptr() as *const A::Item).unwrap(),
             _ => debug_unreachable!(),
         }
     }
     #[inline]
-    unsafe fn inline_mut(&mut self) -> *mut A::Item {
+    unsafe fn inline_mut(&mut self) -> NonNull<A::Item> {
         match self {
-            SmallVecData::Inline(a) => a.as_mut_ptr() as *mut A::Item,
+            SmallVecData::Inline(a) => NonNull::new(a.as_mut_ptr() as *mut A::Item).unwrap(),
             _ => debug_unreachable!(),
         }
     }
@@ -504,22 +513,22 @@ impl<A: Array> SmallVecData<A> {
         }
     }
     #[inline]
-    unsafe fn heap(&self) -> (*mut A::Item, usize) {
+    unsafe fn heap(&self) -> (ConstNonNull<A::Item>, usize) {
         match self {
-            SmallVecData::Heap(data) => *data,
+            SmallVecData::Heap { ptr, len } => (ConstNonNull(*ptr), *len),
             _ => debug_unreachable!(),
         }
     }
     #[inline]
-    unsafe fn heap_mut(&mut self) -> &mut (*mut A::Item, usize) {
+    unsafe fn heap_mut(&mut self) -> (NonNull<A::Item>, &mut usize) {
         match self {
-            SmallVecData::Heap(data) => data,
+            SmallVecData::Heap { ptr, len } => (*ptr, len),
             _ => debug_unreachable!(),
         }
     }
     #[inline]
-    fn from_heap(ptr: *mut A::Item, len: usize) -> SmallVecData<A> {
-        SmallVecData::Heap((ptr, len))
+    fn from_heap(ptr: NonNull<A::Item>, len: usize) -> SmallVecData<A> {
+        SmallVecData::Heap { ptr, len }
     }
 }
 
@@ -611,11 +620,13 @@ impl<A: Array> SmallVec<A> {
     #[inline]
     pub fn from_vec(mut vec: Vec<A::Item>) -> SmallVec<A> {
         if vec.capacity() <= Self::inline_capacity() {
+            // Cannot use Vec with smaller capacity
+            // because we use value of `Self::capacity` field as indicator.
             unsafe {
                 let mut data = SmallVecData::<A>::from_inline(MaybeUninit::uninit());
                 let len = vec.len();
                 vec.set_len(0);
-                ptr::copy_nonoverlapping(vec.as_ptr(), data.inline_mut(), len);
+                ptr::copy_nonoverlapping(vec.as_ptr(), data.inline_mut().as_ptr(), len);
 
                 SmallVec {
                     capacity: len,
@@ -625,6 +636,9 @@ impl<A: Array> SmallVec<A> {
         } else {
             let (ptr, cap, len) = (vec.as_mut_ptr(), vec.capacity(), vec.len());
             mem::forget(vec);
+            let ptr = NonNull::new(ptr)
+                // See docs: https://doc.rust-lang.org/std/vec/struct.Vec.html#method.as_mut_ptr
+                .expect("Cannot be null by `Vec` invariant");
 
             SmallVec {
                 capacity: cap,
@@ -750,7 +764,7 @@ impl<A: Array> SmallVec<A> {
     /// Returns a tuple with (data ptr, len, capacity)
     /// Useful to get all SmallVec properties with a single check of the current storage variant.
     #[inline]
-    fn triple(&self) -> (*const A::Item, usize, usize) {
+    fn triple(&self) -> (ConstNonNull<A::Item>, usize, usize) {
         unsafe {
             if self.spilled() {
                 let (ptr, len) = self.data.heap();
@@ -763,10 +777,10 @@ impl<A: Array> SmallVec<A> {
 
     /// Returns a tuple with (data ptr, len ptr, capacity)
     #[inline]
-    fn triple_mut(&mut self) -> (*mut A::Item, &mut usize, usize) {
+    fn triple_mut(&mut self) -> (NonNull<A::Item>, &mut usize, usize) {
         unsafe {
             if self.spilled() {
-                let &mut (ptr, ref mut len_ptr) = self.data.heap_mut();
+                let (ptr, len_ptr) = self.data.heap_mut();
                 (ptr, len_ptr, self.capacity)
             } else {
                 (
@@ -840,11 +854,11 @@ impl<A: Array> SmallVec<A> {
             let (mut ptr, mut len, cap) = self.triple_mut();
             if *len == cap {
                 self.reserve(1);
-                let &mut (heap_ptr, ref mut heap_len) = self.data.heap_mut();
+                let (heap_ptr, heap_len) = self.data.heap_mut();
                 ptr = heap_ptr;
                 len = heap_len;
             }
-            ptr::write(ptr.add(*len), value);
+            ptr::write(ptr.as_ptr().add(*len), value);
             *len += 1;
         }
     }
@@ -854,6 +868,7 @@ impl<A: Array> SmallVec<A> {
     pub fn pop(&mut self) -> Option<A::Item> {
         unsafe {
             let (ptr, len_ptr, _) = self.triple_mut();
+            let ptr: *const _ = ptr.as_ptr();
             if *len_ptr == 0 {
                 return None;
             }
@@ -895,15 +910,15 @@ impl<A: Array> SmallVec<A> {
     /// Panics if `new_cap` is less than the vector's length
     pub fn try_grow(&mut self, new_cap: usize) -> Result<(), CollectionAllocErr> {
         unsafe {
-            let (ptr, &mut len, cap) = self.triple_mut();
             let unspilled = !self.spilled();
+            let (ptr, &mut len, cap) = self.triple_mut();
             assert!(new_cap >= len);
-            if new_cap <= self.inline_size() {
+            if new_cap <= Self::inline_capacity() {
                 if unspilled {
                     return Ok(());
                 }
                 self.data = SmallVecData::from_inline(MaybeUninit::uninit());
-                ptr::copy_nonoverlapping(ptr, self.data.inline_mut(), len);
+                ptr::copy_nonoverlapping(ptr.as_ptr(), self.data.inline_mut().as_ptr(), len);
                 self.capacity = len;
                 deallocate(ptr, cap);
             } else if new_cap != cap {
@@ -913,19 +928,18 @@ impl<A: Array> SmallVec<A> {
                 if unspilled {
                     new_alloc = NonNull::new(alloc::alloc::alloc(layout))
                         .ok_or(CollectionAllocErr::AllocErr { layout })?
-                        .cast()
-                        .as_ptr();
-                    ptr::copy_nonoverlapping(ptr, new_alloc, len);
+                        .cast();
+                    ptr::copy_nonoverlapping(ptr.as_ptr(), new_alloc.as_ptr(), len);
                 } else {
                     // This should never fail since the same succeeded
                     // when previously allocating `ptr`.
                     let old_layout = layout_array::<A::Item>(cap)?;
 
-                    let new_ptr = alloc::alloc::realloc(ptr as *mut u8, old_layout, layout.size());
+                    let new_ptr =
+                        alloc::alloc::realloc(ptr.as_ptr() as *mut u8, old_layout, layout.size());
                     new_alloc = NonNull::new(new_ptr)
                         .ok_or(CollectionAllocErr::AllocErr { layout })?
-                        .cast()
-                        .as_ptr();
+                        .cast();
                 }
                 self.data = SmallVecData::from_heap(new_alloc, len);
                 self.capacity = new_cap;
@@ -994,8 +1008,8 @@ impl<A: Array> SmallVec<A> {
             unsafe {
                 let (ptr, len) = self.data.heap();
                 self.data = SmallVecData::from_inline(MaybeUninit::uninit());
-                ptr::copy_nonoverlapping(ptr, self.data.inline_mut(), len);
-                deallocate(ptr, self.capacity);
+                ptr::copy_nonoverlapping(ptr.as_ptr(), self.data.inline_mut().as_ptr(), len);
+                deallocate(ptr.0, self.capacity);
                 self.capacity = len;
             }
         } else if self.capacity() > len {
@@ -1013,6 +1027,7 @@ impl<A: Array> SmallVec<A> {
     pub fn truncate(&mut self, len: usize) {
         unsafe {
             let (ptr, len_ptr, _) = self.triple_mut();
+            let ptr = ptr.as_ptr();
             while len < *len_ptr {
                 let last_index = *len_ptr - 1;
                 *len_ptr = last_index;
@@ -1060,11 +1075,11 @@ impl<A: Array> SmallVec<A> {
     /// Panics if `index` is out of bounds.
     pub fn remove(&mut self, index: usize) -> A::Item {
         unsafe {
-            let (mut ptr, len_ptr, _) = self.triple_mut();
+            let (ptr, len_ptr, _) = self.triple_mut();
             let len = *len_ptr;
             assert!(index < len);
             *len_ptr = len - 1;
-            ptr = ptr.add(index);
+            let ptr = ptr.as_ptr().add(index);
             let item = ptr::read(ptr);
             ptr::copy(ptr.add(1), ptr, len - index - 1);
             item
@@ -1078,7 +1093,8 @@ impl<A: Array> SmallVec<A> {
         self.reserve(1);
 
         unsafe {
-            let (mut ptr, len_ptr, _) = self.triple_mut();
+            let (ptr, len_ptr, _) = self.triple_mut();
+            let mut ptr = ptr.as_ptr();
             let len = *len_ptr;
             ptr = ptr.add(index);
             if index < len {
@@ -1181,11 +1197,11 @@ impl<A: Array> SmallVec<A> {
 
     /// Convert a SmallVec to a Vec, without reallocating if the SmallVec has already spilled onto
     /// the heap.
-    pub fn into_vec(self) -> Vec<A::Item> {
+    pub fn into_vec(mut self) -> Vec<A::Item> {
         if self.spilled() {
             unsafe {
-                let (ptr, len) = self.data.heap();
-                let v = Vec::from_raw_parts(ptr, len, self.capacity);
+                let (ptr, &mut len) = self.data.heap_mut();
+                let v = Vec::from_raw_parts(ptr.as_ptr(), len, self.capacity);
                 mem::forget(self);
                 v
             }
@@ -1407,6 +1423,12 @@ impl<A: Array> SmallVec<A> {
     /// }
     #[inline]
     pub unsafe fn from_raw_parts(ptr: *mut A::Item, length: usize, capacity: usize) -> SmallVec<A> {
+        // SAFETY: We require caller to provide same ptr as we alloc
+        // and we never alloc null pointer.
+        let ptr = unsafe {
+            debug_assert!(!ptr.is_null(), "Called `from_raw_parts` with null pointer.");
+            NonNull::new_unchecked(ptr)
+        };
         assert!(capacity > Self::inline_capacity());
         SmallVec {
             capacity,
@@ -1419,7 +1441,7 @@ impl<A: Array> SmallVec<A> {
         // We shadow the slice method of the same name to avoid going through
         // `deref`, which creates an intermediate reference that may place
         // additional safety constraints on the contents of the slice.
-        self.triple().0
+        self.triple().0.as_ptr()
     }
 
     /// Returns a raw mutable pointer to the vector's buffer.
@@ -1427,7 +1449,7 @@ impl<A: Array> SmallVec<A> {
         // We shadow the slice method of the same name to avoid going through
         // `deref_mut`, which creates an intermediate reference that may place
         // additional safety constraints on the contents of the slice.
-        self.triple_mut().0
+        self.triple_mut().0.as_ptr()
     }
 }
 
@@ -1455,7 +1477,8 @@ where
             }
         } else {
             let mut b = slice.to_vec();
-            let (ptr, cap) = (b.as_mut_ptr(), b.capacity());
+            let cap = b.capacity();
+            let ptr = NonNull::new(b.as_mut_ptr()).expect("Vec always contain non null pointers.");
             mem::forget(b);
             SmallVec {
                 capacity: cap,
@@ -1527,6 +1550,7 @@ where
             let mut v = SmallVec::<A>::new();
             unsafe {
                 let (ptr, len_ptr, _) = v.triple_mut();
+                let ptr = ptr.as_ptr();
                 let mut local_len = SetLenOnDrop::new(len_ptr);
 
                 for i in 0..n {
@@ -1545,7 +1569,7 @@ impl<A: Array> ops::Deref for SmallVec<A> {
     fn deref(&self) -> &[A::Item] {
         unsafe {
             let (ptr, len, _) = self.triple();
-            slice::from_raw_parts(ptr, len)
+            slice::from_raw_parts(ptr.as_ptr(), len)
         }
     }
 }
@@ -1555,7 +1579,7 @@ impl<A: Array> ops::DerefMut for SmallVec<A> {
     fn deref_mut(&mut self) -> &mut [A::Item] {
         unsafe {
             let (ptr, &mut len, _) = self.triple_mut();
-            slice::from_raw_parts_mut(ptr, len)
+            slice::from_raw_parts_mut(ptr.as_ptr(), len)
         }
     }
 }
@@ -1764,6 +1788,7 @@ impl<A: Array> Extend<A::Item> for SmallVec<A> {
 
         unsafe {
             let (ptr, len_ptr, cap) = self.triple_mut();
+            let ptr = ptr.as_ptr();
             let mut len = SetLenOnDrop::new(len_ptr);
             while len.get() < cap {
                 if let Some(out) = iter.next() {
@@ -1802,8 +1827,8 @@ unsafe impl<#[may_dangle] A: Array> Drop for SmallVec<A> {
     fn drop(&mut self) {
         unsafe {
             if self.spilled() {
-                let (ptr, len) = self.data.heap();
-                Vec::from_raw_parts(ptr, len, self.capacity);
+                let (ptr, &mut len) = self.data.heap_mut();
+                Vec::from_raw_parts(ptr.as_ptr(), len, self.capacity);
             } else {
                 ptr::drop_in_place(&mut self[..]);
             }
@@ -1816,8 +1841,8 @@ impl<A: Array> Drop for SmallVec<A> {
     fn drop(&mut self) {
         unsafe {
             if self.spilled() {
-                let (ptr, len) = self.data.heap();
-                Vec::from_raw_parts(ptr, len, self.capacity);
+                let (ptr, &mut len) = self.data.heap_mut();
+                drop(Vec::from_raw_parts(ptr.as_ptr(), len, self.capacity));
             } else {
                 ptr::drop_in_place(&mut self[..]);
             }
@@ -2130,3 +2155,27 @@ where
         SmallVec::from_slice(self)
     }
 }
+
+// Immutable counterpart for `NonNull<T>`.
+#[repr(transparent)]
+struct ConstNonNull<T>(NonNull<T>);
+
+impl<T> ConstNonNull<T> {
+    #[inline]
+    fn new(ptr: *const T) -> Option<Self> {
+        NonNull::new(ptr as *mut T).map(Self)
+    }
+    #[inline]
+    fn as_ptr(self) -> *const T {
+        self.0.as_ptr()
+    }
+}
+
+impl<T> Clone for ConstNonNull<T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> Copy for ConstNonNull<T> {}
