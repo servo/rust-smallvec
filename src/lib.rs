@@ -125,6 +125,9 @@ use core::marker::PhantomData;
 #[cfg(feature = "write")]
 use std::io;
 
+#[cfg(feature = "drain_keep_rest")]
+use core::mem::ManuallyDrop;
+
 /// Creates a [`SmallVec`] containing the arguments.
 ///
 /// `smallvec!` allows `SmallVec`s to be defined with the same syntax as array expressions.
@@ -406,6 +409,198 @@ impl<'a, T: 'a + Array> Drop for Drain<'a, T> {
                 }
                 source_vec.set_len(start + self.tail_len);
             }
+        }
+    }
+}
+
+#[cfg(feature = "drain_filter")]
+/// An iterator which uses a closure to determine if an element should be removed.
+///
+/// Returned from [`SmallVec::drain_filter`][1].
+/// 
+/// [1]: struct.SmallVec.html#method.drain_filter
+pub struct DrainFilter<'a, T, F>
+where
+    F: FnMut(&mut T::Item) -> bool,
+    T: Array,
+{
+    vec: &'a mut SmallVec<T>,
+    /// The index of the item that will be inspected by the next call to `next`.
+    idx: usize,
+    /// The number of items that have been drained (removed) thus far.
+    del: usize,
+    /// The original length of `vec` prior to draining.
+    old_len: usize,
+    /// The filter test predicate.
+    pred: F,
+    /// A flag that indicates a panic has occurred in the filter test predicate.
+    /// This is used as a hint in the drop implementation to prevent consumption
+    /// of the remainder of the `DrainFilter`. Any unprocessed items will be
+    /// backshifted in the `vec`, but no further items will be dropped or
+    /// tested by the filter predicate.
+    panic_flag: bool,
+}
+
+#[cfg(feature = "drain_filter")]
+impl <T, F> fmt::Debug for DrainFilter<'_, T, F>
+where
+    F: FnMut(&mut T::Item) -> bool,
+    T: Array,
+    T::Item: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("DrainFilter").field(&self.vec.as_slice()).finish()
+    }
+}
+
+#[cfg(feature = "drain_filter")]
+impl <T, F> Iterator for DrainFilter<'_, T, F>
+where
+    F: FnMut(&mut T::Item) -> bool,
+    T: Array,
+{
+    type Item = T::Item;
+
+    fn next(&mut self) -> Option<T::Item>
+    {
+        unsafe {
+            while self.idx < self.old_len {
+                let i = self.idx;
+                let v = slice::from_raw_parts_mut(self.vec.as_mut_ptr(), self.old_len);
+                self.panic_flag = true;
+                let drained = (self.pred)(&mut v[i]);
+                self.panic_flag = false;
+                // Update the index *after* the predicate is called. If the index
+                // is updated prior and the predicate panics, the element at this
+                // index would be leaked.
+                self.idx += 1;
+                if drained {
+                    self.del += 1;
+                    return Some(ptr::read(&v[i]));
+                } else if self.del > 0 {
+                    let del = self.del;
+                    let src: *const Self::Item = &v[i];
+                    let dst: *mut Self::Item = &mut v[i - del];
+                    ptr::copy_nonoverlapping(src, dst, 1);
+                }
+            }
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.old_len - self.idx))
+    }
+}
+
+#[cfg(feature = "drain_filter")]
+impl <T, F> Drop for DrainFilter<'_, T, F>
+where
+    F: FnMut(&mut T::Item) -> bool,
+    T: Array,
+{
+    fn drop(&mut self) {
+        struct BackshiftOnDrop<'a, 'b, T, F>
+        where
+            F: FnMut(&mut T::Item) -> bool,
+            T: Array
+        {
+            drain: &'b mut DrainFilter<'a, T, F>,
+        }
+
+        impl<'a, 'b, T, F> Drop for BackshiftOnDrop<'a, 'b, T, F>
+        where
+            F: FnMut(&mut T::Item) -> bool,
+            T: Array
+        {
+            fn drop(&mut self) {
+                unsafe {
+                    if self.drain.idx < self.drain.old_len && self.drain.del > 0 {
+                        // This is a pretty messed up state, and there isn't really an
+                        // obviously right thing to do. We don't want to keep trying
+                        // to execute `pred`, so we just backshift all the unprocessed
+                        // elements and tell the vec that they still exist. The backshift
+                        // is required to prevent a double-drop of the last successfully
+                        // drained item prior to a panic in the predicate.
+                        let ptr = self.drain.vec.as_mut_ptr();
+                        let src = ptr.add(self.drain.idx);
+                        let dst = src.sub(self.drain.del);
+                        let tail_len = self.drain.old_len - self.drain.idx;
+                        src.copy_to(dst, tail_len);
+                    }
+                    self.drain.vec.set_len(self.drain.old_len - self.drain.del);
+                }
+            }
+        }
+
+        let backshift = BackshiftOnDrop { drain: self };
+
+        // Attempt to consume any remaining elements if the filter predicate
+        // has not yet panicked. We'll backshift any remaining elements
+        // whether we've already panicked or if the consumption here panics.
+        if !backshift.drain.panic_flag {
+            backshift.drain.for_each(drop);
+        }
+    }
+}
+
+#[cfg(feature = "drain_keep_rest")]
+impl <T, F> DrainFilter<'_, T, F>
+where
+    F: FnMut(&mut T::Item) -> bool,
+    T: Array
+{
+    /// Keep unyielded elements in the source `Vec`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use smallvec::{smallvec, SmallVec};
+    ///
+    /// let mut vec: SmallVec<[char; 2]> = smallvec!['a', 'b', 'c'];
+    /// let mut drain = vec.drain_filter(|_| true);
+    ///
+    /// assert_eq!(drain.next().unwrap(), 'a');
+    ///
+    /// // This call keeps 'b' and 'c' in the vec.
+    /// drain.keep_rest();
+    ///
+    /// // If we wouldn't call `keep_rest()`,
+    /// // `vec` would be empty.
+    /// assert_eq!(vec, SmallVec::<[char; 2]>::from_slice(&['b', 'c']));
+    /// ```
+    pub fn keep_rest(self)
+    {
+        // At this moment layout looks like this:
+        //
+        //  _____________________/-- old_len
+        // /                     \
+        // [kept] [yielded] [tail]
+        //        \_______/ ^-- idx
+        //                \-- del
+        //
+        // Normally `Drop` impl would drop [tail] (via .for_each(drop), ie still calling `pred`)
+        //
+        // 1. Move [tail] after [kept]
+        // 2. Update length of the original vec to `old_len - del`
+        //    a. In case of ZST, this is the only thing we want to do
+        // 3. Do *not* drop self, as everything is put in a consistent state already, there is nothing to do
+        let mut this = ManuallyDrop::new(self);
+
+        unsafe {
+            // ZSTs have no identity, so we don't need to move them around.
+            let needs_move = mem::size_of::<T>() != 0;
+
+            if needs_move && this.idx < this.old_len && this.del > 0 {
+                let ptr = this.vec.as_mut_ptr();
+                let src = ptr.add(this.idx);
+                let dst = src.sub(this.del);
+                let tail_len = this.old_len - this.idx;
+                src.copy_to(dst, tail_len);
+            }
+
+            let new_len = this.old_len - this.del;
+            this.vec.set_len(new_len);
         }
     }
 }
@@ -845,6 +1040,65 @@ impl<A: Array> SmallVec<A> {
                 vec: NonNull::new_unchecked(self as *mut _),
             }
         }
+    }
+
+    
+    #[cfg(feature = "drain_filter")]
+    /// Creates an iterator which uses a closure to determine if an element should be removed.
+    /// 
+    /// If the closure returns true, the element is removed and yielded. If the closure returns
+    /// false, the element will remain in the vector and will not be yielded by the iterator.
+    /// 
+    /// Using this method is equivalent to the following code:
+    /// ```
+    /// # use smallvec::SmallVec;
+    /// # let some_predicate = |x: &mut i32| { *x == 2 || *x == 3 || *x == 6 };
+    /// # let mut vec: SmallVec<[i32; 8]> = SmallVec::from_slice(&[1i32, 2, 3, 4, 5, 6]);
+    /// let mut i = 0;
+    /// while i < vec.len() {
+    ///     if some_predicate(&mut vec[i]) {
+    ///         let val = vec.remove(i);
+    ///         // your code here
+    ///     } else {
+    ///         i += 1;
+    ///     }
+    /// }
+    /// 
+    /// # assert_eq!(vec, SmallVec::<[i32; 8]>::from_slice(&[1i32, 4, 5]));
+    /// ```
+    /// ///
+    /// But `drain_filter` is easier to use. `drain_filter` is also more efficient,
+    /// because it can backshift the elements of the array in bulk.
+    ///
+    /// Note that `drain_filter` also lets you mutate every element in the filter closure,
+    /// regardless of whether you choose to keep or remove it.
+    ///
+    /// # Examples
+    ///
+    /// Splitting an array into evens and odds, reusing the original allocation:
+    ///
+    /// ```
+    /// # use smallvec::SmallVec;
+    /// let mut numbers: SmallVec<[i32; 16]> = SmallVec::from_slice(&[1i32, 2, 3, 4, 5, 6, 8, 9, 11, 13, 14, 15]);
+    ///
+    /// let evens = numbers.drain_filter(|x| *x % 2 == 0).collect::<SmallVec<[i32; 16]>>();
+    /// let odds = numbers;
+    ///
+    /// assert_eq!(evens, SmallVec::<[i32; 16]>::from_slice(&[2i32, 4, 6, 8, 14]));
+    /// assert_eq!(odds, SmallVec::<[i32; 16]>::from_slice(&[1i32, 3, 5, 9, 11, 13, 15]));
+    /// ```
+    pub fn drain_filter<F>(&mut self, filter: F) -> DrainFilter<'_, A, F,>
+    where
+        F: FnMut(&mut A::Item) -> bool,
+    {
+        let old_len = self.len();
+
+        // Guard against us getting leaked (leak amplification)
+        unsafe {
+            self.set_len(0);
+        }
+
+        DrainFilter { vec: self, idx: 0, del: 0, old_len, pred: filter, panic_flag: false }
     }
 
     /// Append an item to the vector.
