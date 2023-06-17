@@ -56,6 +56,19 @@
 //! For details, see the
 //! [Rust Reference](https://doc.rust-lang.org/reference/const_eval.html#const-functions).
 //!
+//! ### `drain_filter`
+//!
+//! **This feature is unstable.** It may change to match the unstable `drain_filter` method in libstd.
+//!
+//! Enables the `drain_filter` method, which produces an iterator that calls a user-provided
+//! closure to determine which elements of the vector to remove and yield from the iterator.
+//!
+//! ### `drain_keep_rest`
+//!
+//! **This feature is unstable.** It may change to match the unstable `drain_keep_rest` method in libstd.
+//!
+//! Enables the `DrainFilter::keep_rest` method.
+//!
 //! ### `specialization`
 //!
 //! **This feature is unstable and requires a nightly build of the Rust toolchain.**
