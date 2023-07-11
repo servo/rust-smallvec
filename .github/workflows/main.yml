@@ -2,9 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [auto]
+    branches: [master]
   pull_request:
   workflow_dispatch:
+  merge_group:
+    types: [checks_requested]
 
 jobs:
   ci:
@@ -86,7 +88,7 @@ jobs:
         run: ./travis_fuzz.sh
 
   build_result:
-    name: homu build finished
+    name: Result
     runs-on: ubuntu-latest
     needs:
       - "ci"
