@@ -1,7 +1,7 @@
 rust-smallvec
 =============
 
-> **Note**
+> **⚠️ Note:**
 > This is the code for smallvec 2.0, which is not yet ready for release.  For
 > details about the changes in version 2.0, please see #183, #240, and #284.
 >
