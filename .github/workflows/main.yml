@@ -44,10 +44,6 @@ jobs:
         if: matrix.toolchain == 'nightly'
         run: cargo check --verbose --no-default-features
 
-      - name: Cargo test w/ union
-        if: matrix.toolchain == 'beta'
-        run: cargo test --verbose --features union
-
       - name: Cargo test all features
         if: matrix.toolchain == 'nightly'
         run: cargo test --verbose --all-features
