@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        toolchain: ["stable", "beta", "nightly", "1.36.0"]
+        toolchain: ["stable", "beta", "nightly", "1.57.0"]
         include:
           - toolchain: stable
             env:
