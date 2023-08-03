@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [v1]
   pull_request:
   workflow_dispatch:
   merge_group:
