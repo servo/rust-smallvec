@@ -17,11 +17,9 @@ jobs:
         os: [ubuntu-latest]
         include:
           - toolchain: stable
-            env:
-              DO_FUZZ: 1
+            fuzz: 1
           - toolchain: beta
-            env:
-              DO_FUZZ: 1
+            fuzz: 1
           - os: windows-latest
             toolchain: nightly
 
@@ -30,8 +28,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install packages
-        if: matrix.os == 'ubuntu-latest'
+      - name: Install packages for fuzzing
+        if: runner.os == 'Linux' && matrix.fuzz == 1
         run: sudo apt-get update -y && sudo apt-get install -y binutils-dev libunwind8-dev libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc libiberty-dev
 
       - name: Install toolchain
@@ -81,9 +79,9 @@ jobs:
           MIRIFLAGS: '-Zmiri-tag-raw-pointers'
 
       - name: fuzz
-        if: env.DO_FUZZ == '1'
+        if: matrix.fuzz == 1
         working-directory: fuzz
-        run: ./travis_fuzz.sh
+        run: ./travis-fuzz.sh
 
   build_result:
     name: Result
