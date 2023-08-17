@@ -1758,6 +1758,7 @@ where
     /// elements toward the back.
     ///
     /// For slices of `Copy` types, this is more efficient than `insert`.
+    #[inline]
     pub fn insert_from_slice(&mut self, index: usize, slice: &[A::Item]) {
         self.reserve(slice.len());
 
