@@ -430,7 +430,7 @@ impl<'a, T: 'a + Array> Drop for Drain<'a, T> {
 /// An iterator which uses a closure to determine if an element should be removed.
 ///
 /// Returned from [`SmallVec::drain_filter`][1].
-/// 
+///
 /// [1]: struct.SmallVec.html#method.drain_filter
 pub struct DrainFilter<'a, T, F>
 where
@@ -1055,13 +1055,12 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
-    
     #[cfg(feature = "drain_filter")]
     /// Creates an iterator which uses a closure to determine if an element should be removed.
-    /// 
+    ///
     /// If the closure returns true, the element is removed and yielded. If the closure returns
     /// false, the element will remain in the vector and will not be yielded by the iterator.
-    /// 
+    ///
     /// Using this method is equivalent to the following code:
     /// ```
     /// # use smallvec::SmallVec;
@@ -1076,7 +1075,7 @@ impl<A: Array> SmallVec<A> {
     ///         i += 1;
     ///     }
     /// }
-    /// 
+    ///
     /// # assert_eq!(vec, SmallVec::<[i32; 8]>::from_slice(&[1i32, 4, 5]));
     /// ```
     /// ///
