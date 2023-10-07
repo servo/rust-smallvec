@@ -243,9 +243,9 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     }
 }
 
-/// Vec guarantees that its length is always less than isize::MAX in *bytes*.
+/// Vec guarantees that its length is always less than [`isize::MAX`] in *bytes*.
 ///
-/// For a non ZST, this means that the length is less than isize::MAX objects, which implies we
+/// For a non ZST, this means that the length is less than `isize::MAX` objects, which implies we
 /// have at least one free bit we can use. We use the least significant bit for the tag. And store
 /// the length in the `usize::BITS - 1` most significant bits.
 ///
@@ -589,7 +589,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         vec
     }
 
-    /// Constructs a new SmallVec on the stack from an A without copying elements. Also sets the length. The user is responsible for ensuring that len <= A::size().
+    /// Constructs a new `SmallVec` on the stack from an A without copying elements. Also sets the length. The user is responsible for ensuring that `len <= A::size()`.
     ///
     /// # Examples
     ///
@@ -1198,22 +1198,22 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 
-    /// Creates a SmallVec directly from the raw components of another SmallVec.
+    /// Creates a `SmallVec` directly from the raw components of another `SmallVec`.
     ///
     /// # Safety
     ///
     /// This is highly unsafe, due to the number of invariants that aren’t checked:
     ///
-    /// - ptr needs to have been previously allocated via SmallVec from its spilled storage (at least, it’s highly likely to be incorrect if it wasn’t).
-    /// - ptr’s A::Item type needs to be the same size and alignment that it was allocated with
-    /// - length needs to be less than or equal to capacity.
-    /// - capacity needs to be the capacity that the pointer was allocated with.
+    /// - `ptr` needs to have been previously allocated via `SmallVec` from its spilled storage (at least, it’s highly likely to be incorrect if it wasn’t).
+    /// - `ptr`’s `A::Item` type needs to be the same size and alignment that it was allocated with
+    /// - `length` needs to be less than or equal to `capacity`.
+    /// - `capacity` needs to be the capacity that the pointer was allocated with.
     ///
     /// Violating these may cause problems like corrupting the allocator’s internal data structures.
     ///
-    /// Additionally, capacity must be greater than the amount of inline storage A has; that is, the new SmallVec must need to spill over into heap allocated storage. This condition is asserted against.
+    /// Additionally, `capacity` must be greater than the amount of inline storage `A` has; that is, the new `SmallVec` must need to spill over into heap allocated storage. This condition is asserted against.
     ///
-    /// The ownership of ptr is effectively transferred to the SmallVec which may then deallocate, reallocate or change the contents of memory pointed to by the pointer at will. Ensure that nothing else uses the pointer after calling this function.
+    /// The ownership of `ptr` is effectively transferred to the `SmallVec` which may then deallocate, reallocate or change the contents of memory pointed to by the pointer at will. Ensure that nothing else uses the pointer after calling this function.
     ///
     /// # Examples
     ///
