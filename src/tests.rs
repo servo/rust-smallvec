@@ -72,13 +72,13 @@ pub fn test_double_spill() {
     );
 }
 
-/// https://github.com/servo/rust-smallvec/issues/4
+// https://github.com/servo/rust-smallvec/issues/4
 #[test]
 fn issue_4() {
     SmallVec::<[Box<u32>; 2]>::new();
 }
 
-/// https://github.com/servo/rust-smallvec/issues/5
+// https://github.com/servo/rust-smallvec/issues/5
 #[test]
 fn issue_5() {
     assert!(Some(SmallVec::<[&u32; 2]>::new()).is_some());

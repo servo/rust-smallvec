@@ -328,7 +328,7 @@ fn infallible<T>(result: Result<T, CollectionAllocErr>) -> T {
 }
 
 /// FIXME: use `Layout::array` when we require a Rust version where it’s stable
-/// https://github.com/rust-lang/rust/issues/55724
+/// <https://github.com/rust-lang/rust/issues/55724>
 fn layout_array<T>(n: usize) -> Result<Layout, CollectionAllocErr> {
     let size = mem::size_of::<T>()
         .checked_mul(n)
@@ -815,7 +815,7 @@ impl<A: Array> SmallVec<A> {
 
     /// Construct a new `SmallVec` from a `Vec<A::Item>`.
     ///
-    /// Elements will be copied to the inline buffer if vec.capacity() <= Self::inline_capacity().
+    /// Elements will be copied to the inline buffer if `vec.capacity() <= Self::inline_capacity()`.
     ///
     /// ```rust
     /// use smallvec::SmallVec;
@@ -970,7 +970,7 @@ impl<A: Array> SmallVec<A> {
     }
 
     /// Returns a tuple with (data ptr, len, capacity)
-    /// Useful to get all SmallVec properties with a single check of the current storage variant.
+    /// Useful to get all `SmallVec` properties with a single check of the current storage variant.
     #[inline]
     fn triple(&self) -> (ConstNonNull<A::Item>, usize, usize) {
         unsafe {
@@ -1475,7 +1475,7 @@ impl<A: Array> SmallVec<A> {
         }
     }
 
-    /// Convert a SmallVec to a Vec, without reallocating if the SmallVec has already spilled onto
+    /// Convert a `SmallVec` to a `Vec`, without reallocating if the `SmallVec` has already spilled onto
     /// the heap.
     pub fn into_vec(mut self) -> Vec<A::Item> {
         if self.spilled() {
@@ -1498,10 +1498,10 @@ impl<A: Array> SmallVec<A> {
         self.into_vec().into_boxed_slice()
     }
 
-    /// Convert the SmallVec into an `A` if possible. Otherwise return `Err(Self)`.
+    /// Convert the `SmallVec` into an `A` if possible. Otherwise return `Err(Self)`.
     ///
-    /// This method returns `Err(Self)` if the SmallVec is too short (and the `A` contains uninitialized elements),
-    /// or if the SmallVec is too long (and all the elements were spilled to the heap).
+    /// This method returns `Err(Self)` if the `SmallVec` is too short (and the `A` contains uninitialized elements),
+    /// or if the `SmallVec` is too long (and all the elements were spilled to the heap).
     pub fn into_inner(self) -> Result<A, Self> {
         if self.spilled() || self.len() != A::size() {
             // Note: A::size, not Self::inline_capacity
@@ -1595,7 +1595,7 @@ impl<A: Array> SmallVec<A> {
     ///
     /// If `new_len` is greater than `len`, the `SmallVec` is extended by the difference, with each
     /// additional slot filled with the result of calling the closure `f`. The return values from `f`
-    //// will end up in the `SmallVec` in the order they have been generated.
+    /// will end up in the `SmallVec` in the order they have been generated.
     ///
     /// If `new_len` is less than `len`, the `SmallVec` is simply truncated.
     ///
@@ -1603,7 +1603,7 @@ impl<A: Array> SmallVec<A> {
     /// value, use `resize`. If you want to use the `Default` trait to generate values, you can pass
     /// `Default::default()` as the second argument.
     ///
-    /// Added for std::vec::Vec compatibility (added in Rust 1.33.0)
+    /// Added for `std::vec::Vec` compatibility (added in Rust 1.33.0)
     ///
     /// ```
     /// # use smallvec::{smallvec, SmallVec};
@@ -2321,7 +2321,7 @@ impl<'a, A: Array> IntoIterator for &'a mut SmallVec<A> {
     }
 }
 
-/// Types that can be used as the backing store for a SmallVec
+/// Types that can be used as the backing store for a [`SmallVec`].
 pub unsafe trait Array {
     /// The type of the array's elements.
     type Item;
@@ -2331,7 +2331,7 @@ pub unsafe trait Array {
 
 /// Set the length of the vec when the `SetLenOnDrop` value goes out of scope.
 ///
-/// Copied from https://github.com/rust-lang/rust/pull/36355
+/// Copied from <https://github.com/rust-lang/rust/pull/36355>
 struct SetLenOnDrop<'a> {
     len: &'a mut usize,
     local_len: usize,
