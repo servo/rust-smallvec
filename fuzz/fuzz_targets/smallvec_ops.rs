@@ -178,11 +178,8 @@ fn do_test_all(data: &[u8]) {
 }
 
 #[cfg(feature = "afl")]
-#[macro_use]
-extern crate afl;
-#[cfg(feature = "afl")]
 fn main() {
-    fuzz!(|data| {
+    afl::fuzz!(|data| {
         // Remove the panic hook so we can actually catch panic
         // See https://github.com/rust-fuzz/afl.rs/issues/150
         std::panic::set_hook(Box::new(|_| {}));
@@ -191,12 +188,9 @@ fn main() {
 }
 
 #[cfg(feature = "honggfuzz")]
-#[macro_use]
-extern crate honggfuzz;
-#[cfg(feature = "honggfuzz")]
 fn main() {
     loop {
-        fuzz!(|data| {
+        honggfuzz::fuzz!(|data| {
             // Remove the panic hook so we can actually catch panic
             // See https://github.com/rust-fuzz/afl.rs/issues/150
             std::panic::set_hook(Box::new(|_| {}));
