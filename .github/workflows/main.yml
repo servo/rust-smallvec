@@ -64,11 +64,25 @@ jobs:
         working-directory: fuzz
         run: ./travis_fuzz.sh
 
+  no-std:
+    name: no_std
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          target: thumbv7m-none-eabi
+      - name: Cargo build
+        run: cargo build --verbose
+
   build_result:
     name: homu build finished
     runs-on: ubuntu-latest
     needs:
       - "linux-ci"
+      - "no-std"
 
     steps:
       - name: Mark the job as successful
