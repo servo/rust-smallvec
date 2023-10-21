@@ -149,8 +149,7 @@ use core::mem::ManuallyDrop;
 /// - Create a [`SmallVec`] containing a given list of elements:
 ///
 /// ```
-/// # #[macro_use] extern crate smallvec;
-/// # use smallvec::SmallVec;
+/// # use smallvec::{smallvec, SmallVec};
 /// # fn main() {
 /// let v: SmallVec<[_; 128]> = smallvec![1, 2, 3];
 /// assert_eq!(v[0], 1);
@@ -162,8 +161,7 @@ use core::mem::ManuallyDrop;
 /// - Create a [`SmallVec`] from a given element and size:
 ///
 /// ```
-/// # #[macro_use] extern crate smallvec;
-/// # use smallvec::SmallVec;
+/// # use smallvec::{smallvec, SmallVec};
 /// # fn main() {
 /// let v: SmallVec<[_; 0x8000]> = smallvec![1; 3];
 /// assert_eq!(v, SmallVec::from_buf([1, 1, 1]));
@@ -209,8 +207,7 @@ macro_rules! smallvec {
 /// - Create a [`SmallVec`] containing a given list of elements:
 ///
 /// ```
-/// # #[macro_use] extern crate smallvec;
-/// # use smallvec::SmallVec;
+/// # use smallvec::{smallvec_inline, SmallVec};
 /// # fn main() {
 /// const V: SmallVec<[i32; 3]> = smallvec_inline![1, 2, 3];
 /// assert_eq!(V[0], 1);
@@ -222,8 +219,7 @@ macro_rules! smallvec {
 /// - Create a [`SmallVec`] from a given element and size:
 ///
 /// ```
-/// # #[macro_use] extern crate smallvec;
-/// # use smallvec::SmallVec;
+/// # use smallvec::{smallvec_inline, SmallVec};
 /// # fn main() {
 /// const V: SmallVec<[i32; 3]> = smallvec_inline![1; 3];
 /// assert_eq!(V, SmallVec::from_buf([1, 1, 1]));
@@ -1666,8 +1662,7 @@ impl<A: Array> SmallVec<A> {
     /// # Examples
     ///
     /// ```
-    /// # #[macro_use] extern crate smallvec;
-    /// # use smallvec::SmallVec;
+    /// # use smallvec::{smallvec, SmallVec};
     /// use std::mem;
     /// use std::ptr;
     ///
