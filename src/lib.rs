@@ -55,7 +55,7 @@
 #[doc(hidden)]
 pub extern crate alloc;
 
-// #[cfg(any(test, feature = "write"))]
+#[cfg(any(test, feature = "write"))]
 extern crate std;
 
 #[cfg(test)]
