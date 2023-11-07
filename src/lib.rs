@@ -23,7 +23,7 @@
 //!
 //! ### `write`
 //!
-//! When this feature is enabled, `SmallVec<[u8; _]>` implements the `std::io::Write` trait.
+//! When this feature is enabled, `SmallVec<u8, _>` implements the `std::io::Write` trait.
 //! This feature is not compatible with `#![no_std]` programs.
 //!
 //! ### `specialization`
