@@ -2384,6 +2384,20 @@ impl<T, const N: usize> SmallVec<[T; N]> {
             data: SmallVecData::from_const(MaybeUninit::new(items)),
         }
     }
+
+    /// Constructs a new `SmallVec` on the stack from an array without
+    /// copying elements. Also sets the length. The user is responsible
+    /// for ensuring that `len <= N`.
+    /// 
+    /// This is a `const` version of [`SmallVec::from_buf_and_len_unchecked`] that is enabled by the feature `const_new`, with the limitation that it only works for arrays.
+    #[cfg_attr(docsrs, doc(cfg(feature = "const_new")))]
+    #[inline]
+    pub const unsafe fn from_const_with_len_unchecked(items: [T; N], len: usize) -> Self {
+        SmallVec {
+            capacity: len,
+            data: SmallVecData::from_const(MaybeUninit::new(items)),
+        }
+    }
 }
 
 #[cfg(feature = "const_generics")]
