@@ -718,6 +718,13 @@ fn shrink_to_fit_unspill() {
 }
 
 #[test]
+fn shrink_after_from_empty_vec() {
+    let mut v = SmallVec::<u8, 2>::from_vec(vec![]);
+    v.shrink_to_fit();
+    assert!(!v.spilled())
+}
+
+#[test]
 fn test_into_vec() {
     let vec = SmallVec::<u8, 2>::from_iter(0..2);
     assert_eq!(vec.into_vec(), vec![0, 1]);

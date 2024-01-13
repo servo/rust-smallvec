@@ -524,6 +524,10 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn from_vec(vec: Vec<T>) -> Self {
+        if vec.capacity() == 0 {
+            return Self::new();
+        }
+
         if Self::is_zst() {
             // "Move" elements to stack buffer. They're ZST so we don't actually have to do
             // anything. Just make sure they're not dropped.
