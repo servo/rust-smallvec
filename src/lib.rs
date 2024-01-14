@@ -408,6 +408,19 @@ where
 }
 
 #[cfg(feature = "drain_filter")]
+impl<T, const N: usize, F> core::fmt::Debug for DrainFilter<'_, T, N, F>
+where
+    F: FnMut(&mut T) -> bool,
+    T: core::fmt::Debug,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_tuple("DrainFilter")
+            .field(&self.vec.as_slice())
+            .finish()
+    }
+}
+
+#[cfg(feature = "drain_filter")]
 impl<T, F, const N: usize> Iterator for DrainFilter<'_, T, N, F>
 where
     F: FnMut(&mut T) -> bool,
