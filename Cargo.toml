@@ -16,6 +16,8 @@ documentation = "https://docs.rs/smallvec/"
 write = []
 specialization = []
 may_dangle = []
+drain_filter = []
+drain_keep_rest = ["drain_filter"]
 
 [dependencies]
 serde = { version = "1", optional = true, default-features = false }
