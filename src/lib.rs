@@ -109,12 +109,13 @@ impl core::fmt::Display for CollectionAllocErr {
 /// Either a stack array with `length <= N` or a heap array
 /// whose pointer and capacity are stored here.
 ///
-/// We store a `*const T` instead of a `*mut T` so that the type is covariant
+/// We store a `NonNull<T>` instead of a `*mut T`, so that
+/// niche-optimization can be performed and the type is covariant
 /// with respect to `T`.
 #[repr(C)]
 pub union RawSmallVec<T, const N: usize> {
     inline: ManuallyDrop<MaybeUninit<[T; N]>>,
-    heap: (*const T, usize), // this pointer is never null
+    heap: (NonNull<T>, usize),
 }
 
 #[inline]
@@ -143,7 +144,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         }
     }
     #[inline]
-    const fn new_heap(ptr: *mut T, capacity: usize) -> Self {
+    const fn new_heap(ptr: NonNull<T>, capacity: usize) -> Self {
         Self {
             heap: (ptr, capacity),
         }
@@ -168,7 +169,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     /// The vector must be on the heap
     #[inline]
     const unsafe fn as_ptr_heap(&self) -> *const T {
-        self.heap.0
+        self.heap.0.as_ptr()
     }
 
     /// # Safety
@@ -176,7 +177,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     /// The vector must be on the heap
     #[inline]
     unsafe fn as_mut_ptr_heap(&mut self) -> *mut T {
-        self.heap.0 as *mut T
+        self.heap.0.as_ptr()
     }
 
     /// # Safety
@@ -216,7 +217,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
                 Err(CollectionAllocErr::AllocErr { layout: new_layout })
             } else {
                 copy_nonoverlapping(ptr, new_ptr, len);
-                *self = Self::new_heap(new_ptr, new_capacity);
+                *self = Self::new_heap(NonNull::new_unchecked(new_ptr), new_capacity);
                 Ok(())
             }
         } else {
@@ -236,7 +237,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             if new_ptr.is_null() {
                 Err(CollectionAllocErr::AllocErr { layout: new_layout })
             } else {
-                *self = Self::new_heap(new_ptr, new_capacity);
+                *self = Self::new_heap(NonNull::new_unchecked(new_ptr), new_capacity);
                 Ok(())
             }
         }
@@ -733,7 +734,9 @@ impl<T, const N: usize> SmallVec<T, N> {
             let mut vec = ManuallyDrop::new(vec);
             let len = vec.len();
             let cap = vec.capacity();
-            let ptr = vec.as_mut_ptr();
+            // SAFETY: vec.capacity is not `0` (checked above), so the pointer
+            // can not dangle and thus specifically cannot be null.
+            let ptr = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
 
             Self {
                 len: TaggedLen::new(len, true, Self::is_zst()),
@@ -1002,11 +1005,10 @@ impl<T, const N: usize> SmallVec<T, N> {
         debug_assert!(self.spilled());
         let len = self.len();
         let (ptr, cap) = self.raw.heap;
-        let ptr = ptr as *mut T;
         if len == cap {
             self.reserve(1);
         }
-        ptr.add(len).write(value);
+        ptr.as_ptr().add(len).write(value);
         self.set_len(len + 1)
     }
 
@@ -1076,9 +1078,9 @@ impl<T, const N: usize> SmallVec<T, N> {
 
                     // SAFETY: len <= new_capacity <= Self::inline_size()
                     // so the copy is within bounds of the inline member
-                    copy_nonoverlapping(ptr, self.raw.as_mut_ptr_inline(), len);
+                    copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
                     drop(DropDealloc {
-                        ptr: NonNull::new_unchecked(ptr as *mut u8),
+                        ptr: NonNull::new_unchecked(ptr.cast().as_ptr()),
                         size_bytes: old_cap * size_of::<T>(),
                         align: align_of::<T>(),
                     });
@@ -1154,10 +1156,10 @@ impl<T, const N: usize> SmallVec<T, N> {
             unsafe {
                 let (ptr, capacity) = self.raw.heap;
                 self.raw = RawSmallVec::new_inline(MaybeUninit::uninit());
-                copy_nonoverlapping(ptr, self.raw.as_mut_ptr_inline(), len);
+                copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
                 self.set_inline();
                 alloc::alloc::dealloc(
-                    ptr as *mut T as *mut u8,
+                    ptr.cast().as_ptr(),
                     Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>()),
                 );
             }
@@ -1333,10 +1335,16 @@ impl<T, const N: usize> SmallVec<T, N> {
             vec
         } else {
             let this = ManuallyDrop::new(self);
-            // SAFETY: ptr was created with the global allocator
+            // SAFETY:
+            // - `ptr` was created with the global allocator
+            // - `ptr` was created with the appropriate alignment for `T`
+            // - the allocation pointed to by ptr is exactly cap * sizeof(T)
+            // - `len` is less than or equal to `cap`
+            // - the first `len` entries are proper `T`-values
+            // - the allocation is not larger than `isize::MAX`
             unsafe {
                 let (ptr, cap) = this.raw.heap;
-                Vec::from_raw_parts(ptr as *mut T, len, cap)
+                Vec::from_raw_parts(ptr.as_ptr(), len, cap)
             }
         }
     }
@@ -1510,6 +1518,14 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub unsafe fn from_raw_parts(ptr: *mut T, length: usize, capacity: usize) -> SmallVec<T, N> {
         assert!(!Self::is_zst());
+
+        // SAFETY: We require caller to provide same ptr as we alloc
+        // and we never alloc null pointer.
+        let ptr = unsafe {
+            debug_assert!(!ptr.is_null(), "Called `from_raw_parts` with null pointer.");
+            NonNull::new_unchecked(ptr)
+        };
+
         SmallVec {
             len: TaggedLen::new(length, true, Self::is_zst()),
             raw: RawSmallVec::new_heap(ptr, capacity),
@@ -1548,7 +1564,7 @@ impl<T, const N: usize> SmallVec<T, N> {
                 }
                 let len = self.len();
                 let (ptr, capacity) = self.raw.heap;
-                let ptr = ptr as *mut T;
+                let ptr = ptr.as_ptr();
                 // SAFETY: ptr is valid for `capacity - len` writes
                 let count = extend_batch(ptr, capacity - len, len, &mut iter);
                 self.set_len(len + count);
