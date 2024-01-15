@@ -1080,7 +1080,7 @@ impl<T, const N: usize> SmallVec<T, N> {
                     // so the copy is within bounds of the inline member
                     copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
                     drop(DropDealloc {
-                        ptr: NonNull::new_unchecked(ptr.as_ptr() as *mut u8),
+                        ptr: NonNull::new_unchecked(ptr.cast().as_ptr()),
                         size_bytes: old_cap * size_of::<T>(),
                         align: align_of::<T>(),
                     });
@@ -1159,7 +1159,7 @@ impl<T, const N: usize> SmallVec<T, N> {
                 copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
                 self.set_inline();
                 alloc::alloc::dealloc(
-                    ptr.as_ptr() as *mut u8,
+                    ptr.cast().as_ptr(),
                     Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>()),
                 );
             }
