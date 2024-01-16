@@ -208,18 +208,13 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             return Err(CollectionAllocErr::CapacityOverflow);
         }
 
-        if len == 0 || !was_on_heap {
+        let new_ptr = if len == 0 || !was_on_heap {
             // get a fresh allocation
-
-            // layout has non zero size
-            let new_ptr = alloc(new_layout) as *mut T;
-            if new_ptr.is_null() {
-                Err(CollectionAllocErr::AllocErr { layout: new_layout })
-            } else {
-                copy_nonoverlapping(ptr, new_ptr, len);
-                *self = Self::new_heap(NonNull::new_unchecked(new_ptr), new_capacity);
-                Ok(())
-            }
+            let new_ptr = alloc(new_layout) as *mut T; // `new_layout` has nonzero size.
+            let new_ptr =
+                NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr { layout: new_layout })?;
+            copy_nonoverlapping(ptr, new_ptr.as_ptr(), len);
+            new_ptr
         } else {
             // use realloc
 
@@ -234,13 +229,10 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             // does not overflow when rounded up to alignment. since it was constructed
             // with Layout::array
             let new_ptr = realloc(ptr as *mut u8, old_layout, new_layout.size()) as *mut T;
-            if new_ptr.is_null() {
-                Err(CollectionAllocErr::AllocErr { layout: new_layout })
-            } else {
-                *self = Self::new_heap(NonNull::new_unchecked(new_ptr), new_capacity);
-                Ok(())
-            }
-        }
+            NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr { layout: new_layout })?
+        };
+        *self = Self::new_heap(new_ptr, new_capacity);
+        Ok(())
     }
 }
 
@@ -1080,7 +1072,7 @@ impl<T, const N: usize> SmallVec<T, N> {
                     // so the copy is within bounds of the inline member
                     copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
                     drop(DropDealloc {
-                        ptr: NonNull::new_unchecked(ptr.cast().as_ptr()),
+                        ptr: ptr.cast(),
                         size_bytes: old_cap * size_of::<T>(),
                         align: align_of::<T>(),
                     });
