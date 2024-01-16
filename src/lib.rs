@@ -88,6 +88,10 @@
 //! [Rustonomicon](https://doc.rust-lang.org/1.42.0/nomicon/dropck.html#an-escape-hatch).
 //!
 //! Tracking issue: [rust-lang/rust#34761](https://github.com/rust-lang/rust/issues/34761)
+//!
+//! ### `get-size`
+//!
+//! When this optional dependency is enabled, `SmallVec` implements the `get_size::GetSize` trait.
 
 #![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -140,6 +144,9 @@ use std::io;
 
 #[cfg(feature = "drain_keep_rest")]
 use core::mem::ManuallyDrop;
+
+#[cfg(feature = "get-size")]
+use get_size::GetSize;
 
 /// Creates a [`SmallVec`] containing the arguments.
 ///
@@ -2469,3 +2476,22 @@ impl<T> Clone for ConstNonNull<T> {
 }
 
 impl<T> Copy for ConstNonNull<T> {}
+
+#[cfg(feature = "get-size")]
+impl<A: Array> GetSize for SmallVec<A>
+where
+    A::Item: GetSize,
+{
+    fn get_heap_size(&self) -> usize {
+        let mut total = 0;
+        if self.spilled() {
+            total += self.capacity * A::Item::get_stack_size();
+        }
+
+        for v in self.iter() {
+            total += v.get_heap_size();
+        }
+
+        total
+    }
+}
