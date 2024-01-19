@@ -45,10 +45,6 @@
 //! [Rustonomicon](https://doc.rust-lang.org/1.42.0/nomicon/dropck.html#an-escape-hatch).
 //!
 //! Tracking issue: [rust-lang/rust#34761](https://github.com/rust-lang/rust/issues/34761)
-//!
-//! ### `get-size`
-//!
-//! When this optional dependency is enabled, `SmallVec` implements the `get_size::GetSize` trait.
 
 #![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -92,8 +88,6 @@ use serde::{
 };
 #[cfg(feature = "write")]
 use std::io;
-#[cfg(feature = "get-size")]
-use get_size::GetSize;
 
 /// Error type for APIs with fallible heap allocation
 #[derive(Debug)]
@@ -2180,24 +2174,5 @@ impl<const N: usize> io::Write for SmallVec<u8, N> {
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
-    }
-}
-
-#[cfg(feature = "get-size")]
-impl<T, const N: usize> GetSize for SmallVec<T, N>
-where
-    T: GetSize,
-{
-    fn get_heap_size(&self) -> usize {
-        let mut total = 0;
-        if self.spilled() {
-            total += self.capacity() * T::get_stack_size();
-        }
-
-        for v in self.iter() {
-            total += v.get_heap_size();
-        }
-
-        total
     }
 }
