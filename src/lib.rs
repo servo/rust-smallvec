@@ -69,6 +69,8 @@ use alloc::alloc::Layout;
 use core::borrow::Borrow;
 use core::borrow::BorrowMut;
 use core::fmt::Debug;
+use core::hash::{Hash, Hasher};
+use core::marker::PhantomData;
 use core::mem::align_of;
 use core::mem::size_of;
 use core::mem::ManuallyDrop;
@@ -78,8 +80,6 @@ use core::ptr::addr_of_mut;
 use core::ptr::copy;
 use core::ptr::copy_nonoverlapping;
 use core::ptr::NonNull;
-
-use core::marker::PhantomData;
 
 #[cfg(feature = "serde")]
 use serde::{
@@ -2046,6 +2046,12 @@ where
     #[inline]
     fn cmp(&self, other: &SmallVec<T, N>) -> core::cmp::Ordering {
         self.as_slice().cmp(other.as_slice())
+    }
+}
+
+impl<T: Hash, const N: usize> Hash for SmallVec<T, N> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_slice().hash(state)
     }
 }
 
