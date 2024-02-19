@@ -1909,9 +1909,25 @@ impl<'a, T: Clone, const N: usize> From<&'a [T]> for SmallVec<T, N> {
         slice.iter().cloned().collect()
     }
 }
-impl<T, const N: usize> From<[T; N]> for SmallVec<T, N> {
-    fn from(array: [T; N]) -> Self {
-        Self::from_buf(array)
+
+impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N> {
+    fn from(array: [T; M]) -> Self {
+        if M > N {
+            // If M > N, we'd have to heap allocate anyway,
+            // so delegate for Vec for the allocation
+            Self::from(Vec::from(array))
+        } else {
+            // M <= N
+            let mut this = Self::new();
+            debug_assert!(M <= this.capacity());
+            let array = ManuallyDrop::new(array);
+            // SAFETY: M <= this.capacity()
+            unsafe {
+                copy_nonoverlapping(array.as_ptr(), this.as_mut_ptr(), M);
+                this.set_len(M);
+            }
+            this
+        }
     }
 }
 impl<T, const N: usize> From<Vec<T>> for SmallVec<T, N> {
