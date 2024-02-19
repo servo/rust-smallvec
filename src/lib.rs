@@ -1909,12 +1909,12 @@ impl<'a, T: Clone, const N: usize> From<&'a [T]> for SmallVec<T, N> {
         slice.iter().cloned().collect()
     }
 }
-impl<T: Clone, const N: usize> From<[T; N]> for SmallVec<T, N> {
+impl<T, const N: usize> From<[T; N]> for SmallVec<T, N> {
     fn from(array: [T; N]) -> Self {
         Self::from_buf(array)
     }
 }
-impl<T: Clone, const N: usize> From<Vec<T>> for SmallVec<T, N> {
+impl<T, const N: usize> From<Vec<T>> for SmallVec<T, N> {
     fn from(array: Vec<T>) -> Self {
         Self::from_vec(array)
     }

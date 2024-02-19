@@ -644,6 +644,18 @@ fn test_from() {
     let small_vec: SmallVec<u8, 128> = SmallVec::from(array);
     assert_eq!(&*small_vec, vec![99u8; 128].as_slice());
     drop(small_vec);
+
+    #[derive(PartialEq, Eq, Debug)]
+    struct NoClone(u8);
+    let array = [NoClone(42)];
+    let small_vec: SmallVec<NoClone, 1> = SmallVec::from(array);
+    assert_eq!(&*small_vec, &[NoClone(42)]);
+    drop(small_vec);
+
+    let vec = vec![NoClone(42)];
+    let small_vec: SmallVec<NoClone, 1> = SmallVec::from(vec);
+    assert_eq!(&*small_vec, &[NoClone(42)]);
+    drop(small_vec);
 }
 
 #[test]
