@@ -2016,10 +2016,18 @@ impl<A: Array> From<Vec<A::Item>> for SmallVec<A> {
     }
 }
 
-impl<A: Array> From<A> for SmallVec<A> {
+impl<A1: Array, A2: Array<Item = A1::Item>> From<A2> for SmallVec<A1> {
     #[inline]
-    fn from(array: A) -> SmallVec<A> {
-        SmallVec::from_buf(array)
+    fn from(array: A2) -> SmallVec<A1> {
+        let m = A2::size();
+        let mut this = Self::with_capacity(m);
+        let array = mem::ManuallyDrop::new(array);
+        // SAFETY: m <= this.capacity()
+        unsafe {
+            ptr::copy_nonoverlapping(&*array as *const A2 as *const A2::Item, this.as_mut_ptr(), m);
+            this.set_len(m);
+        }
+        this
     }
 }
 
