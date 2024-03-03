@@ -281,6 +281,40 @@ fn test_truncate_references() {
 }
 
 #[test]
+fn test_split_off() {
+    let mut vec: SmallVec<u32, 4> = smallvec![1, 2, 3, 4, 5, 6];
+    let orig_ptr = vec.as_ptr();
+    let orig_capacity = vec.capacity();
+
+    let split_off = vec.split_off(4);
+    assert_eq!(&vec[..], &[1, 2, 3, 4]);
+    assert_eq!(&split_off[..], &[5, 6]);
+    assert_eq!(vec.capacity(), orig_capacity);
+    assert_eq!(vec.as_ptr(), orig_ptr);
+}
+
+#[test]
+fn test_split_off_take_all() {
+    // Allocate enough capacity that we can tell whether the split-off vector's
+    // capacity is based on its size, or (incorrectly) on the original capacity.
+    let mut vec = SmallVec::<u32, 4>::with_capacity(1000);
+    vec.extend([1, 2, 3, 4, 5, 6]);
+    let orig_ptr = vec.as_ptr();
+    let orig_capacity: usize = vec.capacity();
+
+    let split_off = vec.split_off(0);
+    assert_eq!(&vec[..], &[]);
+    assert_eq!(&split_off[..], &[1, 2, 3, 4, 5, 6]);
+    assert_eq!(vec.capacity(), orig_capacity);
+    assert_eq!(vec.as_ptr(), orig_ptr);
+
+    // The split-off vector should be newly-allocated, and should not have
+    // stolen the original vector's allocation.
+    assert!(split_off.capacity() < orig_capacity);
+    assert_ne!(split_off.as_ptr(), orig_ptr);
+}
+
+#[test]
 fn test_insert_many() {
     let mut v: SmallVec<u8, 8> = SmallVec::new();
     for x in 0..4 {
