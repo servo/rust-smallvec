@@ -26,6 +26,13 @@
 //! When this feature is enabled, `SmallVec<u8, _>` implements the `std::io::Write` trait.
 //! This feature is not compatible with `#![no_std]` programs.
 //!
+//! ### `drain_filter`
+//!
+//! **This feature is unstable.** It may change to match the unstable `drain_filter` method in libstd.
+//!
+//! Enables the `drain_filter` method, which produces an iterator that calls a user-provided
+//! closure to determine which elements of the vector to remove and yield from the iterator.
+//!
 //! ### `specialization`
 //!
 //! **This feature is unstable and requires a nightly build of the Rust toolchain.**
@@ -871,6 +878,48 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub const fn spilled(&self) -> bool {
         self.len.on_heap(Self::is_zst())
+    }
+
+    /// Splits the collection into two at the given index.
+    ///
+    /// Returns a newly allocated vector containing the elements in the range
+    /// `[at, len)`. After the call, the original vector will be left containing
+    /// the elements `[0, at)` with its previous capacity unchanged.
+    ///
+    /// - If you want to take ownership of the entire contents and capacity of
+    ///   the vector, see [`mem::take`] or [`mem::replace`].
+    /// - If you don't need the returned vector at all, see [`SmallVec::truncate`].
+    /// - If you want to take ownership of an arbitrary subslice, or you don't
+    ///   necessarily want to store the removed items in a vector, see [`SmallVec::drain`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if `at > len`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut vec = vec![1, 2, 3];
+    /// let vec2 = vec.split_off(1);
+    /// assert_eq!(vec, [1]);
+    /// assert_eq!(vec2, [2, 3]);
+    /// ```
+    #[inline]
+    pub fn split_off(&mut self, at: usize) -> Self {
+        let len = self.len();
+        assert!(at <= len);
+
+        let other_len = len - at;
+        let mut other = Self::with_capacity(other_len);
+
+        // Unsafely `set_len` and copy items to `other`.
+        unsafe {
+            self.set_len(at);
+            other.set_len(other_len);
+
+            core::ptr::copy_nonoverlapping(self.as_ptr().add(at), other.as_mut_ptr(), other_len);
+        }
+        other
     }
 
     pub fn drain<R>(&mut self, range: R) -> Drain<'_, T, N>
