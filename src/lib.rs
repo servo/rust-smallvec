@@ -26,6 +26,13 @@
 //! When this feature is enabled, `SmallVec<u8, _>` implements the `std::io::Write` trait.
 //! This feature is not compatible with `#![no_std]` programs.
 //!
+//! ### `drain_filter`
+//!
+//! **This feature is unstable.** It may change to match the unstable `drain_filter` method in libstd.
+//!
+//! Enables the `drain_filter` method, which produces an iterator that calls a user-provided
+//! closure to determine which elements of the vector to remove and yield from the iterator.
+//!
 //! ### `specialization`
 //!
 //! **This feature is unstable and requires a nightly build of the Rust toolchain.**
