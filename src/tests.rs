@@ -1,6 +1,6 @@
 use crate::{smallvec, SmallVec};
 
-use std::iter::FromIterator;
+use core::iter::FromIterator;
 
 use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
@@ -1060,27 +1060,13 @@ fn test_clone_from() {
     assert_eq!(&*b, &[20, 21, 22]);
 }
 
-#[cfg(feature = "drain_filter")]
+#[cfg(feature = "extract_if")]
 #[test]
-fn drain_filter() {
+fn test_extract_if() {
     let mut a: SmallVec<u8, 2> = smallvec![1u8, 2, 3, 4, 5, 6, 7, 8];
 
-    let b: SmallVec<u8, 2> = a.drain_filter(|x| *x % 3 == 0).collect();
+    let b: SmallVec<u8, 2> = a.extract_if(|x| *x % 3 == 0).collect();
 
     assert_eq!(a, SmallVec::<u8, 2>::from_slice(&[1u8, 2, 4, 5, 7, 8]));
     assert_eq!(b, SmallVec::<u8, 2>::from_slice(&[3u8, 6]));
-}
-
-#[cfg(feature = "drain_keep_rest")]
-#[test]
-fn drain_keep_rest() {
-    let mut a: SmallVec<i32, 3> = smallvec![1i32, 2, 3, 4, 5, 6, 7, 8];
-    let mut df = a.drain_filter(|x| *x % 2 == 0);
-
-    assert_eq!(df.next().unwrap(), 2);
-    assert_eq!(df.next().unwrap(), 4);
-
-    df.keep_rest();
-
-    assert_eq!(a, SmallVec::<i32, 3>::from_slice(&[1i32, 3, 5, 6, 7, 8]));
 }
