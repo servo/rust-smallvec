@@ -1,6 +1,6 @@
 use crate::{smallvec, SmallVec};
 
-use std::iter::FromIterator;
+use core::iter::FromIterator;
 
 use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
