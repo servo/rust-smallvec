@@ -75,8 +75,6 @@ jobs:
       - name: miri
         if: matrix.toolchain == 'nightly' && matrix.os == 'ubuntu-latest'
         run: bash ./scripts/run_miri.sh
-        env:
-          MIRIFLAGS: '-Zmiri-tag-raw-pointers'
 
       - name: fuzz
         if: matrix.fuzz == 1
