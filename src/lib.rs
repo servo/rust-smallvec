@@ -1372,13 +1372,14 @@ impl<A: Array> SmallVec<A> {
             }
             let mut ptr = ptr.as_ptr();
             let len = *len_ptr;
+            if index > len {
+                panic!("index exceeds length");
+            }
+            // SAFETY: add is UB if index > len, but we panicked first
             ptr = ptr.add(index);
             if index < len {
+                // Shift element to the right of `index`.
                 ptr::copy(ptr, ptr.add(1), len - index);
-            } else if index == len {
-                // No elements need shifting.
-            } else {
-                panic!("index exceeds length");
             }
             *len_ptr = len + 1;
             ptr::write(ptr, element);
