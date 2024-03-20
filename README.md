@@ -28,7 +28,7 @@ rust-smallvec
 use smallvec::{SmallVec, smallvec};
     
 // This SmallVec can hold up to 4 items on the stack:
-let mut v: SmallVec<i32, 4> = smallvec![1, 2, 3, 4];
+let mut v: SmallVec<[i32; 4]> = smallvec![1, 2, 3, 4];
 
 // It will automatically move its contents to the heap if
 // contains more than four items:
