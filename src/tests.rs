@@ -1070,3 +1070,36 @@ fn test_extract_if() {
     assert_eq!(a, SmallVec::<u8, 2>::from_slice(&[1u8, 2, 4, 5, 7, 8]));
     assert_eq!(b, SmallVec::<u8, 2>::from_slice(&[3u8, 6]));
 }
+
+/// This assortment of tests, in combination with miri, verifies we handle UB on fishy arguments
+/// given to SmallVec. Draining and extending the allocation are fairly well-tested earlier, but
+/// `smallvec.insert(usize::MAX, val)` once slipped by!
+///
+/// All code that indexes into SmallVecs should be tested with such "trivially wrong" args.
+#[test]
+fn max_dont_panic() {
+    let mut sv: SmallVec<i32, 2> = smallvec![0];
+    let _ = sv.get(usize::MAX);
+    sv.truncate(usize::MAX);
+}
+
+#[test]
+#[should_panic]
+fn max_remove() {
+    let mut sv: SmallVec<i32, 2> = smallvec![0];
+    sv.remove(usize::MAX);
+}
+
+#[test]
+#[should_panic]
+fn max_swap_remove() {
+    let mut sv: SmallVec<i32, 2> = smallvec![0];
+    sv.swap_remove(usize::MAX);
+}
+
+#[test]
+#[should_panic]
+fn max_insert() {
+    let mut sv: SmallVec<i32, 2> = smallvec![0];
+    sv.insert(usize::MAX, 0);
+}
