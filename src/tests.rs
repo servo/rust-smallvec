@@ -1049,3 +1049,10 @@ fn max_swap_remove() {
     let mut sv: SmallVec<[i32; 2]> = smallvec![0];
     sv.swap_remove(usize::MAX);
 }
+
+#[test]
+#[should_panic]
+fn test_insert_out_of_bounds() {
+    let mut v: SmallVec<[i32; 4]> = SmallVec::new();
+    v.insert(10, 6);
+}
