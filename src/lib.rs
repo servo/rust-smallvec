@@ -1000,6 +1000,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         // SAFETY: we have a mutable reference to each vector and each uniquely owns its memory.
         // so the ranges can't overlap
         unsafe { copy_nonoverlapping(other.as_ptr(), ptr, other_len) };
+        unsafe { self.set_len(total_len) }
     }
 
     #[inline]
