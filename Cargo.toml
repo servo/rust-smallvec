@@ -1,6 +1,6 @@
 [package]
 name = "smallvec"
-version = "2.0.0-alpha.4"
+version = "2.0.0-alpha.5"
 edition = "2018"
 rust-version = "1.57"
 authors = ["The Servo Project Developers"]
