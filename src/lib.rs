@@ -120,7 +120,7 @@ impl core::fmt::Display for CollectionAllocErr {
 /// niche-optimization can be performed and the type is covariant
 /// with respect to `T`.
 #[repr(C)]
-pub union RawSmallVec<T, const N: usize> {
+union RawSmallVec<T, const N: usize> {
     inline: ManuallyDrop<MaybeUninit<[T; N]>>,
     heap: (NonNull<T>, usize),
 }
