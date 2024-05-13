@@ -924,7 +924,7 @@ fn test_resize() {
     assert_eq!(v[..], [1, 0][..]);
 }
 
-#[cfg(feature = "write")]
+#[cfg(feature = "std")]
 #[test]
 fn test_write() {
     use std::io::Write;

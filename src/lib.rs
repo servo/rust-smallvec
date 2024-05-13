@@ -62,7 +62,7 @@
 #[doc(hidden)]
 pub extern crate alloc;
 
-#[cfg(any(test, feature = "write"))]
+#[cfg(any(test, feature = "std"))]
 extern crate std;
 
 #[cfg(test)]
@@ -93,7 +93,7 @@ use serde::{
     de::{Deserialize, Deserializer, SeqAccess, Visitor},
     ser::{Serialize, SerializeSeq, Serializer},
 };
-#[cfg(feature = "write")]
+#[cfg(feature = "std")]
 use std::io;
 
 /// Error type for APIs with fallible heap allocation
@@ -112,6 +112,10 @@ impl core::fmt::Display for CollectionAllocErr {
         write!(f, "Allocation error: {:?}", self)
     }
 }
+
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+impl std::error::Error for CollectionAllocErr {}
 
 /// Either a stack array with `length <= N` or a heap array
 /// whose pointer and capacity are stored here.
@@ -2145,8 +2149,8 @@ where
     }
 }
 
-#[cfg(feature = "write")]
-#[cfg_attr(docsrs, doc(cfg(feature = "write")))]
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl<const N: usize> io::Write for SmallVec<u8, N> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {

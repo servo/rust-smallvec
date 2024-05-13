@@ -13,7 +13,7 @@ readme = "README.md"
 documentation = "https://docs.rs/smallvec/"
 
 [features]
-write = []
+std = []
 specialization = []
 may_dangle = []
 extract_if = []
