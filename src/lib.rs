@@ -16,15 +16,19 @@
 //!
 //! ## Optional features
 //!
+//! ### `std`
+//!
+//! When this feature is enabled, traits available from `std` are implemented:
+//!
+//! * `SmallVec<u8, _>` implements the [`std::io::Write`] trait.
+//! * [`CollectionAllocErr`] implements [`std::error::Error`].
+//!
+//! This feature is not compatible with `#![no_std]` programs.
+//!
 //! ### `serde`
 //!
 //! When this optional dependency is enabled, `SmallVec` implements the `serde::Serialize` and
 //! `serde::Deserialize` traits.
-//!
-//! ### `write`
-//!
-//! When this feature is enabled, `SmallVec<u8, _>` implements the `std::io::Write` trait.
-//! This feature is not compatible with `#![no_std]` programs.
 //!
 //! ### `extract_if`
 //!
@@ -801,7 +805,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// the elements `[0, at)` with its previous capacity unchanged.
     ///
     /// - If you want to take ownership of the entire contents and capacity of
-    ///   the vector, see [`mem::take`] or [`mem::replace`].
+    ///   the vector, see [`core::mem::take`] or [`core::mem::replace`].
     /// - If you don't need the returned vector at all, see [`SmallVec::truncate`].
     /// - If you want to take ownership of an arbitrary subslice, or you don't
     ///   necessarily want to store the removed items in a vector, see [`SmallVec::drain`].
