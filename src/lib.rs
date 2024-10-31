@@ -965,20 +965,6 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    unsafe fn push_heap(&mut self, value: T) {
-        // SAFETY: see above
-        debug_assert!(self.spilled());
-        let len = self.len();
-        let cap = self.raw.heap.1;
-        if len == cap {
-            self.reserve(1);
-        }
-        let ptr = self.raw.heap.0;
-        ptr.as_ptr().add(len).write(value);
-        self.set_len(len + 1)
-    }
-
-    #[inline]
     pub fn pop(&mut self) -> Option<T> {
         if self.is_empty() {
             None
@@ -1502,39 +1488,33 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     fn extend_impl<I: Iterator<Item = T>>(&mut self, iter: I) {
         let mut iter = iter.fuse();
-        let len = self.len();
         let (lower_bound, _) = iter.size_hint();
         self.reserve(lower_bound);
-        let capacity = self.capacity();
-        unsafe {
-            let ptr = self.as_mut_ptr();
-            // SAFETY: ptr is valid for `capacity - len` writes
-            let count = extend_batch(ptr, capacity - len, len, &mut iter);
-            self.set_len(len + count);
-        }
-
-        if let Some(item) = iter.next() {
-            self.push(item);
-        } else {
-            return;
-        }
-
-        // either we ran out of items, in which case this loop doesn't get executed. or we still
-        // have items to push, and in that case we must be on the heap, since we filled up the
-        // capacity and then pushed one item
+        let mut len = self.len();
+        let mut capacity = self.capacity();
+        let mut ptr = self.as_mut_ptr();
         unsafe {
             loop {
-                if let Some(item) = iter.next() {
-                    self.push_heap(item);
-                } else {
-                    break;
-                }
-                let len = self.len();
-                let (ptr, capacity) = self.raw.heap;
-                let ptr = ptr.as_ptr();
                 // SAFETY: ptr is valid for `capacity - len` writes
-                let count = extend_batch(ptr, capacity - len, len, &mut iter);
-                self.set_len(len + count);
+                ptr = ptr.add(len);
+                let mut guard = DropGuard { ptr, len: 0 };
+                iter.by_ref().take(capacity - len).for_each(|item| {
+                    ptr.add(guard.len).write(item);
+                    guard.len += 1;
+                });
+                len += guard.len;
+                core::mem::forget(guard);
+                self.set_len(len);
+                // At this point we either consumed all capacity or the iterator is exhausted (fused)
+                if let Some(item) = iter.next() {
+                    self.push(item);
+                } else {
+                    return;
+                }
+                // SAFETY: The push above would have spilled it
+                let (heap_ptr, heap_capacity) = self.raw.heap;
+                ptr = heap_ptr.as_ptr();
+                capacity = heap_capacity;
             }
         }
     }
@@ -1700,30 +1680,6 @@ unsafe fn insert_many_batch<T, I: Iterator<Item = T>>(
     if count < lower_bound {
         copy(ptr_ith.add(lower_bound), ptr_ith.add(count), len - index);
     }
-    count
-}
-
-// `ptr..ptr + remaining_capacity` must be valid for writes
-#[inline]
-unsafe fn extend_batch<T, I: Iterator<Item = T>>(
-    ptr: *mut T,
-    remaining_capacity: usize,
-    len: usize,
-    iter: &mut I,
-) -> usize {
-    let ptr_end = ptr.add(len);
-    let mut guard = DropGuard {
-        ptr: ptr_end,
-        len: 0,
-    };
-    iter.take(remaining_capacity)
-        .enumerate()
-        .for_each(|(i, item)| {
-            ptr_end.add(i).write(item);
-            guard.len = i + 1;
-        });
-    let count = guard.len;
-    core::mem::forget(guard);
     count
 }
 
