@@ -1136,7 +1136,9 @@ fn collect_from_iter() {
 
     impl<I: Iterator> Iterator for IterNoHint<I> {
         type Item = I::Item;
-        fn next(&mut self) -> Option<Self::Item> { self.0.next() }
+        fn next(&mut self) -> Option<Self::Item> {
+            self.0.next()
+        }
 
         // no implementation of size_hint means it returns (0, None) - which forces from_iter to
         // grow the allocated space iteratively.
@@ -1147,4 +1149,31 @@ fn collect_from_iter() {
     let iter = IterNoHint(std::iter::repeat(1u8).take(1_000_000));
 
     let _y: SmallVec<u8, 1> = SmallVec::from_iter(iter);
+}
+
+#[test]
+fn test_spare_capacity_mut() {
+    let mut v: SmallVec<u8, 2> = SmallVec::new();
+    assert!(!v.spilled());
+    let spare = v.spare_capacity_mut();
+    assert_eq!(spare.len(), 2);
+    assert_eq!(spare.as_ptr().cast::<u8>(), v.as_ptr());
+
+    v.push(1);
+    assert!(!v.spilled());
+    let spare = v.spare_capacity_mut();
+    assert_eq!(spare.len(), 1);
+    assert_eq!(spare.as_ptr().cast::<u8>(), unsafe { v.as_ptr().add(1) });
+
+    v.push(2);
+    assert!(!v.spilled());
+    let spare = v.spare_capacity_mut();
+    assert_eq!(spare.len(), 0);
+    assert_eq!(spare.as_ptr().cast::<u8>(), unsafe { v.as_ptr().add(2) });
+
+    v.push(3);
+    assert!(v.spilled());
+    let spare = v.spare_capacity_mut();
+    assert!(spare.len() >= 1);
+    assert_eq!(spare.as_ptr().cast::<u8>(), unsafe { v.as_ptr().add(3) });
 }

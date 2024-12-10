@@ -1413,6 +1413,22 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 
+    /// Returns the remaining spare capacity of the vector as a slice of
+    /// `MaybeUninit<T>`.
+    ///
+    /// The returned slice can be used to fill the vector with data (e.g. by
+    /// reading from a file) before marking the data as initialized using the
+    /// [`set_len`](Self::set_len) method.
+    #[inline]
+    pub fn spare_capacity_mut(&mut self) -> &mut [MaybeUninit<T>] {
+        unsafe {
+            core::slice::from_raw_parts_mut(
+                self.as_mut_ptr().add(self.len()) as *mut MaybeUninit<T>,
+                self.capacity() - self.len(),
+            )
+        }
+    }
+
     /// Creates a `SmallVec` directly from the raw components of another `SmallVec`.
     ///
     /// # Safety
