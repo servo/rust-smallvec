@@ -500,6 +500,11 @@ pub struct IntoIter<T, const N: usize> {
     _marker: PhantomData<T>,
 }
 
+// SAFETY: IntoIter has unique ownership of its contents.  Sending (or sharing) an `IntoIter<T, N>`
+// is equivalent to sending (or sharing) a `SmallVec<T, N>`.
+unsafe impl<T, const N: usize> Send for IntoIter<T, N> where T: Send {}
+unsafe impl<T, const N: usize> Sync for IntoIter<T, N> where T: Sync {}
+
 impl<T, const N: usize> IntoIter<T, N> {
     #[inline]
     const fn is_zst() -> bool {
