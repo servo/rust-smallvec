@@ -27,6 +27,7 @@ debugger_visualizer = []
 
 [dependencies]
 serde = { version = "1", optional = true, default-features = false }
+malloc_size_of = { version = "0.1", optional = true, default-features = false }
 arbitrary = { version = "1", optional = true }
 
 [dev_dependencies]
