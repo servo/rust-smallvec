@@ -19,6 +19,7 @@ may_dangle = []
 extract_if = []
 
 [dependencies]
+bytes = { version = "1", optional = true, default-features = false }
 serde = { version = "1", optional = true, default-features = false }
 malloc_size_of = { version = "0.1.1", optional = true, default-features = false }
 
