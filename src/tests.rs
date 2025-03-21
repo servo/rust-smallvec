@@ -861,7 +861,7 @@ fn test_from_vec() {
 
 #[test]
 fn test_retain() {
-    // Test inline data storate
+    // Test inline data storage
     let mut sv: SmallVec<i32, 5> = SmallVec::from_slice(&[1, 2, 3, 3, 4]);
     sv.retain(|&mut i| i != 3);
     assert_eq!(sv.pop(), Some(4));
