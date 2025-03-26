@@ -835,7 +835,7 @@ fn test_write() {
 #[cfg(feature = "serde")]
 #[test]
 fn test_serde() {
-    use bincode::{config, deserialize};
+    use bincode1::{config, deserialize};
     let mut small_vec: SmallVec<[i32; 2]> = SmallVec::new();
     small_vec.push(1);
     let encoded = config().limit(100).serialize(&small_vec).unwrap();
