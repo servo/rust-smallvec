@@ -20,6 +20,7 @@ specialization = []
 may_dangle = []
 drain_filter = []
 drain_keep_rest = ["drain_filter"]
+impl_bincode = ["bincode", "unty"]
 
 # UNSTABLE FEATURES (requires Rust nightly)
 # Enable to use the #[debugger_visualizer] attribute.
@@ -29,6 +30,8 @@ debugger_visualizer = []
 serde = { version = "1", optional = true, default-features = false }
 malloc_size_of = { version = "0.1", optional = true, default-features = false }
 arbitrary = { version = "1", optional = true }
+bincode = { version = "2", optional = true, default-features = false }
+unty = { version = "0.0.4", optional = true, default-features = false }
 
 [dev-dependencies]
 bincode1 = { package = "bincode", version = "1.0.1" }

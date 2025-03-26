@@ -2498,3 +2498,106 @@ impl<T> Clone for ConstNonNull<T> {
 }
 
 impl<T> Copy for ConstNonNull<T> {}
+
+#[cfg(feature = "impl_bincode")]
+use bincode::{
+    de::{BorrowDecoder, Decode, Decoder, read::Reader},
+    enc::{Encode, Encoder, write::Writer},
+    error::{DecodeError, EncodeError},
+    BorrowDecode,
+};
+
+#[cfg(feature = "impl_bincode")]
+impl<A, Context> Decode<Context> for SmallVec<A>
+where
+    A: Array,
+    A::Item: Decode<Context>,
+{
+    fn decode<D: Decoder<Context = Context>>(decoder: &mut D) -> Result<Self, DecodeError> {
+        use core::convert::TryInto;
+        let len = u64::decode(decoder)?;
+        let len = len.try_into().map_err(|_| DecodeError::OutsideUsizeRange(len))?;
+        decoder.claim_container_read::<A::Item>(len)?;
+
+        let mut vec = SmallVec::with_capacity(len);
+        if unty::type_equal::<A::Item, u8>() {
+            // Initialize the smallvec's buffer.  Note that we need to do this through
+            // the raw pointer as we cannot name the type [u8; N] even though A::Item is u8.
+            let ptr = vec.as_mut_ptr();
+            // SAFETY: A::Item is u8 and the smallvec has been allocated with enough capacity
+            unsafe {
+                core::ptr::write_bytes(ptr, 0, len);
+                vec.set_len(len);
+            }
+            // Read the data into the smallvec's buffer.
+            let slice = vec.as_mut_slice();
+            // SAFETY: A::Item is u8
+            let slice = unsafe { core::mem::transmute::<&mut [A::Item], &mut [u8]>(slice) };
+            decoder.reader().read(slice)?;
+        } else {
+            for _ in 0..len {
+                decoder.unclaim_bytes_read(core::mem::size_of::<A::Item>());
+                vec.push(A::Item::decode(decoder)?);
+            }
+        }
+        Ok(vec)
+    }
+}
+
+#[cfg(feature = "impl_bincode")]
+impl<'de, A, Context> BorrowDecode<'de, Context> for SmallVec<A>
+where
+    A: Array,
+    A::Item: BorrowDecode<'de, Context>,
+{
+    fn borrow_decode<D: BorrowDecoder<'de, Context = Context>>(decoder: &mut D) -> Result<Self, DecodeError> {
+        use core::convert::TryInto;
+        let len = u64::decode(decoder)?;
+        let len = len.try_into().map_err(|_| DecodeError::OutsideUsizeRange(len))?;
+        decoder.claim_container_read::<A::Item>(len)?;
+
+        let mut vec = SmallVec::with_capacity(len);
+        if unty::type_equal::<A::Item, u8>() {
+            // Initialize the smallvec's buffer.  Note that we need to do this through
+            // the raw pointer as we cannot name the type [u8; N] even though A::Item is u8.
+            let ptr = vec.as_mut_ptr();
+            // SAFETY: A::Item is u8 and the smallvec has been allocated with enough capacity
+            unsafe {
+                core::ptr::write_bytes(ptr, 0, len);
+                vec.set_len(len);
+            }
+            // Read the data into the smallvec's buffer.
+            let slice = vec.as_mut_slice();
+            // SAFETY: A::Item is u8
+            let slice = unsafe { core::mem::transmute::<&mut [A::Item], &mut [u8]>(slice) };
+            decoder.reader().read(slice)?;
+        } else {
+            for _ in 0..len {
+                decoder.unclaim_bytes_read(core::mem::size_of::<A::Item>());
+                vec.push(A::Item::borrow_decode(decoder)?);
+            }
+        }
+        Ok(vec)
+    }
+}
+
+#[cfg(feature = "impl_bincode")]
+impl<A> Encode for SmallVec<A>
+where
+    A: Array,
+    A::Item: Encode,
+{
+    fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), EncodeError> {
+        (self.len() as u64).encode(encoder)?;
+        if unty::type_equal::<A::Item, u8>() {
+            // Safety: A::Item is u8
+            let slice: &[u8] = unsafe { core::mem::transmute(self.as_slice()) };
+            encoder.writer().write(slice)?;
+        } else {
+            for item in self.iter() {
+                item.encode(encoder)?;
+            }
+        }
+        Ok(())
+    }
+}
