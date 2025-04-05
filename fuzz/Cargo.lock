@@ -159,7 +159,7 @@ checksum = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 
 [[package]]
 name = "smallvec"
-version = "1.14.0"
+version = "1.15.0"
 
 [[package]]
 name = "smallvec-fuzz"
