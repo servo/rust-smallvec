@@ -673,11 +673,27 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    pub const fn from_buf(buf: [T; N]) -> Self {
-        // SAFETY: all the members in 0..N are initialized
+    pub const fn from_buf<const S: usize>(elements: [T; S]) -> Self {
+        assert!(S <= N); // Free check since the values are known at compile time
+
+        // Althought we create a new buffer, since S and N are known at compile time,
+        // even with `-C opt-level=1`, it gets optimized as best as it could be. (Checked with <godbolt.org>)
+        let mut buf: MaybeUninit<[T; N]> = MaybeUninit::uninit();
+
+        // SAFETY: buf and elements do not overlap, are aligned and have space
+        // for at least S elements since S <= N.
+        // We will drop the elements only once since we do forget(elements).
+        unsafe {
+            copy_nonoverlapping(elements.as_ptr(), buf.as_mut_ptr() as *mut T, S);
+        }
+
+        // `elements` have been moved into buf and will be droped by SmallVec
+        core::mem::forget(elements);
+
+        // SAFETY: all the members in 0..S are initialized
         Self {
-            len: TaggedLen::new(N, false, Self::is_zst()),
-            raw: RawSmallVec::new_inline(MaybeUninit::new(buf)),
+            len: TaggedLen::new(S, false, Self::is_zst()),
+            raw: RawSmallVec::new_inline(buf),
             _marker: PhantomData,
         }
     }
