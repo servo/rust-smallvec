@@ -2,7 +2,7 @@
 name = "smallvec"
 version = "2.0.0-alpha.11"
 edition = "2021"
-rust-version = "1.57"
+rust-version = "1.83"
 authors = ["The Servo Project Developers"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/servo/rust-smallvec"
