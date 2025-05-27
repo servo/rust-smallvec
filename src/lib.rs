@@ -971,7 +971,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// # use smallvec::SmallVec;
     /// let mut items: SmallVec<i32, 16> = SmallVec::from_slice(&[0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 2, 1, 2]);
     /// let ones = items.extract_if(7.., |x| *x == 1).collect::<SmallVec<i32, 16>>();
-    /// assert_eq!(items, SmallVec<i32, 16>::from_slice(&[0, 0, 0, 0, 0, 0, 0, 2, 2, 2]));
+    /// assert_eq!(items, SmallVec::<i32, 16>::from_slice(&[0, 0, 0, 0, 0, 0, 0, 2, 2, 2]));
     /// assert_eq!(ones.len(), 3);
     /// ```
     pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> ExtractIf<'_, T, N, F>
