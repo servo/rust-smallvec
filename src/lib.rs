@@ -403,6 +403,8 @@ where
     vec: &'a mut SmallVec<T, N>,
     /// The index of the item that will be inspected by the next call to `next`.
     idx: usize,
+    /// Elements at and beyond this point will be retained. Must be equal or smaller than `old_len`.
+    end: usize,
     /// The number of items that have been drained (removed) thus far.
     del: usize,
     /// The original length of `vec` prior to draining.
@@ -433,7 +435,7 @@ where
 
     fn next(&mut self) -> Option<T> {
         unsafe {
-            while self.idx < self.old_len {
+            while self.idx < self.end {
                 let i = self.idx;
                 let v = core::slice::from_raw_parts_mut(self.vec.as_mut_ptr(), self.old_len);
                 let drained = (self.pred)(&mut v[i]);
@@ -456,7 +458,7 @@ where
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.old_len - self.idx))
+        (0, Some(self.end - self.idx))
     }
 }
 
@@ -903,11 +905,14 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[cfg(feature = "extract_if")]
-    /// Creates an iterator which uses a closure to determine if an element should be removed.
+    /// Creates an iterator which uses a closure to determine if element in the range should be removed.
     ///
-    /// If the closure returns true, the element is removed and yielded.
+    /// If the closure returns true, then the element is removed and yielded.
     /// If the closure returns false, the element will remain in the vector and will not be yielded
     /// by the iterator.
+    ///
+    /// Only elements that fall in the provided range are considered for extraction, but any elements
+    /// after the range will still have to be moved if any element has been extracted.
     ///
     /// If the returned `ExtractIf` is not exhausted, e.g. because it is dropped without iterating
     /// or the iteration short-circuits, then the remaining elements will be retained.
@@ -918,10 +923,12 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// Using this method is equivalent to the following code:
     /// ```
     /// # use smallvec::SmallVec;
+    /// # use std::cmp::min;
     /// # let some_predicate = |x: &mut i32| { *x == 2 || *x == 3 || *x == 6 };
     /// # let mut vec: SmallVec<i32, 8> = SmallVec::from_slice(&[1i32, 2, 3, 4, 5, 6]);
+    /// # let range = 1..4;
     /// let mut i = 0;
-    /// while i < vec.len() {
+    /// while i < min(vec.len(), range.end) {
     ///     if some_predicate(&mut vec[i]) {
     ///         let val = vec.remove(i);
     ///         // your code here
@@ -936,8 +943,12 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// But `extract_if` is easier to use. `extract_if` is also more efficient,
     /// because it can backshift the elements of the array in bulk.
     ///
-    /// Note that `extract_if` also lets you mutate every element in the filter closure,
-    /// regardless of whether you choose to keep or remove it.
+    /// Note that `extract_if` also lets you mutate the elements passed to the filter closure,
+    /// regardless of whether you choose to keep or remove them.
+    ///
+    /// # Panics
+    ///
+    /// If `range` is out of bounds.
     ///
     /// # Examples
     ///
@@ -947,17 +958,58 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// # use smallvec::SmallVec;
     /// let mut numbers: SmallVec<i32, 16> = SmallVec::from_slice(&[1i32, 2, 3, 4, 5, 6, 8, 9, 11, 13, 14, 15]);
     ///
-    /// let evens = numbers.extract_if(|x| *x % 2 == 0).collect::<SmallVec<i32, 16>>();
+    /// let evens = numbers.extract_if(.., |x| *x % 2 == 0).collect::<SmallVec<i32, 16>>();
     /// let odds = numbers;
     ///
     /// assert_eq!(evens, SmallVec::<i32, 16>::from_slice(&[2i32, 4, 6, 8, 14]));
     /// assert_eq!(odds, SmallVec::<i32, 16>::from_slice(&[1i32, 3, 5, 9, 11, 13, 15]));
     /// ```
-    pub fn extract_if<F>(&mut self, filter: F) -> ExtractIf<'_, T, N, F>
+    ///
+    /// Using the range argument to only process a part of the vector:
+    ///
+    /// ```
+    /// # use smallvec::SmallVec;
+    /// let mut items: SmallVec<i32, 16> = SmallVec::from_slice(&[0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 2, 1, 2]);
+    /// let ones = items.extract_if(7.., |x| *x == 1).collect::<SmallVec<i32, 16>>();
+    /// assert_eq!(items, SmallVec<i32, 16>::from_slice(&[0, 0, 0, 0, 0, 0, 0, 2, 2, 2]));
+    /// assert_eq!(ones.len(), 3);
+    /// ```
+    pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> ExtractIf<'_, T, N, F>
     where
         F: FnMut(&mut T) -> bool,
+        R: core::ops::RangeBounds<usize>,
     {
         let old_len = self.len();
+        // This line can be used instead once `core::slice::range` is stable.
+        //let core::ops::Range { start, end } = core::slice::range(range, ..old_len);
+        let (start, end) = {
+            let len = old_len;
+
+            let start = match range.start_bound() {
+                core::ops::Bound::Included(&start) => start,
+                core::ops::Bound::Excluded(start) => {
+                    start.checked_add(1).unwrap_or_else(|| panic!("attempted to index slice from after maximum usize"))
+                }
+                core::ops::Bound::Unbounded => 0,
+            };
+
+            let end = match range.end_bound() {
+                core::ops::Bound::Included(end) => {
+                    end.checked_add(1).unwrap_or_else(|| panic!("attempted to index slice up to maximum usize"))
+                }
+                core::ops::Bound::Excluded(&end) => end,
+                core::ops::Bound::Unbounded => len,
+            };
+
+            if start > end {
+                panic!("slice index starts at {start} but ends at {end}");
+            }
+            if end > len {
+                panic!("range end index {end} out of range for slice of length {len}");
+            }
+
+            (start, end)
+        };
 
         // Guard against us getting leaked (leak amplification)
         unsafe {
@@ -966,7 +1018,8 @@ impl<T, const N: usize> SmallVec<T, N> {
 
         ExtractIf {
             vec: self,
-            idx: 0,
+            idx: start,
+            end,
             del: 0,
             old_len,
             pred: filter,
