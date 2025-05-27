@@ -121,9 +121,7 @@ impl core::fmt::Display for CollectionAllocErr {
     }
 }
 
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl std::error::Error for CollectionAllocErr {}
+impl core::error::Error for CollectionAllocErr {}
 
 /// Either a stack array with `length <= N` or a heap array
 /// whose pointer and capacity are stored here.
