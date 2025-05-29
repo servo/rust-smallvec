@@ -279,25 +279,6 @@ fn gen_from_elem<V: Vector<u64>>(n: usize, b: &mut Bencher) {
 }
 
 #[bench]
-fn bench_insert_many(b: &mut Bencher) {
-    #[inline(never)]
-    fn insert_many_noinline<I: IntoIterator<Item = u64>>(
-        vec: &mut SmallVec<u64, VEC_SIZE>,
-        index: usize,
-        iterable: I,
-    ) {
-        vec.insert_many(index, iterable)
-    }
-
-    b.iter(|| {
-        let mut vec = SmallVec::<u64, VEC_SIZE>::new();
-        insert_many_noinline(&mut vec, 0, 0..SPILLED_SIZE as _);
-        insert_many_noinline(&mut vec, 0, 0..SPILLED_SIZE as _);
-        vec
-    });
-}
-
-#[bench]
 fn bench_insert_from_slice(b: &mut Bencher) {
     let v: Vec<u64> = (0..SPILLED_SIZE as _).collect();
     b.iter(|| {

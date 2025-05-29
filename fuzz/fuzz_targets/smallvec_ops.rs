@@ -94,7 +94,7 @@ fn do_test<const N: usize>(data: &[u8]) -> SmallVec<u8, N> {
                 let insert_pos = next_usize!(bytes) % (v.len() + 1);
                 let how_many = next_usize!(bytes);
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    v.insert_many(insert_pos, (0..how_many).map(|_| bytes.next().unwrap()));
+                    v.splice(insert_pos..insert_pos, (0..how_many).map(|_| bytes.next().unwrap()));
                 }));
 
                 if result.is_err() {
@@ -107,7 +107,7 @@ fn do_test<const N: usize>(data: &[u8]) -> SmallVec<u8, N> {
 
             19 => {
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    v.retain(|e| {
+                    v.retain_mut(|e| {
                         let alt_e = bytes.next().unwrap();
                         let retain = *e >= alt_e;
                         *e = e.wrapping_add(alt_e);

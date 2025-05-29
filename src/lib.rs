@@ -176,7 +176,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     }
 
     #[inline]
-    fn as_mut_ptr_inline(&mut self) -> *mut T {
+    const fn as_mut_ptr_inline(&mut self) -> *mut T {
         // SAFETY: See above.
         (unsafe { addr_of_mut!(self.inline) }) as *mut T
     }
@@ -193,7 +193,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     ///
     /// The vector must be on the heap
     #[inline]
-    unsafe fn as_mut_ptr_heap(&mut self) -> *mut T {
+    const unsafe fn as_mut_ptr_heap(&mut self) -> *mut T {
         self.heap.0.as_ptr()
     }
 
@@ -364,29 +364,123 @@ impl<T, const N: usize> core::iter::FusedIterator for Drain<'_, T, N> {}
 
 impl<'a, T: 'a, const N: usize> Drop for Drain<'a, T, N> {
     fn drop(&mut self) {
-        if core::mem::needs_drop::<T>() {
-            self.for_each(drop);
-        }
+        /// Moves back the un-`Drain`ed elements to restore the original `Vec`.
+        struct DropGuard<'r, 'a, T, const N: usize>(&'r mut Drain<'a, T, N>);
 
-        if self.tail_len > 0 {
-            // SAFETY: we're copying initialized members back to the end of the vector
-            // then updating its length
-            unsafe {
-                let source_vec = self.vec.as_mut();
-
-                let start = source_vec.len();
-                let tail = self.tail_start;
-                if tail != start {
-                    // as_mut_ptr creates a &mut, invalidating other pointers.
-                    // This pattern avoids calling it with a pointer already present.
-                    let ptr = source_vec.as_mut_ptr();
-                    let src = ptr.add(tail);
-                    let dst = ptr.add(start);
-                    copy(src, dst, self.tail_len);
+        impl<'r, 'a, T, const N: usize> Drop for DropGuard<'r, 'a, T, N> {
+            fn drop(&mut self) {
+                if self.0.tail_len > 0 {
+                    unsafe {
+                        let source_vec = self.0.vec.as_mut();
+                        // memmove back untouched tail, update to new length
+                        let start = source_vec.len();
+                        let tail = self.0.tail_start;
+                        if tail != start {
+                            let ptr = source_vec.as_mut_ptr();
+                            let src = ptr.add(tail);
+                            let dst = ptr.add(start);
+                            core::ptr::copy(src, dst, self.0.tail_len);
+                        }
+                        source_vec.set_len(start + self.0.tail_len);
+                    }
                 }
-                source_vec.set_len(start + self.tail_len);
             }
         }
+
+        let iter = core::mem::take(&mut self.iter);
+        let drop_len = iter.len();
+
+        let mut vec = self.vec;
+
+        if SmallVec::<T, N>::is_zst() {
+            // ZSTs have no identity, so we don't need to move them around, we only need to drop the correct amount.
+            // this can be achieved by manipulating the Vec length instead of moving values out from `iter`.
+            unsafe {
+                let vec = vec.as_mut();
+                let old_len = vec.len();
+                vec.set_len(old_len + drop_len + self.tail_len);
+                vec.truncate(old_len + self.tail_len);
+            }
+
+            return;
+        }
+
+        // ensure elements are moved back into their appropriate places, even when drop_in_place panics
+        let _guard = DropGuard(self);
+
+        if drop_len == 0 {
+            return;
+        }
+
+        // as_slice() must only be called when iter.len() is > 0 because
+        // it also gets touched by vec::Splice which may turn it into a dangling pointer
+        // which would make it and the vec pointer point to different allocations which would
+        // lead to invalid pointer arithmetic below.
+        let drop_ptr = iter.as_slice().as_ptr();
+
+        unsafe {
+            // drop_ptr comes from a slice::Iter which only gives us a &[T] but for drop_in_place
+            // a pointer with mutable provenance is necessary. Therefore we must reconstruct
+            // it from the original vec but also avoid creating a &mut to the front since that could
+            // invalidate raw pointers to it which some unsafe code might rely on.
+            let vec_ptr = vec.as_mut().as_mut_ptr();
+            // May be replaced with the line below later, once this crate's MSRV is >= 1.87.
+            //let drop_offset = drop_ptr.offset_from_unsigned(vec_ptr);
+            let drop_offset = drop_ptr.offset_from(vec_ptr) as usize;
+            let to_drop = core::ptr::slice_from_raw_parts_mut(vec_ptr.add(drop_offset), drop_len);
+            core::ptr::drop_in_place(to_drop);
+        }
+    }
+}
+
+impl<T, const N: usize> Drain<'_, T, N> {
+    #[must_use]
+    pub fn as_slice(&self) -> &[T] {
+        self.iter.as_slice()
+    }
+
+    /// The range from `self.vec.len` to `self.tail_start` contains elements
+    /// that have been moved out.
+    /// Fill that range as much as possible with new elements from the `replace_with` iterator.
+    /// Returns `true` if we filled the entire range. (`replace_with.next()` didn’t return `None`.)
+    unsafe fn fill<I: Iterator<Item = T>>(&mut self, replace_with: &mut I) -> bool {
+        let vec = unsafe { self.vec.as_mut() };
+        let range_start = vec.len();
+        let range_end = self.tail_start;
+        let range_slice = unsafe {
+            core::slice::from_raw_parts_mut(vec.as_mut_ptr().add(range_start), range_end - range_start)
+        };
+
+        for place in range_slice {
+            if let Some(new_item) = replace_with.next() {
+                unsafe { core::ptr::write(place, new_item) };
+                vec.set_len(vec.len() + 1);
+            } else {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Makes room for inserting more elements before the tail.
+    #[track_caller]
+    unsafe fn move_tail(&mut self, additional: usize) {
+        let vec = unsafe { self.vec.as_mut() };
+        let len = self.tail_start + self.tail_len;
+
+        // Test
+        let old_len = vec.len();
+        vec.set_len(len);
+        vec.reserve(additional);
+        vec.set_len(old_len);
+
+        let new_tail_start = self.tail_start + additional;
+        unsafe {
+            let src = vec.as_ptr().add(self.tail_start);
+            let dst = vec.as_mut_ptr().add(new_tail_start);
+            core::ptr::copy(src, dst, self.tail_len);
+        }
+        self.tail_start = new_tail_start;
     }
 }
 
@@ -487,6 +581,88 @@ where
     }
 }
 
+pub struct Splice<'a, I: Iterator + 'a, const N: usize> {
+    drain: Drain<'a, I::Item, N>,
+    replace_with: I,
+}
+
+impl<'a, I, const N: usize> core::fmt::Debug for Splice<'a, I, N>
+where
+    I: Debug + Iterator + 'a,
+    <I as Iterator>::Item: Debug,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_tuple("Splice")
+            .field(&self.drain)
+            .finish()
+    }
+}
+
+impl<I: Iterator, const N: usize> Iterator for Splice<'_, I, N> {
+    type Item = I::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.drain.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.drain.size_hint()
+    }
+}
+
+impl<I: Iterator, const N: usize> DoubleEndedIterator for Splice<'_, I, N> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.drain.next_back()
+    }
+}
+
+impl<I: Iterator, const N: usize> ExactSizeIterator for Splice<'_, I, N> {}
+
+impl<I: Iterator, const N: usize> Drop for Splice<'_, I, N> {
+    fn drop(&mut self) {
+        self.drain.by_ref().for_each(drop);
+        // At this point draining is done and the only remaining tasks are splicing
+        // and moving things into the final place.
+        // Which means we can replace the slice::Iter with pointers that won't point to deallocated
+        // memory, so that Drain::drop is still allowed to call iter.len(), otherwise it would break
+        // the ptr.sub_ptr contract.
+        self.drain.iter = (&[]).iter();
+
+        unsafe {
+            if self.drain.tail_len == 0 {
+                self.drain.vec.as_mut().extend(self.replace_with.by_ref());
+                return;
+            }
+
+            // First fill the range left by drain().
+            if !self.drain.fill(&mut self.replace_with) {
+                return;
+            }
+
+            // There may be more elements. Use the lower bound as an estimate.
+            // FIXME: Is the upper bound a better guess? Or something else?
+            let (lower_bound, _upper_bound) = self.replace_with.size_hint();
+            if lower_bound > 0 {
+                self.drain.move_tail(lower_bound);
+                if !self.drain.fill(&mut self.replace_with) {
+                    return;
+                }
+            }
+
+            // Collect any remaining elements.
+            let mut collected = self.replace_with.by_ref().collect::<SmallVec<I::Item, N>>().into_iter();
+            // Now we have an exact count.
+            if collected.len() > 0 {
+                self.drain.move_tail(collected.len());
+                let filled = self.drain.fill(&mut collected);
+                debug_assert!(filled);
+                debug_assert_eq!(collected.len(), 0);
+            }
+        }
+        // Let `Drain::drop` move the tail back if necessary and restore `vec.len`.
+    }
+}
+
 /// An iterator that consumes a `SmallVec` and yields its items by value.
 ///
 /// Returned from [`SmallVec::into_iter`][1].
@@ -527,7 +703,7 @@ impl<T, const N: usize> IntoIter<T, N> {
     }
 
     #[inline]
-    fn as_mut_ptr(&mut self) -> *mut T {
+    const fn as_mut_ptr(&mut self) -> *mut T {
         let on_heap = self.end.on_heap(Self::is_zst());
         if on_heap {
             // SAFETY: vector is on the heap
@@ -538,7 +714,7 @@ impl<T, const N: usize> IntoIter<T, N> {
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[T] {
+    pub const fn as_slice(&self) -> &[T] {
         // SAFETY: The members in self.begin..self.end.value() are all initialized
         // So the pointer arithmetic is valid, and so is the construction of the slice
         unsafe {
@@ -551,7 +727,7 @@ impl<T, const N: usize> IntoIter<T, N> {
     }
 
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [T] {
+    pub const fn as_mut_slice(&mut self) -> &mut [T] {
         // SAFETY: see above
         unsafe {
             let ptr = self.as_mut_ptr();
@@ -612,11 +788,6 @@ impl<T, const N: usize> core::iter::FusedIterator for IntoIter<T, N> {}
 
 impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
-    const fn is_zst() -> bool {
-        size_of::<T>() == 0
-    }
-
-    #[inline]
     pub const fn new() -> SmallVec<T, N> {
         Self {
             len: TaggedLen::new(0, false, Self::is_zst()),
@@ -635,46 +806,8 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    pub fn from_vec(vec: Vec<T>) -> Self {
-        if vec.capacity() == 0 {
-            return Self::new();
-        }
-
-        if Self::is_zst() {
-            // "Move" elements to stack buffer. They're ZST so we don't actually have to do
-            // anything. Just make sure they're not dropped.
-            // We don't wrap the vector in ManuallyDrop so that when it's dropped, the memory is
-            // deallocated, if it needs to be.
-            let mut vec = vec;
-            let len = vec.len();
-
-            // SAFETY: `0` is less than the vector's capacity.
-            // old_len..new_len is an empty range. So there are no uninitialized elements
-            unsafe { vec.set_len(0) };
-            Self {
-                len: TaggedLen::new(len, false, Self::is_zst()),
-                raw: RawSmallVec::new(),
-                _marker: PhantomData,
-            }
-        } else {
-            let mut vec = ManuallyDrop::new(vec);
-            let len = vec.len();
-            let cap = vec.capacity();
-            // SAFETY: vec.capacity is not `0` (checked above), so the pointer
-            // can not dangle and thus specifically cannot be null.
-            let ptr = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
-
-            Self {
-                len: TaggedLen::new(len, true, Self::is_zst()),
-                raw: RawSmallVec::new_heap(ptr, cap),
-                _marker: PhantomData,
-            }
-        }
-    }
-
-    #[inline]
     pub const fn from_buf<const S: usize>(elements: [T; S]) -> Self {
-        assert!(S <= N); // Free check since the values are known at compile time
+        const { assert!(S <= N); }
 
         // Althought we create a new buffer, since S and N are known at compile time,
         // even with `-C opt-level=1`, it gets optimized as best as it could be. (Checked with <godbolt.org>)
@@ -751,6 +884,51 @@ impl<T, const N: usize> SmallVec<T, N> {
             _marker: PhantomData,
         }
     }
+}
+
+impl<T, const N: usize> SmallVec<T, N> {
+    #[inline]
+    const fn is_zst() -> bool {
+        size_of::<T>() == 0
+    }
+
+    #[inline]
+    pub fn from_vec(vec: Vec<T>) -> Self {
+        if vec.capacity() == 0 {
+            return Self::new();
+        }
+
+        if Self::is_zst() {
+            // "Move" elements to stack buffer. They're ZST so we don't actually have to do
+            // anything. Just make sure they're not dropped.
+            // We don't wrap the vector in ManuallyDrop so that when it's dropped, the memory is
+            // deallocated, if it needs to be.
+            let mut vec = vec;
+            let len = vec.len();
+
+            // SAFETY: `0` is less than the vector's capacity.
+            // old_len..new_len is an empty range. So there are no uninitialized elements
+            unsafe { vec.set_len(0) };
+            Self {
+                len: TaggedLen::new(len, false, Self::is_zst()),
+                raw: RawSmallVec::new(),
+                _marker: PhantomData,
+            }
+        } else {
+            let mut vec = ManuallyDrop::new(vec);
+            let len = vec.len();
+            let cap = vec.capacity();
+            // SAFETY: vec.capacity is not `0` (checked above), so the pointer
+            // can not dangle and thus specifically cannot be null.
+            let ptr = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
+
+            Self {
+                len: TaggedLen::new(len, true, Self::is_zst()),
+                raw: RawSmallVec::new_heap(ptr, cap),
+                _marker: PhantomData,
+            }
+        }
+    }
 
     /// Sets the tag to be on the heap
     ///
@@ -804,7 +982,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[must_use]
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
@@ -900,6 +1078,7 @@ impl<T, const N: usize> SmallVec<T, N> {
                 iter: range_slice.iter(),
                 // Since self is a &mut, passing it to a function would invalidate the slice iterator.
                 vec: core::ptr::NonNull::new_unchecked(self as *mut _),
+                //vec: core::ptr::NonNull::from(self),
             }
         }
     }
@@ -1026,6 +1205,14 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 
+    pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter, N>
+    where
+        R: core::ops::RangeBounds<usize>,
+        I: IntoIterator<Item = T>,
+    {
+        Splice { drain: self.drain(range), replace_with: replace_with.into_iter() }
+    }
+
     #[inline]
     pub fn push(&mut self, value: T) {
         let len = self.len();
@@ -1053,6 +1240,12 @@ impl<T, const N: usize> SmallVec<T, N> {
             let value = unsafe { self.as_mut_ptr().add(len).read() };
             Some(value)
         }
+    }
+
+    #[inline]
+    pub fn pop_if(&mut self, predicate: impl FnOnce(&mut T) -> bool) -> Option<T> {
+        let last = self.last_mut()?;
+        if predicate(last) { self.pop() } else { None }
     }
 
     #[inline]
@@ -1201,6 +1394,35 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
+    pub fn shrink_to(&mut self, min_capacity: usize) {
+        if !self.spilled() {
+            return;
+        }
+        if self.capacity() > min_capacity {
+            let len = self.len();
+            let target = core::cmp::max(len, min_capacity);
+            if target <= Self::inline_size() {
+                // SAFETY: self.spilled() is true, so we're on the heap
+                unsafe {
+                    let (ptr, capacity) = self.raw.heap;
+                    self.raw = RawSmallVec::new_inline(MaybeUninit::uninit());
+                    copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
+                    self.set_inline();
+                    alloc::alloc::dealloc(
+                        ptr.cast().as_ptr(),
+                        Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>()),
+                    );
+                }
+            } else if target < self.capacity() {
+                // SAFETY: len > Self::inline_size() >= 0
+                // so new capacity is non zero, it is equal to the length
+                // T can't be a ZST because SmallVec<ZST, N> is never spilled.
+                unsafe { infallible(self.raw.try_grow_raw(self.len, target)) };
+            }
+        }
+    }
+
+    #[inline]
     pub fn truncate(&mut self, len: usize) {
         let old_len = self.len();
         if len < old_len {
@@ -1217,55 +1439,41 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    pub fn as_slice(&self) -> &[T] {
-        let len = self.len();
-        let ptr = self.as_ptr();
-        // SAFETY: all the elements in `..len` are initialized
-        unsafe { core::slice::from_raw_parts(ptr, len) }
-    }
-
-    #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [T] {
-        let len = self.len();
-        let ptr = self.as_mut_ptr();
-        // SAFETY: see above
-        unsafe { core::slice::from_raw_parts_mut(ptr, len) }
-    }
-
-    #[inline]
     pub fn swap_remove(&mut self, index: usize) -> T {
         let len = self.len();
-        assert!(index < len);
+        assert!(index < len, "swap_remove index (is {index}) should be < len (is {len})");
         // This can't overflow since `len > index >= 0`
         let new_len = len - 1;
         unsafe {
-            // SAFETY: we set len to a smaller value
+            // We replace self[index] with the last element. Note that if the
+            // bounds check above succeeds there must be a last element (which
+            // can be self[index] itself).
+            let value = core::ptr::read(self.as_ptr().add(index));
+            let base_ptr = self.as_mut_ptr();
+            core::ptr::copy(base_ptr.add(new_len), base_ptr.add(index), 1);
             self.set_len(new_len);
-            let ptr = self.as_mut_ptr();
-            let last = ptr.add(new_len);
-            let ith = ptr.add(index);
-            // This item is initialized since it was in the vector just before
-            let last_item = last.read();
-            // This item is initialized since index < len
-            let ith_item = ith.read();
-
-            // Note that these may be the same element.
-            // This is fine since in this case we just write it back to the pointer past the end of
-            // the vector, so the vector no longer owns it
-            ith.write(last_item);
-            ith_item
+            value
         }
     }
 
     #[inline]
     pub fn clear(&mut self) {
-        self.truncate(0);
+        // SAFETY: we set `len` to a smaller value
+        // then we drop the previously initialized elements
+        unsafe {
+            let old_len = self.len();
+            self.set_len(0);
+            core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(
+                self.as_mut_ptr(),
+                old_len,
+            ));
+        }
     }
 
     #[inline]
     pub fn remove(&mut self, index: usize) -> T {
         let len = self.len();
-        assert!(index < len);
+        assert!(index < len, "removal index (is {index}) should be < len (is {len})");
         let new_len = len - 1;
         unsafe {
             // SAFETY: new_len < len
@@ -1282,7 +1490,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn insert(&mut self, index: usize, value: T) {
         let len = self.len();
-        assert!(index <= len);
+        assert!(index <= len, "insertion index (is {index}) should be <= len (is {len})");
         self.reserve(1);
         let ptr = self.as_mut_ptr();
         unsafe {
@@ -1298,34 +1506,20 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 
-    fn insert_many_impl<I: Iterator<Item = T>>(&mut self, mut index: usize, iter: I) {
+    #[inline]
+    pub const fn as_slice(&self) -> &[T] {
         let len = self.len();
-        if index == len {
-            return self.extend(iter);
-        }
-
-        let mut iter = iter.fuse();
-        let (lower_bound, _) = iter.size_hint();
-        self.reserve(lower_bound);
-
-        let count = unsafe {
-            let ptr = self.as_mut_ptr();
-            // SAFETY: ptr is valid for `lower_bound` writes since we just reserved that much
-            let count = insert_many_batch(ptr, index, lower_bound, len, &mut iter);
-            // SAFETY: insert_many_batch_phase returns the number of elements it initialized, and
-            // leaves the vector in a valid state, without setting the new length
-            self.set_len(len + count);
-            count
-        };
-
-        index += count;
-        iter.enumerate()
-            .for_each(|(i, item)| self.insert(index + i, item));
+        let ptr = self.as_ptr();
+        // SAFETY: all the elements in `..len` are initialized
+        unsafe { core::slice::from_raw_parts(ptr, len) }
     }
 
     #[inline]
-    pub fn insert_many<I: IntoIterator<Item = T>>(&mut self, index: usize, iterable: I) {
-        self.insert_many_impl(index, iterable.into_iter());
+    pub const fn as_mut_slice(&mut self) -> &mut [T] {
+        let len = self.len();
+        let ptr = self.as_mut_ptr();
+        // SAFETY: see above
+        unsafe { core::slice::from_raw_parts_mut(ptr, len) }
     }
 
     #[inline]
@@ -1339,7 +1533,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut T {
+    pub const fn as_mut_ptr(&mut self) -> *mut T {
         if self.len.on_heap(Self::is_zst()) {
             // SAFETY: see above
             unsafe { self.raw.as_mut_ptr_heap() }
@@ -1400,7 +1594,13 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 
-    pub fn retain<F: FnMut(&mut T) -> bool>(&mut self, mut f: F) {
+    #[inline]
+    pub fn retain<F: FnMut(&T) -> bool>(&mut self, mut f: F) {
+        self.retain_mut(|elem| f(elem))
+    }
+
+    #[inline]
+    pub fn retain_mut<F: FnMut(&mut T) -> bool>(&mut self, mut f: F) {
         let mut del = 0;
         let len = self.len();
         let ptr = self.as_mut_ptr();
@@ -1416,11 +1616,6 @@ impl<T, const N: usize> SmallVec<T, N> {
             }
         }
         self.truncate(len - del);
-    }
-
-    #[inline]
-    pub fn retain_mut<F: FnMut(&mut T) -> bool>(&mut self, f: F) {
-        self.retain(f)
     }
 
     #[inline]
@@ -1487,6 +1682,11 @@ impl<T, const N: usize> SmallVec<T, N> {
         } else if old_len > new_len {
             self.truncate(new_len);
         }
+    }
+
+    pub fn leak<'a>(self) -> &'a mut [T] {
+        let mut me = ManuallyDrop::new(self);
+        unsafe { core::slice::from_raw_parts_mut(me.as_mut_ptr(), me.len()) }
     }
 
     /// Returns the remaining spare capacity of the vector as a slice of
@@ -1678,7 +1878,7 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
     pub fn resize(&mut self, len: usize, value: T) {
         let old_len = self.len();
         if len > old_len {
-            self.extend(core::iter::repeat(value).take(len - old_len));
+            self.extend(core::iter::repeat_n(value, len - old_len));
         } else {
             self.truncate(len);
         }
@@ -1709,22 +1909,6 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
     }
 }
 
-struct DropShiftGuard<T> {
-    ptr: *mut T,
-    len: usize,
-    shifted_ptr: *const T,
-    shifted_len: usize,
-}
-impl<T> Drop for DropShiftGuard<T> {
-    #[inline]
-    fn drop(&mut self) {
-        unsafe {
-            core::ptr::slice_from_raw_parts_mut(self.ptr, self.len).drop_in_place();
-            copy(self.shifted_ptr, self.ptr, self.shifted_len);
-        }
-    }
-}
-
 struct DropGuard<T> {
     ptr: *mut T,
     len: usize,
@@ -1736,39 +1920,6 @@ impl<T> Drop for DropGuard<T> {
             core::ptr::slice_from_raw_parts_mut(self.ptr, self.len).drop_in_place();
         }
     }
-}
-
-// Safety:
-//
-// `ptr..ptr + lower_bound` must be valid for writes
-#[inline]
-unsafe fn insert_many_batch<T, I: Iterator<Item = T>>(
-    ptr: *mut T,
-    index: usize,
-    lower_bound: usize,
-    len: usize,
-    iter: &mut I,
-) -> usize {
-    // shift elements to the right to make space for the initial elements from the iterator
-    copy(ptr.add(index), ptr.add(index + lower_bound), len - index);
-    let ptr_ith = ptr.add(index);
-    let mut guard = DropShiftGuard {
-        ptr: ptr_ith,
-        len: 0,
-        shifted_ptr: ptr_ith.add(lower_bound),
-        shifted_len: len - index,
-    };
-    iter.take(lower_bound).enumerate().for_each(|(i, item)| {
-        ptr_ith.add(i).write(item);
-        guard.len = i + 1;
-    });
-    let count = guard.len;
-    core::mem::forget(guard);
-
-    if count < lower_bound {
-        copy(ptr_ith.add(lower_bound), ptr_ith.add(count), len - index);
-    }
-    count
 }
 
 impl<T, const N: usize> Extend<T> for SmallVec<T, N> {

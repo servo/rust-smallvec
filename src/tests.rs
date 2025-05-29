@@ -142,6 +142,30 @@ fn drain_forget() {
 }
 
 #[test]
+fn splice() {
+    // The range starts right before the end.
+    let mut v: SmallVec<u8, 1> = smallvec![0, 1, 2, 3, 4, 5, 6];
+    let new = [7, 8, 9, 10];
+    let u: SmallVec<u8, 1> = v.splice(6.., new).collect();
+    assert_eq!(v, [0, 1, 2, 3, 4, 5, 7, 8, 9, 10]);
+    assert_eq!(u, [6]);
+
+    // The range is empty.
+    let mut v: SmallVec<u8, 1> = smallvec![0, 1, 2, 3, 4, 5, 6];
+    let new = [7, 8, 9, 10];
+    let u: SmallVec<u8, 1> = v.splice(1..1, new).collect();
+    assert_eq!(v, [0, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6]);
+    assert_eq!(u, []);
+
+    // The range is at the beginning and nonempty.
+    let mut v: SmallVec<u8, 1> = smallvec![0, 1, 2, 3, 4, 5, 6];
+    let new = [7, 8, 9, 10];
+    let u: SmallVec<u8, 1> = v.splice(..3, new).collect();
+    assert_eq!(v, [7, 8, 9, 10, 3, 4, 5, 6]);
+    assert_eq!(u, [0, 1, 2]);
+}
+
+#[test]
 fn into_iter() {
     let mut v: SmallVec<u8, 2> = SmallVec::new();
     v.push(3);
@@ -316,20 +340,6 @@ fn test_split_off_take_all() {
 }
 
 #[test]
-fn test_insert_many() {
-    let mut v: SmallVec<u8, 8> = SmallVec::new();
-    for x in 0..4 {
-        v.push(x);
-    }
-    assert_eq!(v.len(), 4);
-    v.insert_many(1, [5, 6].iter().cloned());
-    assert_eq!(
-        &v.iter().map(|v| *v).collect::<Vec<_>>(),
-        &[0, 5, 6, 1, 2, 3]
-    );
-}
-
-#[test]
 fn test_append() {
     let mut v: SmallVec<u8, 8> = SmallVec::new();
     for x in 0..4 {
@@ -346,155 +356,6 @@ fn test_append() {
         &v.iter().map(|v| *v).collect::<Vec<_>>(),
         &[0, 1, 2, 3, 5, 6]
     );
-}
-
-struct MockHintIter<T: Iterator> {
-    x: T,
-    hint: usize,
-}
-impl<T: Iterator> Iterator for MockHintIter<T> {
-    type Item = T::Item;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.x.next()
-    }
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.hint, None)
-    }
-}
-
-#[test]
-fn test_insert_many_short_hint() {
-    let mut v: SmallVec<u8, 8> = SmallVec::new();
-    for x in 0..4 {
-        v.push(x);
-    }
-    assert_eq!(v.len(), 4);
-    v.insert_many(
-        1,
-        MockHintIter {
-            x: [5, 6].iter().cloned(),
-            hint: 5,
-        },
-    );
-    assert_eq!(
-        &v.iter().map(|v| *v).collect::<Vec<_>>(),
-        &[0, 5, 6, 1, 2, 3]
-    );
-}
-
-#[test]
-fn test_insert_many_long_hint() {
-    let mut v: SmallVec<u8, 8> = SmallVec::new();
-    for x in 0..4 {
-        v.push(x);
-    }
-    assert_eq!(v.len(), 4);
-    v.insert_many(
-        1,
-        MockHintIter {
-            x: [5, 6].iter().cloned(),
-            hint: 1,
-        },
-    );
-    assert_eq!(
-        &v.iter().map(|v| *v).collect::<Vec<_>>(),
-        &[0, 5, 6, 1, 2, 3]
-    );
-}
-
-// https://github.com/servo/rust-smallvec/issues/96
-mod insert_many_panic {
-    use crate::{smallvec, SmallVec};
-    use alloc::boxed::Box;
-
-    struct PanicOnDoubleDrop {
-        dropped: Box<bool>,
-    }
-
-    impl PanicOnDoubleDrop {
-        fn new() -> Self {
-            Self {
-                dropped: Box::new(false),
-            }
-        }
-    }
-
-    impl Drop for PanicOnDoubleDrop {
-        fn drop(&mut self) {
-            assert!(!*self.dropped, "already dropped");
-            *self.dropped = true;
-        }
-    }
-
-    /// Claims to yield `hint` items, but actually yields `count`, then panics.
-    struct BadIter {
-        hint: usize,
-        count: usize,
-    }
-
-    impl Iterator for BadIter {
-        type Item = PanicOnDoubleDrop;
-        fn size_hint(&self) -> (usize, Option<usize>) {
-            (self.hint, None)
-        }
-        fn next(&mut self) -> Option<Self::Item> {
-            if self.count == 0 {
-                panic!()
-            }
-            self.count -= 1;
-            Some(PanicOnDoubleDrop::new())
-        }
-    }
-
-    #[test]
-    fn panic_early_at_start() {
-        let mut vec: SmallVec<PanicOnDoubleDrop, 0> =
-            smallvec![PanicOnDoubleDrop::new(), PanicOnDoubleDrop::new(),];
-        let result = ::std::panic::catch_unwind(move || {
-            vec.insert_many(0, BadIter { hint: 1, count: 0 });
-        });
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn panic_early_in_middle() {
-        let mut vec: SmallVec<PanicOnDoubleDrop, 0> =
-            smallvec![PanicOnDoubleDrop::new(), PanicOnDoubleDrop::new(),];
-        let result = ::std::panic::catch_unwind(move || {
-            vec.insert_many(1, BadIter { hint: 4, count: 2 });
-        });
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn panic_early_at_end() {
-        let mut vec: SmallVec<PanicOnDoubleDrop, 0> =
-            smallvec![PanicOnDoubleDrop::new(), PanicOnDoubleDrop::new(),];
-        let result = ::std::panic::catch_unwind(move || {
-            vec.insert_many(2, BadIter { hint: 3, count: 1 });
-        });
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn panic_late_at_start() {
-        let mut vec: SmallVec<PanicOnDoubleDrop, 0> =
-            smallvec![PanicOnDoubleDrop::new(), PanicOnDoubleDrop::new(),];
-        let result = ::std::panic::catch_unwind(move || {
-            vec.insert_many(0, BadIter { hint: 3, count: 5 });
-        });
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn panic_late_at_end() {
-        let mut vec: SmallVec<PanicOnDoubleDrop, 0> =
-            smallvec![PanicOnDoubleDrop::new(), PanicOnDoubleDrop::new(),];
-        let result = ::std::panic::catch_unwind(move || {
-            vec.insert_many(2, BadIter { hint: 3, count: 5 });
-        });
-        assert!(result.is_err());
-    }
 }
 
 #[test]
@@ -863,7 +724,7 @@ fn test_from_vec() {
 fn test_retain() {
     // Test inline data storage
     let mut sv: SmallVec<i32, 5> = SmallVec::from_slice(&[1, 2, 3, 3, 4]);
-    sv.retain(|&mut i| i != 3);
+    sv.retain(|&i| i != 3);
     assert_eq!(sv.pop(), Some(4));
     assert_eq!(sv.pop(), Some(2));
     assert_eq!(sv.pop(), Some(1));
@@ -871,7 +732,7 @@ fn test_retain() {
 
     // Test spilled data storage
     let mut sv: SmallVec<i32, 3> = SmallVec::from_slice(&[1, 2, 3, 3, 4]);
-    sv.retain(|&mut i| i != 3);
+    sv.retain(|&i| i != 3);
     assert_eq!(sv.pop(), Some(4));
     assert_eq!(sv.pop(), Some(2));
     assert_eq!(sv.pop(), Some(1));
@@ -1048,19 +909,6 @@ fn empty_macro() {
 #[test]
 fn zero_size_items() {
     SmallVec::<(), 0>::new().push(());
-}
-
-#[test]
-fn test_insert_many_overflow() {
-    let mut v: SmallVec<u8, 1> = SmallVec::new();
-    v.push(123);
-
-    // Prepare an iterator with small lower bound
-    let iter = (0u8..5).filter(|n| n % 2 == 0);
-    assert_eq!(iter.size_hint().0, 0);
-
-    v.insert_many(0, iter);
-    assert_eq!(&*v, &[0, 2, 4, 123]);
 }
 
 #[test]
