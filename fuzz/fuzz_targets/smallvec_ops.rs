@@ -139,7 +139,7 @@ fn do_test<const N: usize>(data: &[u8]) -> SmallVec<u8, N> {
                 }
             }
             22 => {
-                v = SmallVec::from_slice(data);
+                v = SmallVec::from(data);
             }
 
             23 => {
@@ -149,10 +149,10 @@ fn do_test<const N: usize>(data: &[u8]) -> SmallVec<u8, N> {
             }
 
             24 => {
-                if v.len() < CAP_GROWTH {
-                    let insert_pos = next_usize!(bytes) % (v.len() + 1);
-                    v.insert_from_slice(insert_pos, data);
-                }
+                let a = next_usize!(bytes) % (v.len() + 1);
+                let b = next_usize!(bytes) % (v.len() + 1);
+                let (start, end) = (a.min(b), a.max(b));
+                v.extend_from_within(start..end);
             }
 
             25 => {
@@ -161,7 +161,7 @@ fn do_test<const N: usize>(data: &[u8]) -> SmallVec<u8, N> {
                 }
             }
             26 => {
-                v = SmallVec::from_elem(next_u8!(bytes), next_usize!(bytes));
+                v = smallvec::from_elem(next_u8!(bytes), next_usize!(bytes));
             }
             _ => panic!("booo"),
         }
