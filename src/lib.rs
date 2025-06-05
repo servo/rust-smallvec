@@ -2140,18 +2140,20 @@ impl<T: Clone, const N: usize> Clone for IntoIter<T, N> {
 macro_rules! smallvec {
     // count helper: transform any expression into 1
     (@one $x:expr) => (1usize);
+    () => (
+        $crate::SmallVec::new()
+    );
     ($elem:expr; $n:expr) => ({
         $crate::SmallVec::from_elem($elem, $n)
     });
-    ($($x:expr),*$(,)?) => ({
-        let count = 0usize $(+ $crate::smallvec!(@one $x))*;
-        #[allow(unused_mut)]
+    ($($x:expr),+$(,)?) => ({
+        let count = 0usize $(+ $crate::smallvec!(@one $x))+;
         let mut vec = $crate::SmallVec::new();
         if count <= vec.capacity() {
             $(vec.push($x);)*
             vec
         } else {
-            $crate::SmallVec::from_vec($crate::alloc::vec![$($x,)*])
+            $crate::SmallVec::from_vec($crate::alloc::vec![$($x,)+])
         }
     });
 }
