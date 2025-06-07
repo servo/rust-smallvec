@@ -1809,6 +1809,89 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
             }
         }
     }
+
+    #[inline]
+    pub fn extend_from_slice_copy(&mut self, other: &[T])
+    where
+        T: Copy
+    {
+        
+        let len = other.len();
+        let src = other.as_ptr();
+        
+        let l = self.len();
+        self.reserve(len);
+
+        // SAFETY: Additional memory has been reserved,
+        // therefore the pointer access is valid.
+        unsafe {
+            let dst = self.as_mut_ptr().add(l);
+            copy_nonoverlapping(src, dst, len);
+            self.set_len(l + len);
+        }
+    }
+
+    pub fn extend_from_within_copy<R>(&mut self, src: R)
+    where
+        R: core::ops::RangeBounds<usize>,
+        T: Copy
+    {
+        let src = slice_range(src, ..self.len());
+        let core::ops::Range { start, end } = src;
+        let len = end - start;
+        self.reserve(len);
+
+        // SAFETY: The call to `reserve` ensures that the capacity is large enough.
+        // The range is within bounds through the use of `core::slice::range`.
+        unsafe {
+            let l = self.len();
+            let ptr = self.as_mut_ptr();
+            copy_nonoverlapping(ptr.add(start), ptr.add(l), len);
+            self.set_len(l + len);
+        }
+    }
+
+    pub fn insert_from_slice_copy(&mut self, index: usize, other: &[T])
+    where
+        T: Copy
+    {
+        let l = self.len();
+        let len = other.len();
+        assert!(index <= l);
+        self.reserve(len);
+        unsafe {
+            let base_ptr = self.as_mut_ptr();
+            let ith_ptr = base_ptr.add(index);
+            let shifted_ptr = base_ptr.add(index + len);
+            // elements at `index + other_len..len + other_len` are now initialized
+            copy(ith_ptr, shifted_ptr, l - index);
+            // elements at `index..index + other_len` are now initialized
+            copy_nonoverlapping(other.as_ptr(), ith_ptr, len);
+
+            // SAFETY: all the elements are initialized
+            self.set_len(l + len);
+        }
+    }
+
+    /// A function for creating [`SmallVec`] values out of slices
+    /// for types with the [`Copy`] trait.
+    pub fn from_slice_copy(slice: &[T]) -> Self
+    where
+        T: Copy
+    {
+        let src = slice.as_ptr();
+        let len = slice.len();
+        let mut result = Self::with_capacity(len);
+
+        // SAFETY: By using `with_capacity`, the pointer will point to valid memory.
+        unsafe {
+            let dst = result.as_mut_ptr();
+            copy_nonoverlapping(src, dst, len);
+            result.set_len(len);
+        }
+
+        result
+    }
 }
 
 struct DropGuard<T> {
