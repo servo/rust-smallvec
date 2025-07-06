@@ -374,20 +374,6 @@ fn drain_overflow() {
 }
 
 #[test]
-fn test_insert_from_slice() {
-    let mut v: SmallVec<u8, 8> = SmallVec::new();
-    for x in 0..4 {
-        v.push(x);
-    }
-    assert_eq!(v.len(), 4);
-    v.insert_from_slice(1, &[5, 6]);
-    assert_eq!(
-        &v.iter().map(|v| *v).collect::<Vec<_>>(),
-        &[0, 5, 6, 1, 2, 3]
-    );
-}
-
-#[test]
 fn test_extend_from_slice() {
     let mut v: SmallVec<u8, 8> = SmallVec::new();
     for x in 0..4 {
@@ -398,6 +384,16 @@ fn test_extend_from_slice() {
     assert_eq!(
         &v.iter().map(|v| *v).collect::<Vec<_>>(),
         &[0, 1, 2, 3, 5, 6]
+    );
+}
+
+#[test]
+fn test_extend_from_within() {
+    let mut v: SmallVec<u8, 8> = smallvec![0, 1, 2, 3];
+    v.extend_from_within(1..3);
+    assert_eq!(
+        &v.iter().map(|v| *v).collect::<Vec<_>>(),
+        &[0, 1, 2, 3, 1, 2],
     );
 }
 
@@ -590,9 +586,9 @@ fn test_from() {
 
 #[test]
 fn test_from_slice() {
-    assert_eq!(&SmallVec::<u32, 2>::from_slice(&[1][..])[..], [1]);
+    assert_eq!(&SmallVec::<u32, 2>::from(&[1][..])[..], [1]);
     assert_eq!(
-        &SmallVec::<u32, 2>::from_slice(&[1, 2, 3][..])[..],
+        &SmallVec::<u32, 2>::from(&[1, 2, 3][..])[..],
         [1, 2, 3]
     );
 }
@@ -723,7 +719,7 @@ fn test_from_vec() {
 #[test]
 fn test_retain() {
     // Test inline data storage
-    let mut sv: SmallVec<i32, 5> = SmallVec::from_slice(&[1, 2, 3, 3, 4]);
+    let mut sv: SmallVec<i32, 5> = SmallVec::from(&[1, 2, 3, 3, 4]);
     sv.retain(|&i| i != 3);
     assert_eq!(sv.pop(), Some(4));
     assert_eq!(sv.pop(), Some(2));
@@ -731,7 +727,7 @@ fn test_retain() {
     assert_eq!(sv.pop(), None);
 
     // Test spilled data storage
-    let mut sv: SmallVec<i32, 3> = SmallVec::from_slice(&[1, 2, 3, 3, 4]);
+    let mut sv: SmallVec<i32, 3> = SmallVec::from(&[1, 2, 3, 3, 4]);
     sv.retain(|&i| i != 3);
     assert_eq!(sv.pop(), Some(4));
     assert_eq!(sv.pop(), Some(2));
@@ -757,7 +753,7 @@ fn test_retain() {
 
 #[test]
 fn test_dedup() {
-    let mut dupes: SmallVec<i32, 5> = SmallVec::from_slice(&[1, 1, 2, 3, 3]);
+    let mut dupes: SmallVec<i32, 5> = SmallVec::from(&[1, 1, 2, 3, 3]);
     dupes.dedup();
     assert_eq!(&*dupes, &[1, 2, 3]);
 
@@ -765,11 +761,11 @@ fn test_dedup() {
     empty.dedup();
     assert!(empty.is_empty());
 
-    let mut all_ones: SmallVec<i32, 5> = SmallVec::from_slice(&[1, 1, 1, 1, 1]);
+    let mut all_ones: SmallVec<i32, 5> = SmallVec::from(&[1, 1, 1, 1, 1]);
     all_ones.dedup();
     assert_eq!(all_ones.len(), 1);
 
-    let mut no_dupes: SmallVec<i32, 5> = SmallVec::from_slice(&[1, 2, 3, 4, 5]);
+    let mut no_dupes: SmallVec<i32, 5> = SmallVec::from(&[1, 2, 3, 4, 5]);
     no_dupes.dedup();
     assert_eq!(no_dupes.len(), 5);
 }
@@ -940,8 +936,8 @@ fn test_extract_if() {
 
     let b: SmallVec<u8, 2> = a.extract_if(1..9, |x| *x % 3 == 0).collect();
 
-    assert_eq!(a, SmallVec::<u8, 2>::from_slice(&[0, 1u8, 2, 4, 5, 7, 8, 0]));
-    assert_eq!(b, SmallVec::<u8, 2>::from_slice(&[3u8, 6]));
+    assert_eq!(a, SmallVec::<u8, 2>::from(&[0, 1u8, 2, 4, 5, 7, 8, 0]));
+    assert_eq!(b, SmallVec::<u8, 2>::from(&[3u8, 6]));
 }
 
 /// This assortment of tests, in combination with miri, verifies we handle UB on fishy arguments
