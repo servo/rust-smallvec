@@ -120,22 +120,10 @@ impl core::fmt::Display for CollectionAllocErr {
         write!(f, "Allocation error: {:?}", self)
     }
 }
-
 impl core::error::Error for CollectionAllocErr {}
 
-/// Either a stack array with `length <= N` or a heap array
-/// whose pointer and capacity are stored here.
-///
-/// We store a `NonNull<T>` instead of a `*mut T`, so that
-/// niche-optimization can be performed and the type is covariant
-/// with respect to `T`.
-#[repr(C)]
-pub union RawSmallVec<T, const N: usize> {
-    inline: ManuallyDrop<MaybeUninit<[T; N]>>,
-    heap: (NonNull<T>, usize),
-}
-
 #[inline]
+#[track_caller]
 fn infallible<T>(result: Result<T, CollectionAllocErr>) -> T {
     match result {
         Ok(x) => x,
@@ -179,22 +167,212 @@ where
     core::ops::Range { start, end }
 }
 
-impl<T, const N: usize> RawSmallVec<T, N> {
+#[inline(always)]
+const fn is_zst<T>() -> bool {
+    size_of::<T>() == 0
+}
+
+#[inline(always)]
+const fn inline_size<T, const N: usize>() -> usize {
+    if is_zst::<T>() {
+        usize::MAX
+    } else {
+        N
+    }
+}
+
+/// Creates a [`Layout`] values for arrays of length `n`
+/// for a given type without checking preconditions.
+///
+/// # Safety
+///
+/// The caller must ensure that an array of length `n` results
+/// in a valid layout.
+#[inline(always)]
+const unsafe fn array_layout_unchecked<T>(n: usize) -> Layout {
+    // SAFETY: The caller ensures that the an array of length `n` is possible
+    // which means that the multiplication can't overflow.
+    // The value returned by `align_of` will fulfill the safety conditions for
+    // `Layout::from_size_align_unchecked`.
+    unsafe {
+        Layout::from_size_align_unchecked(size_of::<T>().unchecked_mul(n), align_of::<T>())
+    }
+}
+
+/// A ZST from which memory allocation methods are exposed.
+/// The methods correspond to the `allocator_api` Rust nightly feature.
+#[derive(Clone, Copy)]
+struct A;
+
+impl A {
     #[inline]
-    const fn is_zst() -> bool {
-        size_of::<T>() == 0
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, CollectionAllocErr> {
+        let err = CollectionAllocErr::AllocErr { layout };
+        if layout.size() == 0 {
+            Err(err)
+        } else {
+            // SAFETY: The size of the layout has been checked in the comparison above.
+            unsafe {
+                let ptr = alloc::alloc::alloc(layout);
+                let ptr = NonNull::new(ptr).ok_or(err)?;
+                Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
+            }
+        }
     }
 
-    #[inline]
-    const fn new() -> Self {
-        Self::new_inline(MaybeUninit::uninit())
+    #[inline(always)]
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        if layout.size() > 0 {
+            // SAFETY: Safety conditions are identical.
+            unsafe {
+                alloc::alloc::dealloc(ptr.as_ptr(), layout);
+            }
+        }
     }
+
+    /// # Safety
+    ///
+    /// The new layout must have a size that is larger than or equal to
+    /// the size of the old layout.
+    #[inline(always)]
+    unsafe fn grow(
+        &self,
+        ptr: NonNull<u8>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<NonNull<[u8]>, CollectionAllocErr> {
+        debug_assert!(
+            new_layout.size() >= old_layout.size(),
+            "`new_layout.size()` must be greater than or equal to `old_layout.size()`"
+        );
+
+        let old_size = old_layout.size();
+        let old_align = old_layout.align();
+        let new_size = new_layout.size();
+        let new_align = new_layout.align();
+
+        // SAFETY: Safety condition is upheld by the caller.
+        unsafe {
+            core::hint::assert_unchecked(new_size >= old_size);
+        }
+
+        let err = CollectionAllocErr::AllocErr { layout: new_layout };
+
+        if old_size == 0 {
+            self.allocate(new_layout)
+        } else if old_align == new_align {
+            // SAFETY: The caller ensures that the layout is valid.
+            // The pointers returned by the allocation methods are valid up to `new_size`.
+            unsafe {
+                let new_ptr = alloc::alloc::realloc(ptr.as_ptr(), old_layout, new_size);
+                if new_ptr.is_null() {
+                    return Err(err);
+                }
+                let new_ptr = NonNull::new(new_ptr).ok_or(err)?;
+                Ok(NonNull::slice_from_raw_parts(new_ptr, new_size))
+            }
+        } else {
+            // SAFETY: The caller ensures that the layout is valid.
+            // The pointers returned by the allocation methods are valid up to `new_size`.
+            unsafe {
+                let new_ptr = self.allocate(new_layout)?;
+                let raw = new_ptr.as_ptr().cast::<u8>();
+                copy_nonoverlapping(ptr.as_ptr(), raw, old_size);
+                Ok(new_ptr)
+            }
+        }
+    }
+
+    unsafe fn shrink(
+        &self,
+        ptr: NonNull<u8>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<NonNull<[u8]>, CollectionAllocErr> {
+        debug_assert!(
+            new_layout.size() <= old_layout.size(),
+            "`new_layout.size()` must be smaller than or equal to `old_layout.size()`"
+        );
+
+        let old_size = old_layout.size();
+        let old_align = old_layout.align();
+        let new_size = new_layout.size();
+        let new_align = new_layout.align();
+
+        // SAFETY: The safety condition is upheld by the caller.
+        unsafe {
+            core::hint::assert_unchecked(new_size <= old_size);
+        }
+
+        let err = CollectionAllocErr::AllocErr { layout: new_layout };
+
+        if new_size == 0 {
+            self.deallocate(ptr, old_layout);
+            // FIXME: Replace with `Layout::dangling` once the latter is stable.
+            // This version should work for now wrt. provenance.
+            let data = core::mem::transmute(new_align);
+            Ok(NonNull::slice_from_raw_parts(data, 0))
+        } else if old_align == new_align {
+            // SAFETY: The caller ensures that the layout is valid.
+            // The pointers returned by the allocation methods are valid up to `new_size`.
+            unsafe {
+                let new_ptr = alloc::alloc::realloc(ptr.as_ptr(), old_layout, new_size);
+                if new_ptr.is_null() {
+                    return Err(err);
+                }
+                let new_ptr = NonNull::new(new_ptr).ok_or(err)?;
+                Ok(NonNull::slice_from_raw_parts(new_ptr, new_size))
+            }
+        } else {
+            // SAFETY: The caller ensures that the layout is valid.
+            // The pointers returned by the allocation methods are valid up to `new_size`.
+            unsafe {
+                let new_ptr = self.allocate(new_layout)?;
+                let raw = new_ptr.as_ptr().cast::<u8>();
+                copy_nonoverlapping(ptr.as_ptr(), raw, new_size);
+                Ok(new_ptr)
+            }
+        }
+    }
+}
+
+const GLOBAL: A = A;
+
+struct DropDealloc<'a> {
+    ptr: NonNull<u8>,
+    layout: Layout,
+    allocator: &'a A,
+}
+
+impl Drop for DropDealloc<'_> {
+    #[inline]
+    fn drop(&mut self) {
+        unsafe {
+            self.allocator.deallocate(self.ptr, self.layout);
+        }
+    }
+}
+
+/// Either a stack array with `length <= N` or a heap array
+/// whose pointer and capacity are stored here.
+///
+/// We store a `NonNull<T>` instead of a `*mut T`, so that
+/// niche-optimization can be performed and the type is covariant
+/// with respect to `T`.
+#[repr(C)]
+pub union RawSmallVecUnion<T, const N: usize> {
+    inline: ManuallyDrop<MaybeUninit<[T; N]>>,
+    heap: (NonNull<T>, usize),
+}
+
+impl<T, const N: usize> RawSmallVecUnion<T, N> {
     #[inline]
     const fn new_inline(inline: MaybeUninit<[T; N]>) -> Self {
         Self {
             inline: ManuallyDrop::new(inline),
         }
     }
+
     #[inline]
     const fn new_heap(ptr: NonNull<T>, capacity: usize) -> Self {
         Self {
@@ -218,73 +396,306 @@ impl<T, const N: usize> RawSmallVec<T, N> {
 
     /// # Safety
     ///
-    /// The vector must be on the heap
+    /// The vector must be on the heap.
     #[inline]
     const unsafe fn as_ptr_heap(&self) -> *const T {
-        self.heap.0.as_ptr()
+        // SAFETY: Safety conditions are identical.
+        unsafe {
+            self.heap.0.as_ptr()
+        }
     }
 
     /// # Safety
     ///
-    /// The vector must be on the heap
+    /// The vector must be on the heap.
     #[inline]
     const unsafe fn as_mut_ptr_heap(&mut self) -> *mut T {
-        self.heap.0.as_ptr()
+        // SAFETY: Safety conditions are identical.
+        unsafe {
+            self.heap.0.as_ptr()
+        }
+    }
+}
+
+pub struct RawSmallVec<T, const N: usize> {
+    pub inner: RawSmallVecUnion<T, N>,
+    allocator: A,
+}
+
+impl<T, const N: usize> RawSmallVec<T, N> {
+    #[inline]
+    pub const fn new() -> Self {
+        Self::new_in(GLOBAL)
     }
 
+    #[inline]
+    pub const fn new_inline(inline: MaybeUninit<[T; N]>) -> Self {
+        Self::new_inline_in(inline, GLOBAL)
+    }
+
+    #[inline]
+    pub const fn new_heap(ptr: NonNull<T>, capacity: usize) -> Self {
+        Self::new_heap_in(ptr, capacity, GLOBAL)
+    }
+
+    #[inline]
+    #[track_caller]
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self::with_capacity_in(capacity, GLOBAL)
+    }
+
+    #[inline]
+    pub fn try_with_capacity(capacity: usize) -> Result<Self, CollectionAllocErr> {
+        Self::try_with_capacity_in(capacity, GLOBAL)
+    }
+}
+
+impl<T, const N: usize> RawSmallVec<T, N> {
+    #[inline]
+    const fn new_in(allocator: A) -> Self {
+        Self::new_inline_in(MaybeUninit::uninit(), allocator)
+    }
+
+    #[inline]
+    const fn new_inline_in(inline: MaybeUninit<[T; N]>, allocator: A) -> Self {
+        Self {
+            inner: RawSmallVecUnion::new_inline(inline),
+            allocator,
+        }
+    }
+
+    #[inline]
+    const fn new_heap_in(ptr: NonNull<T>, capacity: usize, allocator: A) -> Self {
+        Self {
+            inner: RawSmallVecUnion::new_heap(ptr, capacity),
+            allocator,
+        }
+    }
+
+    #[inline]
+    #[track_caller]
+    fn with_capacity_in(capacity: usize, allocator: A) -> Self {
+        infallible(Self::try_with_capacity_in(capacity, allocator))
+    }
+
+    #[inline]
+    fn try_with_capacity_in(capacity: usize, allocator: A) -> Result<Self, CollectionAllocErr> {
+        if capacity <= const { inline_size::<T, N>() } {
+            Ok(Self::new_inline_in(MaybeUninit::uninit(), allocator))
+        } else {
+            let layout = Layout::array::<T>(capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
+            let ptr = allocator.allocate(layout)?;
+            let inner = RawSmallVecUnion {
+                heap: (ptr.cast(), capacity)
+            };
+            Ok(Self {
+                inner,
+                allocator,
+            })
+        }
+    }
+
+    /// Gets a pointer to the contents of the vector, under the assumption
+    /// that the content is stored inline.
+    #[inline]
+    pub const fn as_ptr_inline(&self) -> *const T {
+        self.inner.as_ptr_inline()
+    }
+
+    /// Gets a pointer to the contents of the vector, under the assumption
+    /// that the content is stored inline.
+    #[inline]
+    pub const fn as_mut_ptr_inline(&mut self) -> *mut T {
+        self.inner.as_mut_ptr_inline()
+    }
+
+    /// Gets a pointer to the contents of the vector, under the assumption
+    /// that the content is stored on the heap.
+    ///
     /// # Safety
     ///
-    /// `new_capacity` must be non zero, and greater or equal to the length.
-    /// T must not be a ZST.
-    unsafe fn try_grow_raw(
+    /// The vector must be on the heap.
+    #[inline]
+    pub const unsafe fn as_ptr_heap(&self) -> *const T {
+        // SAFETY: The safety requirements are identical.
+        unsafe {
+            self.inner.as_ptr_heap()
+        }
+    }
+
+    /// Gets a pointer to the contents of the vector, under the assumption
+    /// that the content is stored on the heap.
+    ///
+    /// # Safety
+    ///
+    /// The vector must be on the heap.
+    #[inline]
+    pub const unsafe fn as_mut_ptr_heap(&mut self) -> *mut T {
+        // SAFETY: The safety requirements are identical.
+        unsafe {
+            self.inner.as_mut_ptr_heap()
+        }
+    }
+
+    /// Returns `true` if the elements are stored on the heap, and `false` otherwise.
+    ///
+    /// # Safety
+    ///
+    /// The way elements are stored in `self` must correspond to the tag in `len`.
+    unsafe fn try_reserve(
         &mut self,
         len: TaggedLen,
-        new_capacity: usize,
-    ) -> Result<(), CollectionAllocErr> {
-        use alloc::alloc::{alloc, realloc};
-        debug_assert!(!Self::is_zst());
-        debug_assert!(new_capacity > 0);
-        debug_assert!(new_capacity >= len.value(Self::is_zst()));
+        additional: usize,
+    ) -> Result<bool, CollectionAllocErr> {
+        debug_assert!(!is_zst::<T>());
 
-        let was_on_heap = len.on_heap(Self::is_zst());
-        let ptr = if was_on_heap {
-            self.as_mut_ptr_heap()
-        } else {
-            self.as_mut_ptr_inline()
-        };
-        let len = len.value(Self::is_zst());
+        let on_heap = len.on_heap(is_zst::<T>());
+        let len = len.value(is_zst::<T>());
 
-        let new_layout =
-            Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
-        if new_layout.size() > isize::MAX as usize {
-            return Err(CollectionAllocErr::CapacityOverflow);
+        if additional == 0 {
+            return Ok(on_heap);
         }
 
-        let new_ptr = if len == 0 || !was_on_heap {
-            // get a fresh allocation
-            let new_ptr = alloc(new_layout) as *mut T; // `new_layout` has nonzero size.
-            let new_ptr =
-                NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr { layout: new_layout })?;
-            copy_nonoverlapping(ptr, new_ptr.as_ptr(), len);
-            new_ptr
+        let new_capacity = len.checked_add(additional).ok_or(CollectionAllocErr::CapacityOverflow)?;
+
+        if on_heap {
+            // SAFETY: The caller ensures that the tag corresponds to the
+            // way in which data is stored.
+            let (old_ptr, old_capacity) = unsafe { self.inner.heap };
+
+            // Ensure capacity growth is exponential.
+            let new_capacity = new_capacity.max(2 * old_capacity);
+
+            // SAFETY: The stored capacity corresponds always to a valid layout.
+            let old_layout = unsafe { array_layout_unchecked::<T>(old_capacity) };
+
+            let new_layout = Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
+            let ptr = self.allocator.grow(old_ptr.cast(), old_layout, new_layout)?;
+
+            self.inner = RawSmallVecUnion::new_heap(ptr.cast(), new_capacity);
+            Ok(true)
+        } else if new_capacity > inline_size::<T, N>() {
+            // Ensure capacity growth is exponential.
+            let new_capacity = (2 * N).max(new_capacity);
+
+            let layout = Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
+            let ptr = self.allocator.allocate(layout)?;
+
+            // SAFETY: The pointer returned by `allocate` is valid and its own memory region.
+            unsafe {
+                copy_nonoverlapping(self.as_mut_ptr_inline(), ptr.cast().as_ptr(), len);
+            }
+
+            self.inner = RawSmallVecUnion::new_heap(ptr.cast(), new_capacity);
+            Ok(true)
         } else {
-            // use realloc
+            Ok(on_heap)
+        }
+    }
 
-            // this can't overflow since we already constructed an equivalent layout during
-            // the previous allocation
-            let old_layout =
-                Layout::from_size_align_unchecked(self.heap.1 * size_of::<T>(), align_of::<T>());
+    /// Returns `true` if the elements are stored on the heap, and `false` otherwise.
+    ///
+    /// # Safety
+    ///
+    /// The way elements are stored in `self` must correspond to the tag in `len`.
+    unsafe fn try_reserve_exact(
+        &mut self,
+        len: TaggedLen,
+        additional: usize,
+    ) -> Result<bool, CollectionAllocErr> {
+        debug_assert!(!is_zst::<T>());
 
-            // SAFETY: ptr was allocated with this allocator
-            // old_layout is the same as the layout used to allocate the previous memory block
-            // new_layout.size() is greater than zero
-            // does not overflow when rounded up to alignment. since it was constructed
-            // with Layout::array
-            let new_ptr = realloc(ptr as *mut u8, old_layout, new_layout.size()) as *mut T;
-            NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr { layout: new_layout })?
-        };
-        *self = Self::new_heap(new_ptr, new_capacity);
-        Ok(())
+        let on_heap = len.on_heap(is_zst::<T>());
+        let len = len.value(is_zst::<T>());
+
+        if additional == 0 {
+            return Ok(on_heap);
+        }
+
+        let new_capacity = len.checked_add(additional).ok_or(CollectionAllocErr::CapacityOverflow)?;
+
+        if on_heap {
+            // SAFETY: The caller ensures that the tag corresponds to the
+            // way in which data is stored.
+            let (old_ptr, old_capacity) = unsafe { self.inner.heap };
+
+            // SAFETY: The stored capacity corresponds always to a valid layout.
+            let old_layout = unsafe { array_layout_unchecked::<T>(old_capacity) };
+
+            let new_layout = Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
+            let ptr = self.allocator.grow(old_ptr.cast(), old_layout, new_layout)?;
+
+            self.inner = RawSmallVecUnion::new_heap(ptr.cast(), new_capacity);
+
+            Ok(true)
+        } else if new_capacity > inline_size::<T, N>() {
+            let layout = Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
+            let ptr = self.allocator.allocate(layout)?;
+
+            // SAFETY: The pointer returned by `allocate` is valid and its own memory region.
+            unsafe {
+                copy_nonoverlapping(self.as_mut_ptr_inline(), ptr.cast().as_ptr(), len);
+            }
+
+            self.inner = RawSmallVecUnion::new_heap(ptr.cast(), new_capacity);
+
+            Ok(true)
+        } else {
+            Ok(on_heap)
+        }
+    }
+
+    /// Returns `true` if the elements are still stored on the heap, and `false` otherwise.
+    ///
+    /// # Safety
+    ///
+    /// The way elements are stored in `self` must correspond to `on_heap`.
+    unsafe fn shrink_to_fit(
+        &mut self,
+        on_heap: bool,
+        cap: usize,
+    ) -> Result<bool, CollectionAllocErr> {
+        debug_assert!(!is_zst::<T>());
+
+        if on_heap {
+            // SAFETY: The caller ensures that the tag corresponds to the
+            // way in which data is stored.
+            let (old_ptr, old_capacity) = unsafe { self.inner.heap };
+
+            // SAFETY: The stored capacity corresponds always to a valid layout.
+            let layout = unsafe { array_layout_unchecked::<T>(old_capacity) };
+
+            if cap <= N {
+                self.inner = RawSmallVecUnion::new_inline(MaybeUninit::uninit());
+
+                // If the amount of data copied is small, then the code generator
+                // will unfold the copy instead of generating a function call.
+                // However, this is only possible if the amount copied is constant.
+                // This means that for certain small sizes, copying everything is faster.
+                if const { size_of::<T>() * N <= 128 } {
+                    copy_nonoverlapping(old_ptr.cast().as_ptr(), self.as_mut_ptr_inline(), N);
+                } else {
+                    copy_nonoverlapping(old_ptr.cast().as_ptr(), self.as_mut_ptr_inline(), cap);
+                }
+
+                self.allocator.deallocate(old_ptr.cast(), layout);
+
+                Ok(false)
+            } else if cap < old_capacity {
+                // SAFETY: The new capacity is smaller than the old capacity,
+                // and it is already possible to construct a valid layout with the old capacity.
+                let new_layout = unsafe { array_layout_unchecked::<T>(cap) };
+
+                let ptr = self.allocator.shrink(old_ptr.cast(), layout, new_layout)?;
+                self.inner = RawSmallVecUnion::new_heap(ptr.cast(), cap);
+
+                Ok(true)
+            } else {
+                Ok(true)
+            }
+        } else {
+            Ok(on_heap)
+        }
     }
 }
 
@@ -838,11 +1249,12 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
-        let mut this = Self::new();
-        if capacity > Self::inline_size() {
-            this.grow(capacity);
+        let on_heap = capacity > inline_size::<T, N>();
+        Self {
+            len: TaggedLen::new(0, on_heap, Self::is_zst()),
+            raw: RawSmallVec::with_capacity(capacity),
+            _marker: PhantomData,
         }
-        this
     }
 
     #[inline]
@@ -1030,7 +1442,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     pub const fn capacity(&self) -> usize {
         if self.len.on_heap(Self::is_zst()) {
             // SAFETY: raw.heap is active
-            unsafe { self.raw.heap.1 }
+            unsafe { self.raw.inner.heap.1 }
         } else {
             Self::inline_size()
         }
@@ -1276,147 +1688,116 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
 
         let len = self.len();
+        let on_heap = self.spilled();
+        let capacity = self.capacity();
         assert!(new_capacity >= len);
 
-        if new_capacity > Self::inline_size() {
-            // SAFETY: we checked all the preconditions
-            let result = unsafe { self.raw.try_grow_raw(self.len, new_capacity) };
+        if new_capacity <= Self::inline_size() && self.spilled() {
+            // If the desired capacity is smaller than the inline size,
+            // then store all elements inline.
 
-            if result.is_ok() {
-                // SAFETY: the allocation succeeded, so self.raw.heap is now active
-                unsafe { self.set_on_heap() };
+            // SAFETY: The tag inside the length of the vector corresponds to the way
+            // elements are stored inside the vector.
+            // All elements will be stored inline because the vector will
+            // be shrunk to a capacity smaller than the inline size.
+            unsafe {
+                let on_heap = self.raw.shrink_to_fit(on_heap, len)?;
+                debug_assert!(!on_heap);
+                self.set_inline();
             }
-            result
+            Ok(())
+        } else if new_capacity > capacity {
+            self.try_reserve(new_capacity - capacity)
         } else {
-            // new_capacity <= Self::inline_size()
-            if self.spilled() {
-                unsafe {
-                    // SAFETY: heap member is active
-                    let (ptr, old_cap) = self.raw.heap;
-                    // inline member is now active
-
-                    // SAFETY: len <= new_capacity <= Self::inline_size()
-                    // so the copy is within bounds of the inline member
-                    copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
-                    drop(DropDealloc {
-                        ptr: ptr.cast(),
-                        size_bytes: old_cap * size_of::<T>(),
-                        align: align_of::<T>(),
-                    });
-                    self.set_inline();
-                }
-            }
             Ok(())
         }
     }
 
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        // can't overflow since len <= capacity
-        if additional > self.capacity() - self.len() {
-            let new_capacity = infallible(
-                self.len()
-                    .checked_add(additional)
-                    .and_then(usize::checked_next_power_of_two)
-                    .ok_or(CollectionAllocErr::CapacityOverflow),
-            );
-            self.grow(new_capacity);
-        }
+        infallible(self.try_reserve(additional))
     }
 
     #[inline]
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
-        if additional > self.capacity() - self.len() {
-            let new_capacity = self
-                .len()
-                .checked_add(additional)
-                .and_then(usize::checked_next_power_of_two)
-                .ok_or(CollectionAllocErr::CapacityOverflow)?;
-            self.try_grow(new_capacity)
-        } else {
-            Ok(())
+        if Self::is_zst() {
+            return Ok(());
         }
+
+        // SAFETY: The tag inside the length of the vector corresponds to the way
+        // elements are stored inside the vector. The same goes for the return value
+        // of the function.
+        unsafe {
+            let on_heap = self.raw.try_reserve(self.len, additional)?;
+            if on_heap {
+                self.set_on_heap();
+            } else {
+                self.set_inline();
+            }
+        };
+
+        Ok(())
     }
 
     #[inline]
     pub fn reserve_exact(&mut self, additional: usize) {
-        // can't overflow since len <= capacity
-        if additional > self.capacity() - self.len() {
-            let new_capacity = infallible(
-                self.len()
-                    .checked_add(additional)
-                    .ok_or(CollectionAllocErr::CapacityOverflow),
-            );
-            self.grow(new_capacity);
-        }
+        infallible(self.try_reserve_exact(additional))
     }
 
     #[inline]
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
-        if additional > self.capacity() - self.len() {
-            let new_capacity = self
-                .len()
-                .checked_add(additional)
-                .ok_or(CollectionAllocErr::CapacityOverflow)?;
-            self.try_grow(new_capacity)
-        } else {
-            Ok(())
+        if is_zst::<T>() {
+            return Ok(());
         }
+
+        // SAFETY: The tag inside the length of the vector corresponds to the way
+        // elements are stored inside the vector. The same goes for the return value
+        // of the function.
+        unsafe {
+            let on_heap = self.raw.try_reserve_exact(self.len, additional)?;
+            if on_heap {
+                self.set_on_heap();
+            } else {
+                self.set_inline();
+            }
+        };
+
+        Ok(())
     }
 
     #[inline]
     pub fn shrink_to_fit(&mut self) {
-        if !self.spilled() {
+        if is_zst::<T>() {
             return;
         }
+
         let len = self.len();
-        if len <= Self::inline_size() {
-            // SAFETY: self.spilled() is true, so we're on the heap
-            unsafe {
-                let (ptr, capacity) = self.raw.heap;
-                self.raw = RawSmallVec::new_inline(MaybeUninit::uninit());
-                copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
-                self.set_inline();
-                alloc::alloc::dealloc(
-                    ptr.cast().as_ptr(),
-                    Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>()),
-                );
-            }
-        } else if len < self.capacity() {
-            // SAFETY: len > Self::inline_size() >= 0
-            // so new capacity is non zero, it is equal to the length
-            // T can't be a ZST because SmallVec<ZST, N> is never spilled.
-            unsafe { infallible(self.raw.try_grow_raw(self.len, len)) };
-        }
+        let on_heap = self.spilled();
+
+        // SAFETY: The tag inside the length of the vector corresponds to the way
+        // elements are stored inside the vector.
+        let on_heap = unsafe {
+            infallible(self.raw.shrink_to_fit(on_heap, len))
+        };
+        self.len = TaggedLen::new(len, on_heap, is_zst::<T>());
     }
 
     #[inline]
     pub fn shrink_to(&mut self, min_capacity: usize) {
-        if !self.spilled() {
+        if is_zst::<T>() {
             return;
         }
-        if self.capacity() > min_capacity {
-            let len = self.len();
-            let target = core::cmp::max(len, min_capacity);
-            if target <= Self::inline_size() {
-                // SAFETY: self.spilled() is true, so we're on the heap
-                unsafe {
-                    let (ptr, capacity) = self.raw.heap;
-                    self.raw = RawSmallVec::new_inline(MaybeUninit::uninit());
-                    copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
-                    self.set_inline();
-                    alloc::alloc::dealloc(
-                        ptr.cast().as_ptr(),
-                        Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>()),
-                    );
-                }
-            } else if target < self.capacity() {
-                // SAFETY: len > Self::inline_size() >= 0
-                // so new capacity is non zero, it is equal to the length
-                // T can't be a ZST because SmallVec<ZST, N> is never spilled.
-                unsafe { infallible(self.raw.try_grow_raw(self.len, target)) };
-            }
-        }
+
+        let len = self.len();
+        let min_capacity = len.max(min_capacity);
+        let on_heap = self.spilled();
+
+        // SAFETY: The tag inside the length of the vector corresponds to the way
+        // elements are stored inside the vector.
+        let on_heap = unsafe {
+            infallible(self.raw.shrink_to_fit(on_heap, min_capacity))
+        };
+        self.len = TaggedLen::new(len, on_heap, is_zst::<T>());
     }
 
     #[inline]
@@ -1563,7 +1944,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             // - the first `len` entries are proper `T`-values
             // - the allocation is not larger than `isize::MAX`
             unsafe {
-                let (ptr, cap) = this.raw.heap;
+                let (ptr, cap) = this.raw.inner.heap;
                 Vec::from_raw_parts(ptr.as_ptr(), len, cap)
             }
         }
@@ -1768,7 +2149,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         };
 
         SmallVec {
-            len: TaggedLen::new(length, true, Self::is_zst()),
+            len: TaggedLen::new(length, true, is_zst::<T>()),
             raw: RawSmallVec::new_heap(ptr, capacity),
             _marker: PhantomData,
         }
@@ -1910,26 +2291,6 @@ impl<T> Drop for DropGuard<T> {
     }
 }
 
-struct DropDealloc {
-    ptr: NonNull<u8>,
-    size_bytes: usize,
-    align: usize,
-}
-
-impl Drop for DropDealloc {
-    #[inline]
-    fn drop(&mut self) {
-        unsafe {
-            if self.size_bytes > 0 {
-                alloc::alloc::dealloc(
-                    self.ptr.as_ptr(),
-                    Layout::from_size_align_unchecked(self.size_bytes, self.align),
-                );
-            }
-        }
-    }
-}
-
 #[cfg(feature = "may_dangle")]
 unsafe impl<#[may_dangle] T, const N: usize> Drop for SmallVec<T, N> {
     fn drop(&mut self) {
@@ -1943,8 +2304,8 @@ unsafe impl<#[may_dangle] T, const N: usize> Drop for SmallVec<T, N> {
                 let capacity = self.capacity();
                 Some(DropDealloc {
                     ptr: NonNull::new_unchecked(ptr as *mut u8),
-                    size_bytes: capacity * size_of::<T>(),
-                    align: align_of::<T>(),
+                    layout: array_layout_unchecked::<T>(capacity),
+                    allocator: &self.raw.allocator,
                 })
             } else {
                 None
@@ -1966,8 +2327,8 @@ impl<T, const N: usize> Drop for SmallVec<T, N> {
                 let capacity = self.capacity();
                 Some(DropDealloc {
                     ptr: NonNull::new_unchecked(ptr as *mut u8),
-                    size_bytes: capacity * size_of::<T>(),
-                    align: align_of::<T>(),
+                    layout: array_layout_unchecked::<T>(capacity),
+                    allocator: &self.raw.allocator,
                 })
             } else {
                 None
@@ -1987,11 +2348,11 @@ impl<T, const N: usize> Drop for IntoIter<T, N> {
             let end = self.end.value(is_zst);
             let ptr = self.as_mut_ptr();
             let _drop_dealloc = if on_heap {
-                let capacity = self.raw.heap.1;
+                let capacity = self.raw.inner.heap.1;
                 Some(DropDealloc {
                     ptr: NonNull::new_unchecked(ptr as *mut u8),
-                    size_bytes: capacity * size_of::<T>(),
-                    align: align_of::<T>(),
+                    layout: array_layout_unchecked::<T>(capacity),
+                    allocator: &self.raw.allocator,
                 })
             } else {
                 None
