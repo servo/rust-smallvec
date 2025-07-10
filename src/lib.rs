@@ -620,6 +620,11 @@ impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> alloc_pa
             // way in which data is stored.
             let (old_ptr, old_capacity) = unsafe { self.inner.heap };
 
+            // Nothing needs to be done if the capacity is already sufficient.
+            if old_capacity >= new_capacity {
+                return Ok(true);
+            }
+
             // Ensure capacity growth is exponential.
             let new_capacity = new_capacity.max(2 * old_capacity);
 
@@ -675,6 +680,11 @@ impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> alloc_pa
             // SAFETY: The caller ensures that the tag corresponds to the
             // way in which data is stored.
             let (old_ptr, old_capacity) = unsafe { self.inner.heap };
+
+            // Nothing needs to be done if the capacity is already sufficient.
+            if old_capacity >= new_capacity {
+                return Ok(true);
+            }
 
             // SAFETY: The stored capacity corresponds always to a valid layout.
             let old_layout = unsafe { array_layout_unchecked::<T>(old_capacity) };
