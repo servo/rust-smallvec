@@ -59,6 +59,7 @@
 
 #![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(feature = "allocator_api", feature(allocator_api))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization, trusted_len))]
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
@@ -75,6 +76,9 @@ mod tests;
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
+
+#[cfg(feature = "allocator_api")]
+use alloc::alloc::{Global, Allocator};
 
 use alloc::alloc::Layout;
 use core::borrow::Borrow;
@@ -103,6 +107,39 @@ use serde_core::{
 };
 #[cfg(feature = "std")]
 use std::io;
+
+/// A macro that conditionally discards the last type parameter of its input depending on the "allocator_api" feature.
+/// This is used to control the presence of the allocator parameter.
+#[cfg(not(feature = "allocator_api"))]
+macro_rules! alloc_param {
+    // While a more generic version of this macro is likely possible, it isn't needed for the puporses of this crate.
+    ($type:ident<$arg0:tt>) => {
+        $type
+    };
+    ($type:ident<$arg0:tt, $arg1:tt $(,)?>) => {
+        $type<$arg0>
+    };
+    ($type:ident<$arg0:tt, $arg1:tt, $arg2:tt $(,)?>) => {
+        $type<$arg0, $arg1>
+    };
+    ($type:ident<$arg0:tt, $arg1:tt, $arg2:tt, $arg3:tt $(,)?>) => {
+        $type<$arg0, $arg1, $arg2>
+    };
+    ($type:ident<$arg0:tt, $path:ident::$arg1:tt, $arg2:tt, $arg3:tt $(,)?>) => {
+        $type<$arg0, $path::$arg1, $arg2>
+    };
+    ($type:ident<$arg0:tt, $arg1:tt, $arg2:tt, $arg3:tt, $arg4:tt $(,)?>) => {
+        $type<$arg0, $arg1, $arg2, $arg3>
+    };
+}
+
+#[cfg(feature = "allocator_api")]
+macro_rules! alloc_param {
+    // This will return the tokens without change.
+    ($($args:tt)+) => {
+        $($args)*
+    };
+}
 
 /// Error type for APIs with fallible heap allocation
 #[derive(Debug)]
@@ -202,8 +239,10 @@ const unsafe fn array_layout_unchecked<T>(n: usize) -> Layout {
 /// A ZST from which memory allocation methods are exposed.
 /// The methods correspond to the `allocator_api` Rust nightly feature.
 #[derive(Clone, Copy)]
+#[cfg(not(feature = "allocator_api"))]
 struct A;
 
+#[cfg(not(feature = "allocator_api"))]
 impl A {
     #[inline]
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, CollectionAllocErr> {
@@ -336,15 +375,18 @@ impl A {
     }
 }
 
+#[cfg(not(feature = "allocator_api"))]
 const GLOBAL: A = A;
 
-struct DropDealloc<'a> {
+#[cfg(feature = "allocator_api")]
+const GLOBAL: Global = Global;
+
+struct DropDealloc<'a, #[cfg(feature = "allocator_api")] A: Allocator> {
     ptr: NonNull<u8>,
     layout: Layout,
     allocator: &'a A,
 }
-
-impl Drop for DropDealloc<'_> {
+impl<#[cfg(feature = "allocator_api")] A: Allocator> Drop for alloc_param!(DropDealloc<'_, A>) {
     #[inline]
     fn drop(&mut self) {
         unsafe {
@@ -417,12 +459,12 @@ impl<T, const N: usize> RawSmallVecUnion<T, N> {
     }
 }
 
-pub struct RawSmallVec<T, const N: usize> {
+pub struct RawSmallVec<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator = Global> {
     pub inner: RawSmallVecUnion<T, N>,
     allocator: A,
 }
 
-impl<T, const N: usize> RawSmallVec<T, N> {
+impl<T, const N: usize> alloc_param!(RawSmallVec<T, N, Global>) {
     #[inline]
     pub const fn new() -> Self {
         Self::new_in(GLOBAL)
@@ -450,7 +492,22 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     }
 }
 
-impl<T, const N: usize> RawSmallVec<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> alloc_param!(RawSmallVec<T, N, A>) {
+    /// Turn a generic allocation error returned by a parametric allocator into a [`CollectionAllocErr`].
+    #[cfg(feature = "allocator_api")]
+    #[inline(always)]
+    fn handle_alloc_error<U>(r: Result<U, alloc::alloc::AllocError>, layout: Layout) -> Result<U, CollectionAllocErr> {
+        r.map_err(|_| CollectionAllocErr::AllocErr { layout })
+    }
+
+    /// A fallback used whenever the "allocator_api" is disabled. All errors are already [`CollectionAllocErr`] values,
+    /// so nothing needs to be done.
+    #[cfg(not(feature = "allocator_api"))]
+    #[inline(always)]
+    fn handle_alloc_error<U>(r: Result<U, CollectionAllocErr>, _layout: Layout) -> Result<U, CollectionAllocErr> {
+        r
+    }
+
     #[inline]
     const fn new_in(allocator: A) -> Self {
         Self::new_inline_in(MaybeUninit::uninit(), allocator)
@@ -484,7 +541,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             Ok(Self::new_inline_in(MaybeUninit::uninit(), allocator))
         } else {
             let layout = Layout::array::<T>(capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
-            let ptr = allocator.allocate(layout)?;
+            let ptr = Self::handle_alloc_error(allocator.allocate(layout), layout)?;
             let inner = RawSmallVecUnion {
                 heap: (ptr.cast(), capacity)
             };
@@ -570,7 +627,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             let old_layout = unsafe { array_layout_unchecked::<T>(old_capacity) };
 
             let new_layout = Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
-            let ptr = self.allocator.grow(old_ptr.cast(), old_layout, new_layout)?;
+            let ptr = Self::handle_alloc_error(self.allocator.grow(old_ptr.cast(), old_layout, new_layout), new_layout)?;
 
             self.inner = RawSmallVecUnion::new_heap(ptr.cast(), new_capacity);
             Ok(true)
@@ -579,7 +636,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             let new_capacity = (2 * N).max(new_capacity);
 
             let layout = Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
-            let ptr = self.allocator.allocate(layout)?;
+            let ptr = Self::handle_alloc_error(self.allocator.allocate(layout), layout)?;
 
             // SAFETY: The pointer returned by `allocate` is valid and its own memory region.
             unsafe {
@@ -623,14 +680,14 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             let old_layout = unsafe { array_layout_unchecked::<T>(old_capacity) };
 
             let new_layout = Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
-            let ptr = self.allocator.grow(old_ptr.cast(), old_layout, new_layout)?;
+            let ptr = Self::handle_alloc_error(self.allocator.grow(old_ptr.cast(), old_layout, new_layout), new_layout)?;
 
             self.inner = RawSmallVecUnion::new_heap(ptr.cast(), new_capacity);
 
             Ok(true)
         } else if new_capacity > inline_size::<T, N>() {
             let layout = Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
-            let ptr = self.allocator.allocate(layout)?;
+            let ptr = Self::handle_alloc_error(self.allocator.allocate(layout), layout)?;
 
             // SAFETY: The pointer returned by `allocate` is valid and its own memory region.
             unsafe {
@@ -668,14 +725,11 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             if cap <= N {
                 self.inner = RawSmallVecUnion::new_inline(MaybeUninit::uninit());
 
-                // If the amount of data copied is small, then the code generator
-                // will unfold the copy instead of generating a function call.
-                // However, this is only possible if the amount copied is constant.
-                // This means that for certain small sizes, copying everything is faster.
-                if const { size_of::<T>() * N <= 128 } {
-                    copy_nonoverlapping(old_ptr.cast().as_ptr(), self.as_mut_ptr_inline(), N);
-                } else {
-                    copy_nonoverlapping(old_ptr.cast().as_ptr(), self.as_mut_ptr_inline(), cap);
+                // SAFETY: The memory regions don't overlap because one pointer is recently created inline storage.
+                // By taking the minimum value of both capabilities, the copying will only touch valid memory.
+                unsafe {
+                    let count = cap.min(old_capacity);
+                    copy_nonoverlapping(old_ptr.cast().as_ptr(), self.as_mut_ptr_inline(), count);
                 }
 
                 self.allocator.deallocate(old_ptr.cast(), layout);
@@ -686,7 +740,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
                 // and it is already possible to construct a valid layout with the old capacity.
                 let new_layout = unsafe { array_layout_unchecked::<T>(cap) };
 
-                let ptr = self.allocator.shrink(old_ptr.cast(), layout, new_layout)?;
+                let ptr = Self::handle_alloc_error(self.allocator.shrink(old_ptr.cast(), layout, new_layout), new_layout)?;
                 self.inner = RawSmallVecUnion::new_heap(ptr.cast(), cap);
 
                 Ok(true)
@@ -743,14 +797,14 @@ impl TaggedLen {
 }
 
 #[repr(C)]
-pub struct SmallVec<T, const N: usize> {
+pub struct SmallVec<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator = Global> {
     len: TaggedLen,
-    raw: RawSmallVec<T, N>,
+    raw: alloc_param!(RawSmallVec<T, N, A>),
     _marker: PhantomData<T>,
 }
 
-unsafe impl<T: Send, const N: usize> Send for SmallVec<T, N> {}
-unsafe impl<T: Sync, const N: usize> Sync for SmallVec<T, N> {}
+unsafe impl<T: Send, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Send for alloc_param!(SmallVec<T, N, A>) {}
+unsafe impl<T: Sync, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Sync for alloc_param!(SmallVec<T, N, A>) {}
 
 impl<T, const N: usize> Default for SmallVec<T, N> {
     #[inline]
@@ -764,7 +818,7 @@ impl<T, const N: usize> Default for SmallVec<T, N> {
 /// Returned from [`SmallVec::drain`][1].
 ///
 /// [1]: struct.SmallVec.html#method.drain
-pub struct Drain<'a, T: 'a, const N: usize> {
+pub struct Drain<'a, T: 'a, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> {
     // `vec` points to a valid object within its lifetime.
     // This is ensured by the fact that we're holding an iterator to its items.
     //
@@ -775,10 +829,10 @@ pub struct Drain<'a, T: 'a, const N: usize> {
     tail_start: usize,
     tail_len: usize,
     iter: core::slice::Iter<'a, T>,
-    vec: core::ptr::NonNull<SmallVec<T, N>>,
+    vec: core::ptr::NonNull<alloc_param!(SmallVec<T, N, A>)>,
 }
 
-impl<'a, T: 'a, const N: usize> Iterator for Drain<'a, T, N> {
+impl<'a, T: 'a, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Iterator for alloc_param!(Drain<'a, T, N, A>) {
     type Item = T;
 
     #[inline]
@@ -796,7 +850,7 @@ impl<'a, T: 'a, const N: usize> Iterator for Drain<'a, T, N> {
     }
 }
 
-impl<'a, T: 'a, const N: usize> DoubleEndedIterator for Drain<'a, T, N> {
+impl<'a, T: 'a, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> DoubleEndedIterator for alloc_param!(Drain<'a, T, N, A>) {
     #[inline]
     fn next_back(&mut self) -> Option<T> {
         // SAFETY: see above
@@ -806,21 +860,21 @@ impl<'a, T: 'a, const N: usize> DoubleEndedIterator for Drain<'a, T, N> {
     }
 }
 
-impl<T, const N: usize> ExactSizeIterator for Drain<'_, T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> ExactSizeIterator for alloc_param!(Drain<'_, T, N, A>) {
     #[inline]
     fn len(&self) -> usize {
         self.iter.len()
     }
 }
 
-impl<T, const N: usize> core::iter::FusedIterator for Drain<'_, T, N> {}
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> core::iter::FusedIterator for alloc_param!(Drain<'_, T, N, A>) {}
 
-impl<'a, T: 'a, const N: usize> Drop for Drain<'a, T, N> {
+impl<'a, T: 'a, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Drop for alloc_param!(Drain<'a, T, N, A>) {
     fn drop(&mut self) {
         /// Moves back the un-`Drain`ed elements to restore the original `Vec`.
-        struct DropGuard<'r, 'a, T, const N: usize>(&'r mut Drain<'a, T, N>);
+        struct DropGuard<'r, 'a, T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator>(&'r mut alloc_param!(Drain<'a, T, N, A>));
 
-        impl<'r, 'a, T, const N: usize> Drop for DropGuard<'r, 'a, T, N> {
+        impl<'r, 'a, T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Drop for alloc_param!(DropGuard<'r, 'a, T, N, A>) {
             fn drop(&mut self) {
                 if self.0.tail_len > 0 {
                     unsafe {
@@ -845,7 +899,7 @@ impl<'a, T: 'a, const N: usize> Drop for Drain<'a, T, N> {
 
         let mut vec = self.vec;
 
-        if SmallVec::<T, N>::is_zst() {
+        if is_zst::<T>() {
             // ZSTs have no identity, so we don't need to move them around, we only need to drop the correct amount.
             // this can be achieved by manipulating the Vec length instead of moving values out from `iter`.
             unsafe {
@@ -886,7 +940,7 @@ impl<'a, T: 'a, const N: usize> Drop for Drain<'a, T, N> {
     }
 }
 
-impl<T, const N: usize> Drain<'_, T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> alloc_param!(Drain<'_, T, N, A>) {
     #[must_use]
     pub fn as_slice(&self) -> &[T] {
         self.iter.as_slice()
@@ -943,11 +997,11 @@ impl<T, const N: usize> Drain<'_, T, N> {
 /// Returned from [`SmallVec::extract_if`][1].
 ///
 /// [1]: struct.SmallVec.html#method.extract_if
-pub struct ExtractIf<'a, T, const N: usize, F>
+pub struct ExtractIf<'a, T, const N: usize, F, #[cfg(feature = "allocator_api")] A: Allocator>
 where
     F: FnMut(&mut T) -> bool,
 {
-    vec: &'a mut SmallVec<T, N>,
+    vec: &'a mut alloc_param!(SmallVec<T, N, A>),
     /// The index of the item that will be inspected by the next call to `next`.
     idx: usize,
     /// Elements at and beyond this point will be retained. Must be equal or smaller than `old_len`.
@@ -961,7 +1015,7 @@ where
 }
 
 #[cfg(feature = "extract_if")]
-impl<T, const N: usize, F> core::fmt::Debug for ExtractIf<'_, T, N, F>
+impl<T, const N: usize, F, #[cfg(feature = "allocator_api")] A: Allocator> core::fmt::Debug for alloc_param!(ExtractIf<'_, T, N, F, A>)
 where
     F: FnMut(&mut T) -> bool,
     T: core::fmt::Debug,
@@ -974,7 +1028,7 @@ where
 }
 
 #[cfg(feature = "extract_if")]
-impl<T, F, const N: usize> Iterator for ExtractIf<'_, T, N, F>
+impl<T, F, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Iterator for alloc_param!(ExtractIf<'_, T, N, F, A>)
 where
     F: FnMut(&mut T) -> bool,
 {
@@ -1010,7 +1064,7 @@ where
 }
 
 #[cfg(feature = "extract_if")]
-impl<T, F, const N: usize> Drop for ExtractIf<'_, T, N, F>
+impl<T, F, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Drop for alloc_param!(ExtractIf<'_, T, N, F, A>)
 where
     F: FnMut(&mut T) -> bool,
 {
@@ -1034,12 +1088,13 @@ where
     }
 }
 
-pub struct Splice<'a, I: Iterator + 'a, const N: usize> {
-    drain: Drain<'a, I::Item, N>,
+pub struct Splice<'a, I: Iterator + 'a, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> {
+    drain: alloc_param!(Drain<'a, I::Item, N, A>),
+    //drain: Drain<'a, I::Item, N>,
     replace_with: I,
 }
 
-impl<'a, I, const N: usize> core::fmt::Debug for Splice<'a, I, N>
+impl<'a, I, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> core::fmt::Debug for alloc_param!(Splice<'a, I, N, A>)
 where
     I: Debug + Iterator + 'a,
     <I as Iterator>::Item: Debug,
@@ -1049,7 +1104,7 @@ where
     }
 }
 
-impl<I: Iterator, const N: usize> Iterator for Splice<'_, I, N> {
+impl<I: Iterator, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Iterator for alloc_param!(Splice<'_, I, N, A>) {
     type Item = I::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -1061,15 +1116,15 @@ impl<I: Iterator, const N: usize> Iterator for Splice<'_, I, N> {
     }
 }
 
-impl<I: Iterator, const N: usize> DoubleEndedIterator for Splice<'_, I, N> {
+impl<I: Iterator, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> DoubleEndedIterator for alloc_param!(Splice<'_, I, N, A>) {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.drain.next_back()
     }
 }
 
-impl<I: Iterator, const N: usize> ExactSizeIterator for Splice<'_, I, N> {}
+impl<I: Iterator, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> ExactSizeIterator for alloc_param!(Splice<'_, I, N, A>) {}
 
-impl<I: Iterator, const N: usize> Drop for Splice<'_, I, N> {
+impl<I: Iterator, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Drop for alloc_param!(Splice<'_, I, N, A>) {
     fn drop(&mut self) {
         self.drain.by_ref().for_each(drop);
         // At this point draining is done and the only remaining tasks are splicing
@@ -1119,13 +1174,13 @@ impl<I: Iterator, const N: usize> Drop for Splice<'_, I, N> {
 /// Returned from [`SmallVec::into_iter`][1].
 ///
 /// [1]: struct.SmallVec.html#method.into_iter
-pub struct IntoIter<T, const N: usize> {
+pub struct IntoIter<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> {
     // # Safety
     //
     // `end` decides whether the data lives on the heap or not
     //
     // The members from begin..end are initialized
-    raw: RawSmallVec<T, N>,
+    raw: alloc_param!(RawSmallVec<T, N, A>),
     begin: usize,
     end: TaggedLen,
     _marker: PhantomData<T>,
@@ -1133,10 +1188,10 @@ pub struct IntoIter<T, const N: usize> {
 
 // SAFETY: IntoIter has unique ownership of its contents.  Sending (or sharing) an `IntoIter<T, N>`
 // is equivalent to sending (or sharing) a `SmallVec<T, N>`.
-unsafe impl<T, const N: usize> Send for IntoIter<T, N> where T: Send {}
-unsafe impl<T, const N: usize> Sync for IntoIter<T, N> where T: Sync {}
+unsafe impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Send for alloc_param!(IntoIter<T, N, A>) where T: Send {}
+unsafe impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Sync for alloc_param!(IntoIter<T, N, A>) where T: Sync {}
 
-impl<T, const N: usize> IntoIter<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> alloc_param!(IntoIter<T, N, A>) {
     #[inline]
     const fn is_zst() -> bool {
         size_of::<T>() == 0
@@ -1188,9 +1243,15 @@ impl<T, const N: usize> IntoIter<T, N> {
             )
         }
     }
+
+    /// Returns a reference to the underlying allocator.
+    #[cfg(feature = "allocator_api")]
+    pub fn allocator(&self) -> &A {
+        &self.raw.allocator
+    }
 }
 
-impl<T, const N: usize> Iterator for IntoIter<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Iterator for alloc_param!(IntoIter<T, N, A>) {
     type Item = T;
 
     #[inline]
@@ -1215,7 +1276,7 @@ impl<T, const N: usize> Iterator for IntoIter<T, N> {
     }
 }
 
-impl<T, const N: usize> DoubleEndedIterator for IntoIter<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> DoubleEndedIterator for alloc_param!(IntoIter<T, N, A>) {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         let mut end = self.end.value(Self::is_zst());
@@ -1234,10 +1295,26 @@ impl<T, const N: usize> DoubleEndedIterator for IntoIter<T, N> {
         }
     }
 }
-impl<T, const N: usize> ExactSizeIterator for IntoIter<T, N> {}
-impl<T, const N: usize> core::iter::FusedIterator for IntoIter<T, N> {}
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> ExactSizeIterator for alloc_param!(IntoIter<T, N, A>) {}
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> core::iter::FusedIterator for alloc_param!(IntoIter<T, N, A>) {}
 
 impl<T, const N: usize> SmallVec<T, N> {
+    /// A stub for `Self::new_in` that can be used whenever the "allocator_api" feature is disabled.
+    /// This makes it possible to develop some functions independent from the feature,
+    /// reduceing code complexity.
+    #[cfg(not(feature = "allocator_api"))]
+    const fn new_in(_alloc: A) -> Self {
+        const { Self::new() }
+    }
+
+    /// A stub for `Self::with_capacity_in` that can be used whenever the "allocator_api" feature is disabled.
+    /// This makes it possible to develop some functions independent from the feature,
+    /// reduceing code complexity.
+    #[cfg(not(feature = "allocator_api"))]
+    fn with_capacity_in(capacity: usize, _alloc: A) -> Self {
+        Self::with_capacity(capacity)
+    }
+
     #[inline]
     pub const fn new() -> SmallVec<T, N> {
         Self {
@@ -1336,50 +1413,160 @@ impl<T, const N: usize> SmallVec<T, N> {
             _marker: PhantomData,
         }
     }
+
+    /// Creates a `SmallVec` directly from the raw components of another `SmallVec`.
+    ///
+    /// # Safety
+    ///
+    /// This is highly unsafe, due to the number of invariants that aren’t checked:
+    ///
+    /// - `ptr` needs to have been previously allocated via `SmallVec` from its spilled storage (at least, it’s highly likely to be incorrect if it wasn’t).
+    /// - `ptr`’s `A::Item` type needs to be the same size and alignment that it was allocated with
+    /// - `length` needs to be less than or equal to `capacity`.
+    /// - `capacity` needs to be the capacity that the pointer was allocated with.
+    ///
+    /// Violating these may cause problems like corrupting the allocator’s internal data structures.
+    ///
+    /// Additionally, `capacity` must be greater than the amount of inline storage `A` has; that is, the new `SmallVec` must need to spill over into heap allocated storage. This condition is asserted against.
+    ///
+    /// The ownership of `ptr` is effectively transferred to the `SmallVec` which may then deallocate, reallocate or change the contents of memory pointed to by the pointer at will. Ensure that nothing else uses the pointer after calling this function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smallvec::{SmallVec, smallvec};
+    ///
+    /// let mut v: SmallVec<_, 1> = smallvec![1, 2, 3];
+    ///
+    /// // Pull out the important parts of `v`.
+    /// let p = v.as_mut_ptr();
+    /// let len = v.len();
+    /// let cap = v.capacity();
+    /// let spilled = v.spilled();
+    ///
+    /// unsafe {
+    ///     // Forget all about `v`. The heap allocation that stored the
+    ///     // three values won't be deallocated.
+    ///     std::mem::forget(v);
+    ///
+    ///     // Overwrite memory with [4, 5, 6].
+    ///     //
+    ///     // This is only safe if `spilled` is true! Otherwise, we are
+    ///     // writing into the old `SmallVec`'s inline storage on the
+    ///     // stack.
+    ///     assert!(spilled);
+    ///     for i in 0..len {
+    ///         std::ptr::write(p.add(i), 4 + i);
+    ///     }
+    ///
+    ///     // Put everything back together into a SmallVec with a different
+    ///     // amount of inline storage, but which is still less than `cap`.
+    ///     let rebuilt = SmallVec::<_, 2>::from_raw_parts(p, len, cap);
+    ///     assert_eq!(&*rebuilt, &[4, 5, 6]);
+    /// }
+    /// ```
+    #[inline]
+    pub unsafe fn from_raw_parts(ptr: *mut T, length: usize, capacity: usize) -> SmallVec<T, N> {
+        assert!(!Self::is_zst());
+
+        // SAFETY: We require caller to provide same ptr as we alloc
+        // and we never alloc null pointer.
+        let ptr = unsafe {
+            debug_assert!(!ptr.is_null(), "Called `from_raw_parts` with null pointer.");
+            NonNull::new_unchecked(ptr)
+        };
+
+        SmallVec {
+            len: TaggedLen::new(length, true, is_zst::<T>()),
+            raw: RawSmallVec::new_heap(ptr, capacity),
+            _marker: PhantomData,
+        }
+    }
 }
 
-impl<T, const N: usize> SmallVec<T, N> {
-    #[inline]
-    const fn is_zst() -> bool {
-        size_of::<T>() == 0
+#[cfg(feature = "allocator_api")]
+impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
+    #[inline(always)]
+    pub const fn allocator(&self) -> &A {
+        &self.raw.allocator
     }
 
     #[inline]
-    pub fn from_vec(vec: Vec<T>) -> Self {
-        if vec.capacity() == 0 {
-            return Self::new();
+    pub const fn new_in(alloc: A) -> Self {
+        Self {
+            len: TaggedLen::new(0, false, Self::is_zst()),
+            raw: RawSmallVec::new_in(alloc),
+            _marker: PhantomData,
         }
+    }
 
-        if Self::is_zst() {
-            // "Move" elements to stack buffer. They're ZST so we don't actually have to do
-            // anything. Just make sure they're not dropped.
-            // We don't wrap the vector in ManuallyDrop so that when it's dropped, the memory is
-            // deallocated, if it needs to be.
-            let mut vec = vec;
-            let len = vec.len();
-
-            // SAFETY: `0` is less than the vector's capacity.
-            // old_len..new_len is an empty range. So there are no uninitialized elements
-            unsafe { vec.set_len(0) };
-            Self {
-                len: TaggedLen::new(len, false, Self::is_zst()),
-                raw: RawSmallVec::new(),
-                _marker: PhantomData,
-            }
-        } else {
-            let mut vec = ManuallyDrop::new(vec);
-            let len = vec.len();
-            let cap = vec.capacity();
-            // SAFETY: vec.capacity is not `0` (checked above), so the pointer
-            // can not dangle and thus specifically cannot be null.
-            let ptr = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
-
-            Self {
-                len: TaggedLen::new(len, true, Self::is_zst()),
-                raw: RawSmallVec::new_heap(ptr, cap),
-                _marker: PhantomData,
-            }
+    #[inline]
+    pub fn with_capacity_in(capacity: usize, alloc: A) -> Self {
+        let on_heap = capacity > inline_size::<T, N>();
+        Self {
+            len: TaggedLen::new(0, on_heap, Self::is_zst()),
+            raw: RawSmallVec::with_capacity_in(capacity, alloc),
+            _marker: PhantomData,
         }
+    }
+
+    #[inline]
+    pub fn try_with_capacity_in(
+        capacity: usize,
+        alloc: A,
+    ) -> Result<Self, CollectionAllocErr> {
+        let on_heap = capacity > inline_size::<T, N>();
+        Ok(Self {
+            len: TaggedLen::new(0, on_heap, Self::is_zst()),
+            raw: RawSmallVec::try_with_capacity_in(capacity, alloc)?,
+            _marker: PhantomData,
+        })
+    }
+
+    #[inline]
+    pub unsafe fn from_raw_parts_in(
+        ptr: *mut T,
+        length: usize,
+        capacity: usize,
+        alloc: A,
+    ) -> Self {
+        assert!(!Self::is_zst());
+
+        // SAFETY: We require caller to provide same ptr as we alloc
+        // and we never alloc null pointer.
+        let ptr = unsafe {
+            debug_assert!(!ptr.is_null(), "Called `from_raw_parts` with null pointer.");
+            NonNull::new_unchecked(ptr)
+        };
+
+        Self {
+            len: TaggedLen::new(length, true, is_zst::<T>()),
+            raw: RawSmallVec::new_heap_in(ptr, capacity, alloc),
+            _marker: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub unsafe fn from_parts_in(
+        ptr: NonNull<T>,
+        length: usize,
+        capacity: usize,
+        alloc: A,
+    ) -> Self {
+        assert!(!Self::is_zst());
+
+        Self {
+            len: TaggedLen::new(length, true, is_zst::<T>()),
+            raw: RawSmallVec::new_heap_in(ptr, capacity, alloc),
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> alloc_param!(SmallVec<T, N, A>) {
+    #[inline]
+    const fn is_zst() -> bool {
+        size_of::<T>() == 0
     }
 
     /// Sets the tag to be on the heap
@@ -1453,49 +1640,46 @@ impl<T, const N: usize> SmallVec<T, N> {
         self.len.on_heap(Self::is_zst())
     }
 
-    /// Splits the collection into two at the given index.
-    ///
-    /// Returns a newly allocated vector containing the elements in the range
-    /// `[at, len)`. After the call, the original vector will be left containing
-    /// the elements `[0, at)` with its previous capacity unchanged.
-    ///
-    /// - If you want to take ownership of the entire contents and capacity of
-    ///   the vector, see [`core::mem::take`] or [`core::mem::replace`].
-    /// - If you don't need the returned vector at all, see [`SmallVec::truncate`].
-    /// - If you want to take ownership of an arbitrary subslice, or you don't
-    ///   necessarily want to store the removed items in a vector, see [`SmallVec::drain`].
-    ///
-    /// # Panics
-    ///
-    /// Panics if `at > len`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// let mut vec = vec![1, 2, 3];
-    /// let vec2 = vec.split_off(1);
-    /// assert_eq!(vec, [1]);
-    /// assert_eq!(vec2, [2, 3]);
-    /// ```
     #[inline]
-    pub fn split_off(&mut self, at: usize) -> Self {
-        let len = self.len();
-        assert!(at <= len);
+    pub fn from_vec(vec: alloc_param!(Vec<T, A>)) -> Self {
+        let mut vec = ManuallyDrop::new(vec);
+        let cap = vec.capacity();
+        let len = vec.len();
+        #[cfg(feature = "allocator_api")]
+        // SAFETY: casting a reference to a pointer results
+        // in a valid pointer. Since the value is wrapped inside a
+        // `ManuallyDrop`, the value is not dropped twice.
+        let alloc = unsafe { core::ptr::read(vec.allocator() as *const A) };
+        #[cfg(not(feature = "allocator_api"))]
+        let alloc = A;
 
-        let other_len = len - at;
-        let mut other = Self::with_capacity(other_len);
+        if Self::is_zst() {
+            // Standard Rust ZST vecs don't allocate, so no memory management needs to be done.
+            Self {
+                len: TaggedLen::new(len, false, Self::is_zst()),
+                raw: RawSmallVec::new_in(alloc),
+                _marker: PhantomData,
+            }
+        } else if cap > 0 {
+            // FIXME: Replace with `Vec::as_non_null` once it is stable.
+            // SAFETY: The pointer of a vector is never null.
+            let ptr = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
 
-        // Unsafely `set_len` and copy items to `other`.
-        unsafe {
-            self.set_len(at);
-            other.set_len(other_len);
-
-            core::ptr::copy_nonoverlapping(self.as_ptr().add(at), other.as_mut_ptr(), other_len);
+            Self {
+                len: TaggedLen::new(len, true, Self::is_zst()),
+                raw: RawSmallVec::new_heap_in(ptr, cap, alloc),
+                _marker: PhantomData,
+            }
+        } else {
+            Self {
+                len: TaggedLen::new(0, false, Self::is_zst()),
+                raw: RawSmallVec::new_inline_in(MaybeUninit::uninit(), alloc),
+                _marker: PhantomData,
+            }
         }
-        other
     }
 
-    pub fn drain<R>(&mut self, range: R) -> Drain<'_, T, N>
+    pub fn drain<R>(&mut self, range: R) -> alloc_param!(Drain<'_, T, N, A>)
     where
         R: core::ops::RangeBounds<usize>,
     {
@@ -1591,7 +1775,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// assert_eq!(items, SmallVec::<i32, 16>::from(&[0, 0, 0, 0, 0, 0, 0, 2, 2, 2]));
     /// assert_eq!(ones.len(), 3);
     /// ```
-    pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> ExtractIf<'_, T, N, F>
+    pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> alloc_param!(ExtractIf<'_, T, N, F, A>)
     where
         F: FnMut(&mut T) -> bool,
         R: core::ops::RangeBounds<usize>,
@@ -1614,7 +1798,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 
-    pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter, N>
+    pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> alloc_param!(Splice<'_, I::IntoIter, N, A>)
     where
         R: core::ops::RangeBounds<usize>,
         I: IntoIterator<Item = T>,
@@ -1658,7 +1842,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    pub fn append<const M: usize>(&mut self, other: &mut SmallVec<T, M>) {
+    pub fn append<const M: usize>(&mut self, other: &mut alloc_param!(SmallVec<T, M, A>)) {
         // can't overflow since both are smaller than isize::MAX and 2 * isize::MAX < usize::MAX
         let len = self.len();
         let other_len = other.len();
@@ -1921,11 +2105,25 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    pub fn into_vec(self) -> Vec<T> {
+    pub fn into_vec(self) -> alloc_param!(Vec<T, A>) {
         let len = self.len();
-        if !self.spilled() {
+        let on_heap = self.spilled();
+        let this = ManuallyDrop::new(self);
+
+        // SAFETY: casting a reference to a pointer results
+        // in a valid pointer. Since the value is wrapped inside a
+        // `ManuallyDrop`, the value is not dropped twice.
+        #[cfg(feature = "allocator_api")]
+        let alloc = unsafe {
+            core::ptr::read(&this.raw.allocator as *const A)
+        };
+
+        if !on_heap {
+            #[cfg(not(feature = "allocator_api"))]
             let mut vec = Vec::with_capacity(len);
-            let this = ManuallyDrop::new(self);
+            #[cfg(feature = "allocator_api")]
+            let mut vec = Vec::with_capacity_in(len, alloc);
+
             // SAFETY: we create a new vector with sufficient capacity, copy our elements into it
             // to transfer ownership and then set the length
             // we don't drop the elements we previously held
@@ -1935,9 +2133,8 @@ impl<T, const N: usize> SmallVec<T, N> {
             }
             vec
         } else {
-            let this = ManuallyDrop::new(self);
             // SAFETY:
-            // - `ptr` was created with the global allocator
+            // - `ptr` was created with the appropriate allocator
             // - `ptr` was created with the appropriate alignment for `T`
             // - the allocation pointed to by ptr is exactly cap * sizeof(T)
             // - `len` is less than or equal to `cap`
@@ -1945,13 +2142,22 @@ impl<T, const N: usize> SmallVec<T, N> {
             // - the allocation is not larger than `isize::MAX`
             unsafe {
                 let (ptr, cap) = this.raw.inner.heap;
-                Vec::from_raw_parts(ptr.as_ptr(), len, cap)
+
+                #[cfg(not(feature = "allocator_api"))]
+                {
+                    Vec::from_raw_parts(ptr.as_ptr(), len, cap)
+                }
+
+                #[cfg(feature = "allocator_api")]
+                {
+                    Vec::from_raw_parts_in(ptr.as_ptr(), len, cap, alloc)
+                }
             }
         }
     }
 
     #[inline]
-    pub fn into_boxed_slice(self) -> Box<[T]> {
+    pub fn into_boxed_slice(self) -> alloc_param!(Box<[T], A>) {
         self.into_vec().into_boxed_slice()
     }
 
@@ -2085,78 +2291,85 @@ impl<T, const N: usize> SmallVec<T, N> {
             )
         }
     }
+}
 
-    /// Creates a `SmallVec` directly from the raw components of another `SmallVec`.
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator + Clone> alloc_param!(SmallVec<T, N, A>) {
+    /// Splits the collection into two at the given index.
     ///
-    /// # Safety
+    /// Returns a newly allocated vector containing the elements in the range
+    /// `[at, len)`. After the call, the original vector will be left containing
+    /// the elements `[0, at)` with its previous capacity unchanged.
     ///
-    /// This is highly unsafe, due to the number of invariants that aren’t checked:
+    /// - If you want to take ownership of the entire contents and capacity of
+    ///   the vector, see [`core::mem::take`] or [`core::mem::replace`].
+    /// - If you don't need the returned vector at all, see [`SmallVec::truncate`].
+    /// - If you want to take ownership of an arbitrary subslice, or you don't
+    ///   necessarily want to store the removed items in a vector, see [`SmallVec::drain`].
     ///
-    /// - `ptr` needs to have been previously allocated via `SmallVec` from its spilled storage (at least, it’s highly likely to be incorrect if it wasn’t).
-    /// - `ptr`’s `A::Item` type needs to be the same size and alignment that it was allocated with
-    /// - `length` needs to be less than or equal to `capacity`.
-    /// - `capacity` needs to be the capacity that the pointer was allocated with.
+    /// # Panics
     ///
-    /// Violating these may cause problems like corrupting the allocator’s internal data structures.
-    ///
-    /// Additionally, `capacity` must be greater than the amount of inline storage `A` has; that is, the new `SmallVec` must need to spill over into heap allocated storage. This condition is asserted against.
-    ///
-    /// The ownership of `ptr` is effectively transferred to the `SmallVec` which may then deallocate, reallocate or change the contents of memory pointed to by the pointer at will. Ensure that nothing else uses the pointer after calling this function.
+    /// Panics if `at > len`.
     ///
     /// # Examples
     ///
     /// ```
-    /// use smallvec::{SmallVec, smallvec};
-    ///
-    /// let mut v: SmallVec<_, 1> = smallvec![1, 2, 3];
-    ///
-    /// // Pull out the important parts of `v`.
-    /// let p = v.as_mut_ptr();
-    /// let len = v.len();
-    /// let cap = v.capacity();
-    /// let spilled = v.spilled();
-    ///
-    /// unsafe {
-    ///     // Forget all about `v`. The heap allocation that stored the
-    ///     // three values won't be deallocated.
-    ///     std::mem::forget(v);
-    ///
-    ///     // Overwrite memory with [4, 5, 6].
-    ///     //
-    ///     // This is only safe if `spilled` is true! Otherwise, we are
-    ///     // writing into the old `SmallVec`'s inline storage on the
-    ///     // stack.
-    ///     assert!(spilled);
-    ///     for i in 0..len {
-    ///         std::ptr::write(p.add(i), 4 + i);
-    ///     }
-    ///
-    ///     // Put everything back together into a SmallVec with a different
-    ///     // amount of inline storage, but which is still less than `cap`.
-    ///     let rebuilt = SmallVec::<_, 2>::from_raw_parts(p, len, cap);
-    ///     assert_eq!(&*rebuilt, &[4, 5, 6]);
-    /// }
+    /// let mut vec = vec![1, 2, 3];
+    /// let vec2 = vec.split_off(1);
+    /// assert_eq!(vec, [1]);
+    /// assert_eq!(vec2, [2, 3]);
     /// ```
     #[inline]
-    pub unsafe fn from_raw_parts(ptr: *mut T, length: usize, capacity: usize) -> SmallVec<T, N> {
-        assert!(!Self::is_zst());
+    pub fn split_off(&mut self, at: usize) -> Self {
+        let len = self.len();
+        assert!(at <= len);
 
-        // SAFETY: We require caller to provide same ptr as we alloc
-        // and we never alloc null pointer.
-        let ptr = unsafe {
-            debug_assert!(!ptr.is_null(), "Called `from_raw_parts` with null pointer.");
-            NonNull::new_unchecked(ptr)
-        };
+        let other_len = len - at;
 
-        SmallVec {
-            len: TaggedLen::new(length, true, is_zst::<T>()),
-            raw: RawSmallVec::new_heap(ptr, capacity),
-            _marker: PhantomData,
+        let mut other = Self::with_capacity_in(other_len, self.raw.allocator.clone());
+
+        // Unsafely `set_len` and copy items to `other`.
+        unsafe {
+            self.set_len(at);
+            other.set_len(other_len);
+
+            core::ptr::copy_nonoverlapping(self.as_ptr().add(at), other.as_mut_ptr(), other_len);
         }
+        other
     }
 }
 
-impl<T: Clone, const N: usize> SmallVec<T, N> {
+impl<T: Clone, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> alloc_param!(SmallVec<T, N, A>) {
+    /// Creates a [`SmallVec`] value from the slice `slice` with the specified allocator.
+    #[cfg(feature = "allocator_api")]
+    pub fn from_slice_in(slice: &[T], alloc: A) -> Self {
+        if slice.len() > Self::inline_size() {
+            // Standard Rust vectors are already specialized.
+            Self::from_vec(slice.to_vec_in(alloc))
+        } else {
+            // SAFETY: The precondition is checked in the initial comparison above.
+            unsafe {
+                #[cfg(feature = "specialization")]
+                {
+                    <Self as spec_traits::SpecFromSlice<T, alloc_param!(A)>>::spec_from(slice, alloc)
+                }
+
+                #[cfg(not(feature = "specialization"))]
+                {
+                    Self::from_slice_fallback(slice, alloc)
+                }
+            }
+        }
+    }
+
+    /// A stub for `Self::from_slice_in` that can be used whenever the "allocator_api" feature is disabled.
+    /// This makes it possible to develop some functions independent from the feature,
+    /// reduceing code complexity.
+    #[cfg(not(feature = "allocator_api"))]
+    #[inline(always)]
+    fn from_slice_in(slice: &[T], _alloc: A) -> Self {
+        Self::from(slice)
+    }
+
     #[inline]
     pub fn resize(&mut self, len: usize, value: T) {
         let old_len = self.len();
@@ -2257,12 +2470,32 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
         }
     }
 
+    #[cfg(feature = "allocator_api")]
     /// A function for creating [`SmallVec`] values out of slices
     /// for types with the [`Copy`] trait.
-    pub fn from_slice_copy(slice: &[T]) -> Self
+    pub fn from_slice_copy_in(slice: &[T], alloc: A) -> Self
     where
         T: Copy
     {
+        let src = slice.as_ptr();
+        let len = slice.len();
+        let mut result = Self::with_capacity_in(len, alloc);
+
+        // SAFETY: By using `with_capacity_in`, the pointer will point to valid memory.
+        unsafe {
+            let dst = result.as_mut_ptr();
+            copy_nonoverlapping(src, dst, len);
+            result.set_len(len);
+        }
+
+        result
+    }
+}
+
+impl<T: Copy, const N: usize> SmallVec<T, N> {
+    /// A function for creating [`SmallVec`] values out of slices
+    /// for types with the [`Copy`] trait.
+    pub fn from_slice_copy(slice: &[T]) -> Self {
         let src = slice.as_ptr();
         let len = slice.len();
         let mut result = Self::with_capacity(len);
@@ -2292,7 +2525,7 @@ impl<T> Drop for DropGuard<T> {
 }
 
 #[cfg(feature = "may_dangle")]
-unsafe impl<#[may_dangle] T, const N: usize> Drop for SmallVec<T, N> {
+unsafe impl<#[may_dangle] T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Drop for alloc_param!(SmallVec<T, N, A>) {
     fn drop(&mut self) {
         let on_heap = self.spilled();
         let len = self.len();
@@ -2316,7 +2549,7 @@ unsafe impl<#[may_dangle] T, const N: usize> Drop for SmallVec<T, N> {
 }
 
 #[cfg(not(feature = "may_dangle"))]
-impl<T, const N: usize> Drop for SmallVec<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Drop for alloc_param!(SmallVec<T, N, A>) {
     fn drop(&mut self) {
         let on_heap = self.spilled();
         let len = self.len();
@@ -2338,7 +2571,7 @@ impl<T, const N: usize> Drop for SmallVec<T, N> {
     }
 }
 
-impl<T, const N: usize> Drop for IntoIter<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Drop for alloc_param!(IntoIter<T, N, A>) {
     fn drop(&mut self) {
         // SAFETY: see above
         unsafe {
@@ -2362,7 +2595,7 @@ impl<T, const N: usize> Drop for IntoIter<T, N> {
     }
 }
 
-impl<T, const N: usize> core::ops::Deref for SmallVec<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> core::ops::Deref for alloc_param!(SmallVec<T, N, A>) {
     type Target = [T];
 
     #[inline]
@@ -2370,7 +2603,7 @@ impl<T, const N: usize> core::ops::Deref for SmallVec<T, N> {
         self.as_slice()
     }
 }
-impl<T, const N: usize> core::ops::DerefMut for SmallVec<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> core::ops::DerefMut for alloc_param!(SmallVec<T, N, A>) {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.as_mut_slice()
@@ -2389,13 +2622,44 @@ pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N> 
         #[cfg(feature = "specialization")]
         {
             // SAFETY: The precondition is checked in the initial comparison above.
-            unsafe { <SmallVec<T, N> as spec_traits::SpecFromElem<T>>::spec_from_elem(elem, n) }
+            #[cfg(feature = "allocator_api")]
+            unsafe {
+                <SmallVec<T, N> as spec_traits::SpecFromElem<T, Global>>::spec_from_elem(elem, n, GLOBAL)
+            }
+
+            // SAFETY: The precondition is checked in the initial comparison above.
+            #[cfg(not(feature = "allocator_api"))]
+            unsafe {
+                <SmallVec<T, N> as spec_traits::SpecFromElem<T>>::spec_from_elem(elem, n, GLOBAL)
+            }
         }
 
         #[cfg(not(feature = "specialization"))]
         {
             // SAFETY: The precondition is checked in the initial comparison above.
-            unsafe { SmallVec::<T, N>::from_elem_fallback(elem, n) }
+            unsafe { SmallVec::<T, N>::from_elem_fallback(elem, n, GLOBAL) }
+        }
+    }
+}
+
+#[cfg(feature = "allocator_api")]
+#[doc(hidden)]
+#[track_caller]
+pub fn from_elem_in<T: Clone, const N: usize, A: Allocator>(elem: T, n: usize, alloc: A) -> SmallVec<T, N, A> {
+    if n > SmallVec::<T, N, A>::inline_size() {
+        // Standard Rust vectors are already specialized.
+        SmallVec::<T, N, A>::from_vec(alloc::vec::from_elem_in(elem, n, alloc))
+    } else {
+        #[cfg(feature = "specialization")]
+        {
+            // SAFETY: The precondition is checked in the initial comparison above.
+            unsafe { <SmallVec<T, N, A> as spec_traits::SpecFromElem<T, A>>::spec_from_elem(elem, n, alloc) }
+        }
+
+        #[cfg(not(feature = "specialization"))]
+        {
+            // SAFETY: The precondition is checked in the initial comparison above.
+            unsafe { SmallVec::<T, N, A>::from_elem_fallback(elem, n, alloc) }
         }
     }
 }
@@ -2407,27 +2671,65 @@ mod spec_traits {
     /// A trait for specializing the implementation of [`from_elem`].
     ///
     /// [`from_elem`]: crate::from_elem
-    pub(crate) trait SpecFromElem<T> {
+    pub(crate) trait SpecFromElem<T, #[cfg(feature = "allocator_api")] A: Allocator> {
         /// Creates a `Smallvec` value where `elem` is repeated `n` times.
         /// This will use the inline storage, not the heap.
         ///
         /// # Safety
         ///
         /// The caller must ensure that `n <= Self::inline_size()`.
-        unsafe fn spec_from_elem(elem: T, n: usize) -> Self;
+        unsafe fn spec_from_elem(elem: T, n: usize, alloc: A) -> Self;
     }
 
+    #[cfg(not(feature = "allocator_api"))]
     impl<T: Clone, const N: usize> SpecFromElem<T> for SmallVec<T, N> {
         #[inline]
-        default unsafe fn spec_from_elem(elem: T, n: usize) -> Self {
+        default unsafe fn spec_from_elem(elem: T, n: usize, alloc: A) -> Self {
             // SAFETY: Safety conditions are identical.
-            unsafe { SmallVec::from_elem_fallback(elem, n) }
+            unsafe { SmallVec::from_elem_fallback(elem, n, alloc) }
         }
     }
 
+    #[cfg(feature = "allocator_api")]
+    impl<T: Clone, const N: usize, A: Allocator> SpecFromElem<T, A> for SmallVec<T, N, A> {
+        #[inline]
+        default unsafe fn spec_from_elem(elem: T, n: usize, alloc: A) -> Self {
+            // SAFETY: Safety conditions are identical.
+            unsafe { SmallVec::from_elem_fallback(elem, n, alloc) }
+        }
+    }
+
+    #[cfg(not(feature = "allocator_api"))]
     impl<T: Copy, const N: usize> SpecFromElem<T> for SmallVec<T, N> {
-        unsafe fn spec_from_elem(elem: T, n: usize) -> Self {
-            let mut result = Self::new();
+        unsafe fn spec_from_elem(elem: T, n: usize, alloc: A) -> Self {
+            let mut result = Self::new_in(alloc);
+
+            if n > 0 {
+                let ptr = result.raw.as_mut_ptr_inline();
+
+                // SAFETY: The caller ensures that the first `n`
+                // is smaller than the inline size.
+                unsafe {
+                    for i in 0..n {
+                        ptr.add(i).write(elem);
+                    }
+                }
+            }
+
+            // SAFETY: The first `n` elements of the vector
+            // have been initialized in the loop above.
+            unsafe {
+                result.set_len(n);
+            }
+
+            result
+        }
+    }
+
+    #[cfg(feature = "allocator_api")]
+    impl<T: Copy, const N: usize, A: Allocator> SpecFromElem<T, A> for SmallVec<T, N, A> {
+        unsafe fn spec_from_elem(elem: T, n: usize, alloc: A) -> Self {
+            let mut result = Self::new_in(alloc);
 
             if n > 0 {
                 let ptr = result.raw.as_mut_ptr_inline();
@@ -2458,7 +2760,7 @@ mod spec_traits {
         fn spec_extend(&mut self, iter: I);
     }
 
-    impl<T, I, const N: usize> SpecExtend<T, I> for SmallVec<T, N>
+    impl<T, I, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> SpecExtend<T, I> for alloc_param!(SmallVec<T, N, A>)
     where
         I: Iterator<Item = T>,
     {
@@ -2468,7 +2770,7 @@ mod spec_traits {
         }
     }
 
-    impl<T, I, const N: usize> SpecExtend<T, I> for SmallVec<T, N>
+    impl<T, I, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> SpecExtend<T, I> for alloc_param!(SmallVec<T, N, A>)
     where
         I: core::iter::TrustedLen<Item = T>,
     {
@@ -2499,8 +2801,8 @@ mod spec_traits {
         }
     }
 
-    impl<T, const N: usize, const M: usize> SpecExtend<T, IntoIter<T, M>> for SmallVec<T, N> {
-        fn spec_extend(&mut self, mut iter: IntoIter<T, M>) {
+    impl<T, const N: usize, const M: usize, #[cfg(feature = "allocator_api")] A: Allocator> SpecExtend<T, alloc_param!(IntoIter<T, M, A>)> for alloc_param!(SmallVec<T, N, A>) {
+        fn spec_extend(&mut self, mut iter: alloc_param!(IntoIter<T, M, A>)) {
             let slice = iter.as_slice();
             let len = slice.len();
             let old_len = self.len();
@@ -2525,7 +2827,7 @@ mod spec_traits {
         }
     }
 
-    impl<'a, T: 'a, const N: usize, I> SpecExtend<&'a T, I> for SmallVec<T, N>
+    impl<'a, T: 'a, const N: usize, I, #[cfg(feature = "allocator_api")] A: Allocator> SpecExtend<&'a T, I> for alloc_param!(SmallVec<T, N, A>)
     where
         I: Iterator<Item = &'a T>,
         T: Clone,
@@ -2536,7 +2838,7 @@ mod spec_traits {
         }
     }
 
-    impl<'a, T: 'a, const N: usize> SpecExtend<&'a T, core::slice::Iter<'a, T>> for SmallVec<T, N>
+    impl<'a, T: 'a, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> SpecExtend<&'a T, core::slice::Iter<'a, T>> for alloc_param!(SmallVec<T, N, A>)
     where
         T: Copy,
     {
@@ -2577,7 +2879,7 @@ mod spec_traits {
         unsafe fn spec_extend_from_within(&mut self, src: core::ops::Range<usize>);
     }
 
-    impl<T: Clone, const N: usize> SpecExtendFromWithin<T> for SmallVec<T, N> {
+    impl<T: Clone, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> SpecExtendFromWithin<T> for alloc_param!(SmallVec<T, N, A>) {
         default unsafe fn spec_extend_from_within(&mut self, src: core::ops::Range<usize>) {
             // SAFETY: Safety conditions are identical.
             unsafe {
@@ -2586,7 +2888,7 @@ mod spec_traits {
         }
     }
 
-    impl<T: Copy, const N: usize> SpecExtendFromWithin<T> for SmallVec<T, N> {
+    impl<T: Copy, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> SpecExtendFromWithin<T> for alloc_param!(SmallVec<T, N, A>) {
         unsafe fn spec_extend_from_within(&mut self, src: core::ops::Range<usize>) {
             let old_len = self.len();
 
@@ -2623,7 +2925,7 @@ mod spec_traits {
     {
         #[inline]
         default fn spec_from_iter(iter: I) -> Self {
-            Self::from_iter_fallback(iter)
+            Self::from_iter_fallback(iter, GLOBAL)
         }
     }
 
@@ -2653,14 +2955,14 @@ mod spec_traits {
         fn spec_clone_from(&mut self, source: &[T]);
     }
 
-    impl<T: Clone, const N: usize> SpecCloneFrom<T> for SmallVec<T, N> {
+    impl<T: Clone, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> SpecCloneFrom<T> for alloc_param!(SmallVec<T, N, A>) {
         #[inline]
         default fn spec_clone_from(&mut self, source: &[T]) {
             self.clone_from_fallback(source);
         }
     }
 
-    impl<T: Copy, const N: usize> SpecCloneFrom<T> for SmallVec<T, N> {
+    impl<T: Copy, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> SpecCloneFrom<T> for alloc_param!(SmallVec<T, N, A>) {
         fn spec_clone_from(&mut self, source: &[T]) {
             self.clear();
             self.extend_from_slice(source);
@@ -2669,26 +2971,60 @@ mod spec_traits {
 
     /// A trait for specializing the implementation of [`From`]
     /// with the source type being slices.
-    pub(crate) trait SpecFromSlice<T> {
+    pub(crate) trait SpecFromSlice<T, #[cfg(feature = "allocator_api")] A> {
         /// Creates a `SmallVec` value based on the contents of `slice`.
         /// This will use the inline storage, not the heap.
         ///
         /// # Safety
         ///
         /// The caller must ensure that `slice.len() <= Self::inline_size()`.
-        unsafe fn spec_from(slice: &[T]) -> Self;
+        unsafe fn spec_from(slice: &[T], alloc: A) -> Self;
     }
 
+    #[cfg(not(feature = "allocator_api"))]
     impl<T: Clone, const N: usize> SpecFromSlice<T> for SmallVec<T, N> {
-        default unsafe fn spec_from(slice: &[T]) -> Self {
+        default unsafe fn spec_from(slice: &[T], alloc: A) -> Self {
             // SAFETY: Safety conditions are identical.
-            unsafe { Self::from_slice_fallback(slice) }
+            unsafe { Self::from_slice_fallback(slice, alloc) }
         }
     }
 
+    #[cfg(feature = "allocator_api")]
+    impl<T: Clone, const N: usize, A: Allocator> SpecFromSlice<T, A> for SmallVec<T, N, A> {
+        default unsafe fn spec_from(slice: &[T], alloc: A) -> Self {
+            // SAFETY: Safety conditions are identical.
+            unsafe { Self::from_slice_fallback(slice, alloc) }
+        }
+    }
+
+    #[cfg(not(feature = "allocator_api"))]
     impl<T: Copy, const N: usize> SpecFromSlice<T> for SmallVec<T, N> {
-        unsafe fn spec_from(slice: &[T]) -> Self {
-            let mut v = Self::new();
+        unsafe fn spec_from(slice: &[T], alloc: A) -> Self {
+            let mut v = Self::new_in(alloc);
+
+            let src = slice.as_ptr();
+            let len = slice.len();
+            let dst = v.as_mut_ptr();
+
+            // SAFETY: The caller ensures that the slice length is smaller
+            // than or equal to the inline length.
+            unsafe {
+                copy_nonoverlapping(src, dst, len);
+            }
+
+            // SAFETY: The elements were initialized above.
+            unsafe {
+                v.set_len(len);
+            }
+
+            v
+        }
+    }
+
+    #[cfg(feature = "allocator_api")]
+    impl<T: Copy, const N: usize, A: Allocator> SpecFromSlice<T, A> for SmallVec<T, N, A> {
+        unsafe fn spec_from(slice: &[T], alloc: A) -> Self {
+            let mut v = Self::new_in(alloc);
 
             let src = slice.as_ptr();
             let len = slice.len();
@@ -2712,18 +3048,18 @@ mod spec_traits {
 
 /// Fallback functions for various specialized methods. These are kept in
 /// a separate implementation block for easy access whenever specialization is disabled.
-impl<T, const N: usize> SmallVec<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> alloc_param!(SmallVec<T, N, A>) {
     /// Creates a `Smallvec` value where `elem` is repeated `n` times.
     /// This will use the inline storage, not the heap.
     ///
     /// # Safety
     ///
     /// The caller must ensure that `n <= Self::inline_size()`.
-    unsafe fn from_elem_fallback(elem: T, n: usize) -> Self
+    unsafe fn from_elem_fallback(elem: T, n: usize, alloc: A) -> Self
     where
         T: Clone,
     {
-        let mut result = Self::new();
+        let mut result = Self::new_in(alloc);
 
         if n > 0 {
             let ptr = result.raw.as_mut_ptr_inline();
@@ -2802,12 +3138,12 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 
-    fn from_iter_fallback<I>(iter: I) -> Self
+    fn from_iter_fallback<I>(iter: I, alloc: A) -> Self
     where
         I: Iterator<Item = T>,
     {
         let (size, _) = iter.size_hint();
-        let mut v = Self::with_capacity(size);
+        let mut v = Self::with_capacity_in(size, alloc);
         for x in iter {
             v.push(x);
         }
@@ -2838,11 +3174,11 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// # Safety
     ///
     /// The caller must ensure that `slice.len() <= Self::inline_size()`.
-    unsafe fn from_slice_fallback(slice: &[T]) -> Self
+    unsafe fn from_slice_fallback(slice: &[T], alloc: A) -> Self
     where
         T: Clone,
     {
-        let mut v = Self::new();
+        let mut v = Self::new_in(alloc);
 
         let src = slice.as_ptr();
         let len = slice.len();
@@ -2880,12 +3216,20 @@ impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N> {
             unsafe {
                 #[cfg(feature = "specialization")]
                 {
-                    <Self as spec_traits::SpecFromSlice<T>>::spec_from(slice)
+                    #[cfg(feature = "allocator_api")]
+                    {
+                        <Self as spec_traits::SpecFromSlice<T, Global>>::spec_from(slice, GLOBAL)
+                    }
+
+                    #[cfg(not(feature = "allocator_api"))]
+                    {
+                        <Self as spec_traits::SpecFromSlice<T>>::spec_from(slice, GLOBAL)
+                    }
                 }
 
                 #[cfg(not(feature = "specialization"))]
                 {
-                    Self::from_slice_fallback(slice)
+                    Self::from_slice_fallback(slice, GLOBAL)
                 }
             }
         }
@@ -2934,16 +3278,17 @@ impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N> {
     }
 }
 
-impl<T, const N: usize> From<Vec<T>> for SmallVec<T, N> {
-    fn from(array: Vec<T>) -> Self {
-        Self::from_vec(array)
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> From<alloc_param!(Vec<T, A>)> for alloc_param!(SmallVec<T, N, A>) {
+    fn from(v: alloc_param!(Vec<T, A>)) -> Self {
+        Self::from_vec(v)
     }
 }
 
-impl<T: Clone, const N: usize> Clone for SmallVec<T, N> {
+impl<T: Clone, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator + Clone> Clone for alloc_param!(SmallVec<T, N, A>) {
     #[inline]
-    fn clone(&self) -> SmallVec<T, N> {
-        SmallVec::from(self.as_slice())
+    fn clone(&self) -> Self {
+        let alloc = self.raw.allocator.clone();
+        Self::from_slice_in(self.as_slice(), alloc)
     }
 
     #[inline]
@@ -2960,14 +3305,15 @@ impl<T: Clone, const N: usize> Clone for SmallVec<T, N> {
     }
 }
 
-impl<T: Clone, const N: usize> Clone for IntoIter<T, N> {
+impl<T: Clone, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator + Clone> Clone for alloc_param!(IntoIter<T, N, A>) {
     #[inline]
-    fn clone(&self) -> IntoIter<T, N> {
-        SmallVec::from(self.as_slice()).into_iter()
+    fn clone(&self) -> Self {
+        let alloc = self.raw.allocator.clone();
+        SmallVec::from_slice_in(self.as_slice(), alloc).into_iter()
     }
 }
 
-impl<T, const N: usize> Extend<T> for SmallVec<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Extend<T> for alloc_param!(SmallVec<T, N, A>) {
     #[inline]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         #[cfg(feature = "specialization")]
@@ -2982,7 +3328,7 @@ impl<T, const N: usize> Extend<T> for SmallVec<T, N> {
     }
 }
 
-impl<'a, T: Clone + 'a, const N: usize> Extend<&'a T> for SmallVec<T, N> {
+impl<'a, T: Clone + 'a, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Extend<&'a T> for alloc_param!(SmallVec<T, N, A>) {
     #[inline]
     fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
         #[cfg(feature = "specialization")]
@@ -3007,7 +3353,7 @@ impl<T, const N: usize> core::iter::FromIterator<T> for SmallVec<T, N> {
 
         #[cfg(not(feature = "specialization"))]
         {
-            Self::from_iter_fallback(iter.into_iter())
+            Self::from_iter_fallback(iter.into_iter(), GLOBAL)
         }
     }
 }
@@ -3047,8 +3393,8 @@ macro_rules! smallvec_inline {
     });
 }
 
-impl<T, const N: usize> IntoIterator for SmallVec<T, N> {
-    type IntoIter = IntoIter<T, N>;
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> IntoIterator for alloc_param!(SmallVec<T, N, A>) {
+    type IntoIter = alloc_param!(IntoIter<T, N, A>);
     type Item = T;
     fn into_iter(self) -> Self::IntoIter {
         // SAFETY: we move out of this.raw by reading the value at its address, which is fine since
@@ -3057,7 +3403,7 @@ impl<T, const N: usize> IntoIterator for SmallVec<T, N> {
             // Set SmallVec len to zero as `IntoIter` drop handles dropping of the elements
             let this = ManuallyDrop::new(self);
             IntoIter {
-                raw: (&this.raw as *const RawSmallVec<T, N>).read(),
+                raw: (&this.raw as *const alloc_param!(RawSmallVec<T, N, A>)).read(),
                 begin: 0,
                 end: this.len,
                 _marker: PhantomData,
@@ -3066,7 +3412,7 @@ impl<T, const N: usize> IntoIterator for SmallVec<T, N> {
     }
 }
 
-impl<'a, T, const N: usize> IntoIterator for &'a SmallVec<T, N> {
+impl<'a, T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> IntoIterator for &'a alloc_param!(SmallVec<T, N, A>) {
     type IntoIter = core::slice::Iter<'a, T>;
     type Item = &'a T;
     fn into_iter(self) -> Self::IntoIter {
@@ -3074,7 +3420,7 @@ impl<'a, T, const N: usize> IntoIterator for &'a SmallVec<T, N> {
     }
 }
 
-impl<'a, T, const N: usize> IntoIterator for &'a mut SmallVec<T, N> {
+impl<'a, T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> IntoIterator for &'a mut alloc_param!(SmallVec<T, N, A>) {
     type IntoIter = core::slice::IterMut<'a, T>;
     type Item = &'a mut T;
     fn into_iter(self) -> Self::IntoIter {
@@ -3082,18 +3428,21 @@ impl<'a, T, const N: usize> IntoIterator for &'a mut SmallVec<T, N> {
     }
 }
 
-impl<T, U, const N: usize, const M: usize> PartialEq<SmallVec<U, M>> for SmallVec<T, N>
+impl<T, U, const N: usize, const M: usize,
+    #[cfg(feature = "allocator_api")] A1: Allocator,
+    #[cfg(feature = "allocator_api")] A2: Allocator,
+> PartialEq<alloc_param!(SmallVec<U, M, A2>)> for alloc_param!(SmallVec<T, N, A1>)
 where
     T: PartialEq<U>,
 {
     #[inline]
-    fn eq(&self, other: &SmallVec<U, M>) -> bool {
+    fn eq(&self, other: &alloc_param!(SmallVec<U, M, A2>)) -> bool {
         self.as_slice().eq(other.as_slice())
     }
 }
-impl<T, const N: usize> Eq for SmallVec<T, N> where T: Eq {}
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Eq for alloc_param!(SmallVec<T, N, A>) where T: Eq {}
 
-impl<T, U, const N: usize, const M: usize> PartialEq<[U; M]> for SmallVec<T, N>
+impl<T, U, const N: usize, const M: usize, #[cfg(feature = "allocator_api")] A: Allocator> PartialEq<[U; M]> for alloc_param!(SmallVec<T, N, A>)
 where
     T: PartialEq<U>,
 {
@@ -3103,7 +3452,7 @@ where
     }
 }
 
-impl<T, U, const N: usize, const M: usize> PartialEq<&[U; M]> for SmallVec<T, N>
+impl<T, U, const N: usize, const M: usize, #[cfg(feature = "allocator_api")] A: Allocator> PartialEq<&[U; M]> for alloc_param!(SmallVec<T, N, A>)
 where
     T: PartialEq<U>,
 {
@@ -3113,7 +3462,7 @@ where
     }
 }
 
-impl<T, U, const N: usize> PartialEq<[U]> for SmallVec<T, N>
+impl<T, U, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> PartialEq<[U]> for alloc_param!(SmallVec<T, N, A>)
 where
     T: PartialEq<U>,
 {
@@ -3123,7 +3472,7 @@ where
     }
 }
 
-impl<T, U, const N: usize> PartialEq<&[U]> for SmallVec<T, N>
+impl<T, U, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> PartialEq<&[U]> for alloc_param!(SmallVec<T, N, A>)
 where
     T: PartialEq<U>,
 {
@@ -3133,7 +3482,7 @@ where
     }
 }
 
-impl<T, U, const N: usize> PartialEq<&mut [U]> for SmallVec<T, N>
+impl<T, U, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> PartialEq<&mut [U]> for alloc_param!(SmallVec<T, N, A>)
 where
     T: PartialEq<U>,
 {
@@ -3143,73 +3492,76 @@ where
     }
 }
 
-impl<T, const N: usize> PartialOrd for SmallVec<T, N>
+impl<T, const N: usize, const M: usize,
+    #[cfg(feature = "allocator_api")] A1: Allocator,
+    #[cfg(feature = "allocator_api")] A2: Allocator,
+    > PartialOrd<alloc_param!(SmallVec<T, M, A2>)> for alloc_param!(SmallVec<T, N, A1>)
 where
     T: PartialOrd,
 {
     #[inline]
-    fn partial_cmp(&self, other: &SmallVec<T, N>) -> Option<core::cmp::Ordering> {
+    fn partial_cmp(&self, other: &alloc_param!(SmallVec<T, M, A2>)) -> Option<core::cmp::Ordering> {
         self.as_slice().partial_cmp(other.as_slice())
     }
 }
 
-impl<T, const N: usize> Ord for SmallVec<T, N>
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Ord for alloc_param!(SmallVec<T, N, A>)
 where
     T: Ord,
 {
     #[inline]
-    fn cmp(&self, other: &SmallVec<T, N>) -> core::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.as_slice().cmp(other.as_slice())
     }
 }
 
-impl<T: Hash, const N: usize> Hash for SmallVec<T, N> {
+impl<T: Hash, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Hash for alloc_param!(SmallVec<T, N, A>) {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.as_slice().hash(state)
     }
 }
 
-impl<T, const N: usize> Borrow<[T]> for SmallVec<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Borrow<[T]> for alloc_param!(SmallVec<T, N, A>) {
     #[inline]
     fn borrow(&self) -> &[T] {
         self.as_slice()
     }
 }
 
-impl<T, const N: usize> BorrowMut<[T]> for SmallVec<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> BorrowMut<[T]> for alloc_param!(SmallVec<T, N, A>) {
     #[inline]
     fn borrow_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<T, const N: usize> AsRef<[T]> for SmallVec<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> AsRef<[T]> for alloc_param!(SmallVec<T, N, A>) {
     #[inline]
     fn as_ref(&self) -> &[T] {
         self.as_slice()
     }
 }
 
-impl<T, const N: usize> AsMut<[T]> for SmallVec<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> AsMut<[T]> for alloc_param!(SmallVec<T, N, A>) {
     #[inline]
     fn as_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
     }
 }
 
-impl<T: Debug, const N: usize> Debug for SmallVec<T, N> {
+impl<T: Debug, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Debug for alloc_param!(SmallVec<T, N, A>) {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_list().entries(self.iter()).finish()
     }
 }
 
-impl<T: Debug, const N: usize> Debug for IntoIter<T, N> {
+impl<T: Debug, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Debug for alloc_param!(IntoIter<T, N, A>) {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("IntoIter").field(&self.as_slice()).finish()
     }
 }
 
-impl<T: Debug, const N: usize> Debug for Drain<'_, T, N> {
+impl<T: Debug, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Debug for alloc_param!(Drain<'_, T, N, A>) {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("Drain").field(&self.iter.as_slice()).finish()
     }
@@ -3217,7 +3569,7 @@ impl<T: Debug, const N: usize> Debug for Drain<'_, T, N> {
 
 #[cfg(feature = "serde")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
-impl<T, const N: usize> Serialize for SmallVec<T, N>
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Serialize for alloc_param!(SmallVec<T, N, A>)
 where
     T: Serialize,
 {
@@ -3232,28 +3584,30 @@ where
 
 #[cfg(feature = "serde")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
-impl<'de, T, const N: usize> Deserialize<'de> for SmallVec<T, N>
+impl<'de, T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Deserialize<'de> for alloc_param!(SmallVec<T, N, A>)
 where
     T: Deserialize<'de>,
 {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_seq(SmallVecVisitor {
-            phantom: PhantomData,
+            phantom_type: PhantomData,
+            phantom_alloc: PhantomData,
         })
     }
 }
 
 #[cfg(feature = "serde")]
-struct SmallVecVisitor<T, const N: usize> {
-    phantom: PhantomData<T>,
+struct SmallVecVisitor<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> {
+    phantom_type: PhantomData<T>,
+    phantom_alloc: PhantomData<A>,
 }
 
 #[cfg(feature = "serde")]
-impl<'de, T, const N: usize> Visitor<'de> for SmallVecVisitor<T, N>
+impl<'de, T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Visitor<'de> for alloc_param!(SmallVecVisitor<T, N, A>)
 where
     T: Deserialize<'de>,
 {
-    type Value = SmallVec<T, N>;
+    type Value = alloc_param!(SmallVec<T, N, A>);
 
     fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         formatter.write_str("a sequence")
@@ -3277,7 +3631,7 @@ where
 }
 
 #[cfg(feature = "malloc_size_of")]
-impl<T, const N: usize> MallocShallowSizeOf for SmallVec<T, N> {
+impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> MallocShallowSizeOf for alloc_param!(SmallVec<T, N, A>) {
     fn shallow_size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         if self.spilled() {
             unsafe { ops.malloc_size_of(self.as_ptr()) }
@@ -3288,7 +3642,7 @@ impl<T, const N: usize> MallocShallowSizeOf for SmallVec<T, N> {
 }
 
 #[cfg(feature = "malloc_size_of")]
-impl<T: MallocSizeOf, const N: usize> MallocSizeOf for SmallVec<T, N> {
+impl<T: MallocSizeOf, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> MallocSizeOf for alloc_param!(SmallVec<T, N, A>) {
     fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         let mut n = self.shallow_size_of(ops);
         for elem in self.iter() {
@@ -3300,7 +3654,7 @@ impl<T: MallocSizeOf, const N: usize> MallocSizeOf for SmallVec<T, N> {
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl<const N: usize> io::Write for SmallVec<u8, N> {
+impl<const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> io::Write for alloc_param!(SmallVec<u8, N, A>) {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.extend_from_slice(buf);
@@ -3320,7 +3674,7 @@ impl<const N: usize> io::Write for SmallVec<u8, N> {
 }
 
 #[cfg(feature = "bytes")]
-unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
+unsafe impl<const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> BufMut for alloc_param!(SmallVec<u8, N, A>) {
     #[inline]
     fn remaining_mut(&self) -> usize {
         // A vector can never have more than isize::MAX bytes

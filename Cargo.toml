@@ -13,6 +13,7 @@ readme = "README.md"
 documentation = "https://docs.rs/smallvec/"
 
 [features]
+allocator_api = []
 std = []
 specialization = []
 may_dangle = []
