@@ -3584,30 +3584,28 @@ where
 
 #[cfg(feature = "serde")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
-impl<'de, T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Deserialize<'de> for alloc_param!(SmallVec<T, N, A>)
+impl<'de, T, const N: usize> Deserialize<'de> for SmallVec<T, N>
 where
     T: Deserialize<'de>,
 {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_seq(SmallVecVisitor {
-            phantom_type: PhantomData,
-            phantom_alloc: PhantomData,
+            phantom: PhantomData,
         })
     }
 }
 
 #[cfg(feature = "serde")]
-struct SmallVecVisitor<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> {
-    phantom_type: PhantomData<T>,
-    phantom_alloc: PhantomData<A>,
+struct SmallVecVisitor<T, const N: usize> {
+    phantom: PhantomData<T>,
 }
 
 #[cfg(feature = "serde")]
-impl<'de, T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Visitor<'de> for alloc_param!(SmallVecVisitor<T, N, A>)
+impl<'de, T, const N: usize> Visitor<'de> for SmallVecVisitor<T, N>
 where
     T: Deserialize<'de>,
 {
-    type Value = alloc_param!(SmallVec<T, N, A>);
+    type Value = SmallVec<T, N>;
 
     fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         formatter.write_str("a sequence")
