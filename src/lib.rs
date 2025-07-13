@@ -30,6 +30,12 @@
 //! When this optional dependency is enabled, `SmallVec` implements the `serde::Serialize` and
 //! `serde::Deserialize` traits.
 //!
+//! ### [`litemap`](https://docs.rs/litemap/0.8/litemap/)
+//!
+//! When this optional dependency is enabled, `SmallVec` implements the
+//! [`store`](https://docs.rs/litemap/0.8/litemap/store/index.html) interface to enable pluggable
+//! backends for LiteMap.
+//!
 //! ### `extract_if`
 //!
 //! **This feature is unstable.** It may change to match the unstable `extract_if` method in libstd.
@@ -94,6 +100,11 @@ use core::ptr::NonNull;
 
 #[cfg(feature = "bytes")]
 use bytes::{buf::UninitSlice, BufMut};
+#[cfg(feature = "litemap")]
+use litemap::store::{
+    Store, StoreBulkMut, StoreConstEmpty, StoreFromIterable, StoreFromIterator, StoreIntoIterator,
+    StoreIterable, StoreIterableMut, StoreMut, StoreSlice,
+};
 #[cfg(feature = "malloc_size_of")]
 use malloc_size_of::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps};
 #[cfg(feature = "serde")]
@@ -3020,5 +3031,271 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
         // If the addition overflows, then the `resize` will fail.
         let new_len = self.len().saturating_add(cnt);
         self.resize(new_len, val);
+    }
+}
+
+#[cfg(feature = "litemap")]
+type MapF<K, V> = fn(&(K, V)) -> (&K, &V);
+#[cfg(feature = "litemap")]
+#[inline]
+fn map_f<K, V>(input: &(K, V)) -> (&K, &V) {
+    (&input.0, &input.1)
+}
+#[cfg(feature = "litemap")]
+type MapFMut<K, V> = fn(&mut (K, V)) -> (&K, &mut V);
+#[cfg(feature = "litemap")]
+#[inline]
+fn map_f_mut<K, V>(input: &mut (K, V)) -> (&K, &mut V) {
+    (&input.0, &mut input.1)
+}
+
+#[cfg(feature = "litemap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "litemap")))]
+impl<K, V, const N: usize> Store<K, V> for SmallVec<(K, V), N> {
+    #[inline]
+    fn lm_len(&self) -> usize {
+        self.len()
+    }
+
+    #[inline]
+    fn lm_is_empty(&self) -> bool {
+        self.is_empty()
+    }
+
+    #[inline]
+    fn lm_get(&self, index: usize) -> Option<(&K, &V)> {
+        self.get(index).map(map_f)
+    }
+
+    #[inline]
+    fn lm_last(&self) -> Option<(&K, &V)> {
+        self.last().map(map_f)
+    }
+
+    #[inline]
+    fn lm_binary_search_by<F>(&self, mut cmp: F) -> Result<usize, usize>
+    where
+        F: FnMut(&K) -> core::cmp::Ordering,
+    {
+        self.binary_search_by(|(k, _)| cmp(k))
+    }
+}
+
+#[cfg(feature = "litemap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "litemap")))]
+impl<K, V, const N: usize> StoreSlice<K, V> for SmallVec<(K, V), N> {
+    type Slice = [(K, V)];
+
+    #[inline]
+    fn lm_get_range(&self, range: core::ops::Range<usize>) -> Option<&Self::Slice> {
+        self.get(range)
+    }
+}
+
+#[cfg(feature = "litemap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "litemap")))]
+impl<K, V, const N: usize> StoreMut<K, V> for SmallVec<(K, V), N> {
+    #[inline]
+    fn lm_with_capacity(capacity: usize) -> Self {
+        Self::with_capacity(capacity)
+    }
+
+    #[inline]
+    fn lm_reserve(&mut self, additional: usize) {
+        self.reserve(additional)
+    }
+
+    #[inline]
+    fn lm_get_mut(&mut self, index: usize) -> Option<(&K, &mut V)> {
+        self.as_mut_slice().get_mut(index).map(map_f_mut)
+    }
+
+    #[inline]
+    fn lm_push(&mut self, key: K, value: V) {
+        self.push((key, value))
+    }
+
+    #[inline]
+    fn lm_insert(&mut self, index: usize, key: K, value: V) {
+        self.insert(index, (key, value))
+    }
+
+    #[inline]
+    fn lm_remove(&mut self, index: usize) -> (K, V) {
+        self.remove(index)
+    }
+
+    #[inline]
+    fn lm_clear(&mut self) {
+        self.clear()
+    }
+}
+
+#[cfg(feature = "litemap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "litemap")))]
+impl<K: Ord, V, const N: usize> StoreBulkMut<K, V> for SmallVec<(K, V), N> {
+    #[inline]
+    fn lm_retain<F>(&mut self, mut predicate: F)
+    where
+        F: FnMut(&K, &V) -> bool,
+    {
+        self.retain(|(k, v)| predicate(k, v));
+    }
+
+    /// This is copied from `litemap` crate, since this is not exported.
+    /// <https://github.com/unicode-org/icu4x/blob/91ec4f0f76a02a0c24c03847b3116211f09b1673/utils/litemap/src/store/vec_impl.rs#L110-L158>
+    /// Extends this store with items from an iterator.
+    ///
+    /// It uses a two-pass (sort + dedup) approach to avoid any potential quadratic costs.
+    ///
+    /// The asymptotic worst case complexity is O((n + m) log(n + m)), where `n`
+    /// is the number of elements already in `self` and `m` is the number of elements
+    /// in the iterator. The best case complexity is O(m), when the input iterator is
+    /// already sorted, keys aren't duplicated and all keys sort after the existing ones.
+    #[inline]
+    fn lm_extend<I>(&mut self, other: I)
+    where
+        I: IntoIterator<Item = (K, V)>,
+    {
+        // First N elements in self that are already sorted and not duplicated.
+        let mut sorted_len = self.len();
+        // Use SmallVec::extend as it has a specialized code for slice and trusted-len iterators.
+        self.extend(other);
+        // `sorted_len` is the length of the sorted run before extension
+        // window slice `w` is guaranteed to have a length of 2.
+        #[allow(clippy::indexing_slicing)]
+        {
+            // Count new elements that are sorted and non-duplicated.
+            // Starting from the end of the existing sorted run, if any.
+            // Thus, start the slice at sorted_len.saturating_sub(1).
+            sorted_len += self[sorted_len.saturating_sub(1)..]
+                .windows(2)
+                .take_while(|w| w[0].0 < w[1].0)
+                .count();
+        }
+        // `windows(2)` only yields `slice len - 1` times, or none if the slice is empty.
+        // In other words, the first extended element of the slice won't be counted as sorted
+        // if self was initially empty (sorted_len == 0). We adjust this by adding 1 if the
+        // original slice was empty but became not empty after extend.
+        sorted_len += (sorted_len == 0 && !self.is_empty()) as usize;
+
+        // If everything was in order, we're done
+        if sorted_len >= self.len() {
+            return;
+        }
+
+        // Use stable sort to keep relative order of duplicates.
+        self.sort_by(|a, b| a.0.cmp(&b.0));
+        // Deduplicate by keeping the last element of the run in the first slice.
+        let (dedup, _merged_dup) = partition_dedup_by(self);
+        sorted_len = dedup.len();
+        self.truncate(sorted_len);
+    }
+}
+
+/// This is copied from `litemap` crate, since this is not exported.
+/// See <https://github.com/unicode-org/icu4x/blob/91ec4f0f76a02a0c24c03847b3116211f09b1673/utils/litemap/src/store/vec_impl.rs#L160-L254>
+///
+/// Moves all but the _last_ of consecutive elements to the end of the slice satisfying
+/// equality on K.
+///
+/// Returns two slices. The first contains no consecutive repeated elements.
+/// The second contains all the duplicates in no specified order.
+///
+/// This is based on std::slice::partition_dedup_by (currently unstable) but retains the
+/// _last_ element of the duplicate run in the first slice (instead of first).
+#[cfg(feature = "litemap")]
+#[inline]
+#[expect(clippy::type_complexity)]
+fn partition_dedup_by<K: Eq, V>(v: &mut [(K, V)]) -> (&mut [(K, V)], &mut [(K, V)]) {
+    if v.len() <= 1 {
+        return (v, &mut []);
+    }
+
+    let mut read_idx: usize = 1;
+    let mut write_idx: usize = 1;
+
+    while let Some((before_read, [read, ..])) = v.split_at_mut_checked(read_idx) {
+        // First, `read_idx >= write_idx` is always true as `read_idx` is always incremented
+        // whereas `write_idx` is only incremented when a distinct element is found.
+        // Second, before_read is always at least 1 length due to read_idx being initialized to 1.
+        // Thus it is safe to index before_read with `write_idx - 1`.
+        #[expect(clippy::indexing_slicing)]
+        let prev_write = &mut before_read[write_idx - 1];
+        if read.0 == prev_write.0 {
+            core::mem::swap(read, prev_write);
+        } else {
+            // Equivalent to checking if write_idx == read_idx
+            if let Some(write) = before_read.get_mut(write_idx) {
+                core::mem::swap(read, write);
+            }
+            write_idx += 1;
+        }
+        read_idx += 1;
+    }
+    v.split_at_mut(write_idx)
+}
+
+#[cfg(feature = "litemap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "litemap")))]
+impl<K, V, const N: usize> StoreConstEmpty<K, V> for SmallVec<(K, V), N> {
+    const EMPTY: Self = SmallVec::new();
+}
+
+#[cfg(feature = "litemap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "litemap")))]
+impl<K: Ord, V, const N: usize> StoreFromIterable<K, V> for SmallVec<(K, V), N> {
+    #[inline]
+    fn lm_sort_from_iter<I: IntoIterator<Item = (K, V)>>(iter: I) -> Self {
+        let mut v = Self::new();
+        v.lm_extend(iter);
+        v
+    }
+}
+
+#[cfg(feature = "litemap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "litemap")))]
+impl<K, V, const N: usize> StoreFromIterator<K, V> for SmallVec<(K, V), N> {}
+
+#[cfg(feature = "litemap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "litemap")))]
+impl<K, V, const N: usize> StoreIntoIterator<K, V> for SmallVec<(K, V), N> {
+    type KeyValueIntoIter = IntoIter<(K, V), N>;
+
+    #[inline]
+    fn lm_into_iter(self) -> Self::KeyValueIntoIter {
+        self.into_iter()
+    }
+
+    #[inline]
+    fn lm_extend_end(&mut self, other: Self) {
+        self.extend(other);
+    }
+
+    #[inline]
+    fn lm_extend_start(&mut self, other: Self) {
+        self.splice(0..0, other);
+    }
+}
+
+#[cfg(feature = "litemap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "litemap")))]
+impl<'a, K: 'a, V: 'a, const N: usize> StoreIterable<'a, K, V> for SmallVec<(K, V), N> {
+    type KeyValueIter = core::iter::Map<core::slice::Iter<'a, (K, V)>, MapF<K, V>>;
+
+    #[inline]
+    fn lm_iter(&'a self) -> Self::KeyValueIter {
+        self.iter().map(map_f)
+    }
+}
+
+#[cfg(feature = "litemap")]
+#[cfg_attr(docsrs, doc(cfg(feature = "litemap")))]
+impl<'a, K: 'a, V: 'a, const N: usize> StoreIterableMut<'a, K, V> for SmallVec<(K, V), N> {
+    type KeyValueIterMut = core::iter::Map<core::slice::IterMut<'a, (K, V)>, MapFMut<K, V>>;
+
+    #[inline]
+    fn lm_iter_mut(&'a mut self) -> Self::KeyValueIterMut {
+        self.iter_mut().map(map_f_mut)
     }
 }
