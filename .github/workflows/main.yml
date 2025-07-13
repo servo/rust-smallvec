@@ -38,6 +38,9 @@ jobs:
       - name: Cargo test
         run: cargo test --verbose
 
+      - name: Cargo test w/ litemap
+        run: cargo test --verbose --features litemap,litemap/testing
+
       - name: Cargo test w/ serde
         run: cargo test --verbose --features serde
 
@@ -50,7 +53,7 @@ jobs:
 
       - name: Cargo test all features
         if: matrix.toolchain == 'nightly'
-        run: cargo test --verbose --all-features
+        run: cargo test --verbose --all-features --features litemap/testing
 
       - name: Cargo bench
         if: matrix.toolchain == 'nightly'

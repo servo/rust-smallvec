@@ -1121,3 +1121,10 @@ mod buf_mut {
         }
     }
 }
+
+// Note: To test against the `litemap` feature, you need to enable `litemap/testing` feature in cli.
+#[cfg(all(test, feature = "litemap"))]
+#[test]
+fn test_litemap() {
+    litemap::testing::check_store_full::<SmallVec<(u32, u64), 16>>()
+}
