@@ -813,8 +813,8 @@ pub struct SmallVec<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allo
     _marker: PhantomData<T>,
 }
 
-unsafe impl<T: Send, const N: usize, #[cfg(feature = "allocator_api")] A: Send> Send for alloc_param!(SmallVec<T, N, A>) {}
-unsafe impl<T: Sync, const N: usize, #[cfg(feature = "allocator_api")] A: Sync> Sync for alloc_param!(SmallVec<T, N, A>) {}
+unsafe impl<T: Send, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator + Send> Send for alloc_param!(SmallVec<T, N, A>) {}
+unsafe impl<T: Sync, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator + Sync> Sync for alloc_param!(SmallVec<T, N, A>) {}
 
 impl<T, const N: usize> Default for SmallVec<T, N> {
     #[inline]
@@ -1198,8 +1198,8 @@ pub struct IntoIter<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allo
 
 // SAFETY: IntoIter has unique ownership of its contents.  Sending (or sharing) an `IntoIter<T, N>`
 // is equivalent to sending (or sharing) a `SmallVec<T, N>`.
-unsafe impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Send> Send for alloc_param!(IntoIter<T, N, A>) where T: Send {}
-unsafe impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Sync> Sync for alloc_param!(IntoIter<T, N, A>) where T: Sync {}
+unsafe impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator + Send> Send for alloc_param!(IntoIter<T, N, A>) where T: Send {}
+unsafe impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator + Sync> Sync for alloc_param!(IntoIter<T, N, A>) where T: Sync {}
 
 impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> alloc_param!(IntoIter<T, N, A>) {
     #[inline]
