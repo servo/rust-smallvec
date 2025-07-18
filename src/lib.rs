@@ -628,7 +628,7 @@ impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> alloc_pa
             // Ensure capacity growth is exponential.
             let new_capacity = new_capacity.max(2 * old_capacity);
 
-            // SAFETY: The stored capacity corresponds always to a valid layout.
+            // SAFETY: The stored capacity always corresponds to a valid layout.
             let old_layout = unsafe { array_layout_unchecked::<T>(old_capacity) };
 
             let new_layout = Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
@@ -686,7 +686,7 @@ impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> alloc_pa
                 return Ok(true);
             }
 
-            // SAFETY: The stored capacity corresponds always to a valid layout.
+            // SAFETY: The stored capacity always corresponds to a valid layout.
             let old_layout = unsafe { array_layout_unchecked::<T>(old_capacity) };
 
             let new_layout = Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
@@ -813,8 +813,8 @@ pub struct SmallVec<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allo
     _marker: PhantomData<T>,
 }
 
-unsafe impl<T: Send, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Send for alloc_param!(SmallVec<T, N, A>) {}
-unsafe impl<T: Sync, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Sync for alloc_param!(SmallVec<T, N, A>) {}
+unsafe impl<T: Send, const N: usize, #[cfg(feature = "allocator_api")] A: Send> Send for alloc_param!(SmallVec<T, N, A>) {}
+unsafe impl<T: Sync, const N: usize, #[cfg(feature = "allocator_api")] A: Sync> Sync for alloc_param!(SmallVec<T, N, A>) {}
 
 impl<T, const N: usize> Default for SmallVec<T, N> {
     #[inline]
@@ -1198,8 +1198,8 @@ pub struct IntoIter<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allo
 
 // SAFETY: IntoIter has unique ownership of its contents.  Sending (or sharing) an `IntoIter<T, N>`
 // is equivalent to sending (or sharing) a `SmallVec<T, N>`.
-unsafe impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Send for alloc_param!(IntoIter<T, N, A>) where T: Send {}
-unsafe impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> Sync for alloc_param!(IntoIter<T, N, A>) where T: Sync {}
+unsafe impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Send> Send for alloc_param!(IntoIter<T, N, A>) where T: Send {}
+unsafe impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Sync> Sync for alloc_param!(IntoIter<T, N, A>) where T: Sync {}
 
 impl<T, const N: usize, #[cfg(feature = "allocator_api")] A: Allocator> alloc_param!(IntoIter<T, N, A>) {
     #[inline]
