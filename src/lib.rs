@@ -105,6 +105,7 @@ use serde::{
 use std::io;
 
 /// Error type for APIs with fallible heap allocation
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Debug)]
 pub enum CollectionAllocErr {
     /// Overflow `usize::MAX` or other error during size computation
@@ -562,6 +563,18 @@ where
     }
 }
 
+#[cfg(all(feature = "extract_if", feature = "defmt"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "defmt")))]
+impl<T, const N: usize, F> defmt::Format for ExtractIf<'_, T, N, F>
+where
+    F: FnMut(&mut T) -> bool,
+    T: defmt::Format,
+{
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "ExtractIf({:?})", self.vec.as_slice());
+    }
+}
+
 #[cfg(feature = "extract_if")]
 impl<T, F, const N: usize> Iterator for ExtractIf<'_, T, N, F>
 where
@@ -635,6 +648,17 @@ where
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("Splice").field(&self.drain).finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<'a, I, const N: usize> defmt::Format for Splice<'a, I, N>
+where
+    I: Iterator + 'a,
+    <I as Iterator>::Item: defmt::Format,
+{
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "Splice({:?})", self.drain);
     }
 }
 
@@ -2848,6 +2872,33 @@ impl<T: Debug, const N: usize> Debug for IntoIter<T, N> {
 impl<T: Debug, const N: usize> Debug for Drain<'_, T, N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("Drain").field(&self.iter.as_slice()).finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+#[cfg_attr(docsrs, doc(cfg(feature = "defmt")))]
+impl<T: defmt::Format, const N: usize> defmt::Format for SmallVec<T, N> {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "{=[?]}", self.as_slice());
+    }
+}
+
+#[cfg(feature = "defmt")]
+#[cfg_attr(docsrs, doc(cfg(feature = "defmt")))]
+impl<T: defmt::Format, const N: usize> defmt::Format for IntoIter<T, N> {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "IntoIter({=[?]})", self.as_slice());
+    }
+}
+
+#[cfg(feature = "defmt")]
+#[cfg_attr(docsrs, doc(cfg(feature = "defmt")))]
+impl<T: defmt::Format, const N: usize> defmt::Format for Drain<'_, T, N>
+where
+    T: defmt::Format,
+{
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "Drain({=[?]})", self.iter.as_slice());
     }
 }
 
