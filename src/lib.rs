@@ -56,6 +56,10 @@
 //! For details, see the
 //! [Rust Reference](https://doc.rust-lang.org/reference/const_eval.html#const-functions).
 //!
+//! ### `defmt`
+//!
+//! When this feature is enabled, `SmallVec` implements the `defmt::Format` trait.
+//!
 //! ### `drain_filter`
 //!
 //! **This feature is unstable.** It may change to match the unstable `drain_filter` method in libstd.
@@ -295,6 +299,7 @@ impl<T: Clone> ExtendFromSlice<T> for Vec<T> {
 }
 
 /// Error type for APIs with fallible heap allocation
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Debug)]
 pub enum CollectionAllocErr {
     /// Overflow `usize::MAX` or other error during size computation
@@ -361,6 +366,16 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Drain").field(&self.iter.as_slice()).finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<'a, T: 'a + Array> defmt::Format for Drain<'a, T>
+where
+    T::Item: defmt::Format,
+{
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "Drain({=[?]})", self.iter.as_slice());
     }
 }
 
@@ -2122,6 +2137,16 @@ where
     }
 }
 
+#[cfg(feature = "defmt")]
+impl<A: Array> defmt::Format for SmallVec<A>
+where
+    A::Item: defmt::Format,
+{
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "{=[?]}", self.as_slice());
+    }
+}
+
 impl<A: Array> Default for SmallVec<A> {
     #[inline]
     fn default() -> SmallVec<A> {
@@ -2242,6 +2267,16 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("IntoIter").field(&self.as_slice()).finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<A: Array> defmt::Format for IntoIter<A>
+where
+    A::Item: defmt::Format,
+{
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "IntoIter({=[?]})", self.as_slice());
     }
 }
 
