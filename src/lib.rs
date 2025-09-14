@@ -97,7 +97,7 @@ use bytes::{buf::UninitSlice, BufMut};
 #[cfg(feature = "malloc_size_of")]
 use malloc_size_of::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps};
 #[cfg(feature = "serde")]
-use serde::{
+use serde_core::{
     de::{Deserialize, Deserializer, SeqAccess, Visitor},
     ser::{Serialize, SerializeSeq, Serializer},
 };
@@ -2899,7 +2899,7 @@ where
     where
         B: SeqAccess<'de>,
     {
-        use serde::de::Error;
+        use serde_core::de::Error;
         let len = seq.size_hint().unwrap_or(0);
         let mut values = SmallVec::new();
         values.try_reserve(len).map_err(B::Error::custom)?;
