@@ -1646,6 +1646,11 @@ impl<T, const N: usize> SmallVec<T, N> {
     pub fn retain_mut<F: FnMut(&mut T) -> bool>(&mut self, mut f: F) {
         let len = self.len();
 
+        if len == 0 {
+            // return early as hint to llvm, like what std does
+            return;
+        }
+
         let ptr = self.as_mut_ptr();
         let mut write_idx = 0;
 
