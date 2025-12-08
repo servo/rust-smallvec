@@ -1311,16 +1311,26 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn reserve(&mut self, additional: usize) {
-        // can't overflow since len <= capacity
-        if additional > self.capacity() - self.len() {
+        // Callers expect this function to be very cheap when there is already sufficient capacity.
+        // Therefore, we move all the resizing and error-handling logic behind a call, while making
+        // sure that this function is likely to be inlined as just a comparison and a call if the
+        // comparison fails.
+        #[cold]
+        fn do_reserve_and_handle<T, const N: usize>(slf: &mut SmallVec<T, N>, additional: usize) {
             let new_capacity = infallible(
-                self.len()
+                slf.len()
                     .checked_add(additional)
                     .and_then(usize::checked_next_power_of_two)
                     .ok_or(CollectionAllocErr::CapacityOverflow),
             );
-            self.grow(new_capacity);
+            slf.grow(new_capacity);
+        }
+
+        // can't overflow since len <= capacity
+        if additional > self.capacity() - self.len() {
+            do_reserve_and_handle(self, additional);
         }
     }
 
@@ -1332,22 +1342,30 @@ impl<T, const N: usize> SmallVec<T, N> {
                 .checked_add(additional)
                 .and_then(usize::checked_next_power_of_two)
                 .ok_or(CollectionAllocErr::CapacityOverflow)?;
-            self.try_grow(new_capacity)
-        } else {
-            Ok(())
+            self.try_grow(new_capacity)?;
         }
+            Ok(())
     }
 
     #[inline]
+    #[track_caller]
     pub fn reserve_exact(&mut self, additional: usize) {
-        // can't overflow since len <= capacity
-        if additional > self.capacity() - self.len() {
+        #[cold]
+        fn do_reserve_exact_and_handle<T, const N: usize>(
+            slf: &mut SmallVec<T, N>,
+            additional: usize,
+        ) {
             let new_capacity = infallible(
-                self.len()
+                slf.len()
                     .checked_add(additional)
                     .ok_or(CollectionAllocErr::CapacityOverflow),
             );
-            self.grow(new_capacity);
+            slf.grow(new_capacity);
+        }
+
+        // can't overflow since len <= capacity
+        if additional > self.capacity() - self.len() {
+            do_reserve_exact_and_handle(self, additional);
         }
     }
 
@@ -1358,10 +1376,9 @@ impl<T, const N: usize> SmallVec<T, N> {
                 .len()
                 .checked_add(additional)
                 .ok_or(CollectionAllocErr::CapacityOverflow)?;
-            self.try_grow(new_capacity)
-        } else {
-            Ok(())
+            self.try_grow(new_capacity)?;
         }
+            Ok(())
     }
 
     #[inline]
