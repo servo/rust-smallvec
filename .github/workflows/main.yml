@@ -44,6 +44,9 @@ jobs:
       - name: Cargo test w/ malloc_size_of
         run: cargo test --verbose --features malloc_size_of
 
+      - name: Cargo fmt
+        run: cargo --all -- --check
+
       - name: Cargo check w/o default features
         if: matrix.toolchain == 'nightly'
         run: cargo check --verbose --no-default-features
@@ -92,4 +95,3 @@ jobs:
       - name: Mark the job as unsuccessful
         run: exit 1
         if: "!success()"
-
