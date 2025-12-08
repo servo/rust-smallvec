@@ -1226,15 +1226,16 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn pop(&mut self) -> Option<T> {
-        if self.is_empty() {
+        let len = self.len();
+        if len == 0 {
             None
         } else {
-            let len = self.len() - 1;
-            // SAFETY: len < old_len since this can't overflow, because the old length is non zero
-            unsafe { self.set_len(len) };
+            let new_len = len - 1;
+            // SAFETY: new_len < len since len is non-zero
+            unsafe { self.set_len(new_len) };
             // SAFETY: this element was initialized and we just gave up ownership of it, so we can
             // give it away
-            let value = unsafe { self.as_mut_ptr().add(len).read() };
+            let value = unsafe { self.as_mut_ptr().add(new_len).read() };
             Some(value)
         }
     }
