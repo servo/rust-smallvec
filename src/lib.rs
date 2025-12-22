@@ -849,7 +849,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     pub const fn from_buf<const S: usize>(elements: [T; S]) -> Self {
         const { assert!(S <= N); }
 
-        // Althought we create a new buffer, since S and N are known at compile time,
+        // Although we create a new buffer, since S and N are known at compile time,
         // even with `-C opt-level=1`, it gets optimized as best as it could be. (Checked with <godbolt.org>)
         let mut buf: MaybeUninit<[T; N]> = MaybeUninit::uninit();
 
@@ -860,7 +860,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             copy_nonoverlapping(elements.as_ptr(), buf.as_mut_ptr() as *mut T, S);
         }
 
-        // `elements` have been moved into buf and will be droped by SmallVec
+        // `elements` have been moved into buf and will be dropped by SmallVec
         core::mem::forget(elements);
 
         // SAFETY: all the members in 0..S are initialized
@@ -2230,7 +2230,7 @@ mod spec_traits {
             let len = src.len();
 
             // SAFETY: The caller ensures that the vector has spare capacity
-            // for at least `src.len()` elements. This is alse the amount of memory
+            // for at least `src.len()` elements. This is also the amount of memory
             // accessed when the data is copied.
             unsafe {
                 let ptr = self.as_mut_ptr();
