@@ -204,16 +204,12 @@ impl<T, const N: usize> RawSmallVec<T, N> {
 
     #[inline]
     const fn as_ptr_inline(&self) -> *const T {
-        // SAFETY: This is safe because we don't read the value. We only get a pointer to the data.
-        // Dereferencing the pointer is unsafe so unsafe code is required to misuse the return
-        // value.
-        (unsafe { addr_of!(self.inline) }) as *const T
+        addr_of!(self.inline) as *const T
     }
 
     #[inline]
     const fn as_mut_ptr_inline(&mut self) -> *mut T {
-        // SAFETY: See above.
-        (unsafe { addr_of_mut!(self.inline) }) as *mut T
+        addr_of_mut!(self.inline) as *mut T
     }
 
     /// # Safety
