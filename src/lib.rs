@@ -144,6 +144,12 @@ fn infallible<T>(result: Result<T, CollectionAllocErr>) -> T {
     }
 }
 
+/// Helper function to check if a type is a ZST.
+#[inline]
+const fn is_zst<T>() -> bool {
+    const { size_of::<T>() == 0 }
+}
+
 #[inline]
 /// A local copy of [`core::slice::range`]. The latter function is unstable
 /// and thus cannot be used yet.
@@ -180,10 +186,7 @@ where
 }
 
 impl<T, const N: usize> RawSmallVec<T, N> {
-    #[inline]
-    const fn is_zst() -> bool {
-        size_of::<T>() == 0
-    }
+    const IS_ZST: bool = size_of::<T>() == 0;
 
     #[inline]
     const fn new() -> Self {
@@ -242,17 +245,17 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         new_capacity: usize,
     ) -> Result<(), CollectionAllocErr> {
         use alloc::alloc::{alloc, realloc};
-        debug_assert!(!Self::is_zst());
+        debug_assert!(!Self::IS_ZST);
         debug_assert!(new_capacity > 0);
-        debug_assert!(new_capacity >= len.value(Self::is_zst()));
+        debug_assert!(new_capacity >= len.value::<T>());
 
-        let was_on_heap = len.on_heap(Self::is_zst());
+        let was_on_heap = len.on_heap::<T>();
         let ptr = if was_on_heap {
             self.as_mut_ptr_heap()
         } else {
             self.as_mut_ptr_inline()
         };
-        let len = len.value(Self::is_zst());
+        let len = len.value::<T>();
 
         let new_layout =
             Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
@@ -301,8 +304,8 @@ struct TaggedLen(usize);
 
 impl TaggedLen {
     #[inline]
-    pub const fn new(len: usize, on_heap: bool, is_zst: bool) -> Self {
-        if is_zst {
+    pub const fn new<T>(len: usize, on_heap: bool) -> Self {
+        if const { is_zst::<T>() } {
             debug_assert!(!on_heap);
             TaggedLen(len)
         } else {
@@ -313,8 +316,8 @@ impl TaggedLen {
 
     #[inline]
     #[must_use]
-    pub const fn on_heap(self, is_zst: bool) -> bool {
-        if is_zst {
+    pub const fn on_heap<T>(self) -> bool {
+        if const { is_zst::<T>() } {
             false
         } else {
             (self.0 & 1_usize) == 1
@@ -322,8 +325,8 @@ impl TaggedLen {
     }
 
     #[inline]
-    pub const fn value(self, is_zst: bool) -> usize {
-        if is_zst {
+    pub const fn value<T>(self) -> usize {
+        if const { is_zst::<T>() } {
             self.0
         } else {
             self.0 >> 1
@@ -434,7 +437,7 @@ impl<'a, T: 'a, const N: usize> Drop for Drain<'a, T, N> {
 
         let mut vec = self.vec;
 
-        if SmallVec::<T, N>::is_zst() {
+        if SmallVec::<T, N>::IS_ZST {
             // ZSTs have no identity, so we don't need to move them around, we only need to drop the correct amount.
             // this can be achieved by manipulating the Vec length instead of moving values out from `iter`.
             unsafe {
@@ -726,14 +729,10 @@ unsafe impl<T, const N: usize> Send for IntoIter<T, N> where T: Send {}
 unsafe impl<T, const N: usize> Sync for IntoIter<T, N> where T: Sync {}
 
 impl<T, const N: usize> IntoIter<T, N> {
-    #[inline]
-    const fn is_zst() -> bool {
-        size_of::<T>() == 0
-    }
 
     #[inline]
     const fn as_ptr(&self) -> *const T {
-        let on_heap = self.end.on_heap(Self::is_zst());
+        let on_heap = self.end.on_heap::<T>();
         if on_heap {
             // SAFETY: vector is on the heap
             unsafe { self.raw.as_ptr_heap() }
@@ -744,7 +743,7 @@ impl<T, const N: usize> IntoIter<T, N> {
 
     #[inline]
     const fn as_mut_ptr(&mut self) -> *mut T {
-        let on_heap = self.end.on_heap(Self::is_zst());
+        let on_heap = self.end.on_heap::<T>();
         if on_heap {
             // SAFETY: vector is on the heap
             unsafe { self.raw.as_mut_ptr_heap() }
@@ -761,7 +760,7 @@ impl<T, const N: usize> IntoIter<T, N> {
             let ptr = self.as_ptr();
             core::slice::from_raw_parts(
                 ptr.add(self.begin),
-                self.end.value(Self::is_zst()) - self.begin,
+                self.end.value::<T>() - self.begin,
             )
         }
     }
@@ -773,7 +772,7 @@ impl<T, const N: usize> IntoIter<T, N> {
             let ptr = self.as_mut_ptr();
             core::slice::from_raw_parts_mut(
                 ptr.add(self.begin),
-                self.end.value(Self::is_zst()) - self.begin,
+                self.end.value::<T>() - self.begin,
             )
         }
     }
@@ -784,7 +783,7 @@ impl<T, const N: usize> Iterator for IntoIter<T, N> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.begin == self.end.value(Self::is_zst()) {
+        if self.begin == self.end.value::<T>() {
             None
         } else {
             // SAFETY: see above
@@ -799,7 +798,7 @@ impl<T, const N: usize> Iterator for IntoIter<T, N> {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let size = self.end.value(Self::is_zst()) - self.begin;
+        let size = self.end.value::<T>() - self.begin;
         (size, Some(size))
     }
 }
@@ -807,16 +806,16 @@ impl<T, const N: usize> Iterator for IntoIter<T, N> {
 impl<T, const N: usize> DoubleEndedIterator for IntoIter<T, N> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        let mut end = self.end.value(Self::is_zst());
+        let mut end = self.end.value::<T>();
         if self.begin == end {
             None
         } else {
             // SAFETY: see above
             unsafe {
                 let ptr = self.as_mut_ptr();
-                let on_heap = self.end.on_heap(Self::is_zst());
+                let on_heap = self.end.on_heap::<T>();
                 end -= 1;
-                self.end = TaggedLen::new(end, on_heap, Self::is_zst());
+                self.end = TaggedLen::new::<T>(end, on_heap);
                 let value = ptr.add(end).read();
                 Some(value)
             }
@@ -830,7 +829,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub const fn new() -> SmallVec<T, N> {
         Self {
-            len: TaggedLen::new(0, false, Self::is_zst()),
+            len: TaggedLen::new::<T>(0, false),
             raw: RawSmallVec::new(),
             _marker: PhantomData,
         }
@@ -865,7 +864,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
         // SAFETY: all the members in 0..S are initialized
         Self {
-            len: TaggedLen::new(S, false, Self::is_zst()),
+            len: TaggedLen::new::<T>(S, false),
             raw: RawSmallVec::new_inline(buf),
             _marker: PhantomData,
         }
@@ -876,7 +875,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         assert!(len <= N);
         // SAFETY: all the members in 0..len are initialized
         let mut vec = Self {
-            len: TaggedLen::new(len, false, Self::is_zst()),
+            len: TaggedLen::new::<T>(len, false),
             raw: RawSmallVec::new_inline(MaybeUninit::new(buf)),
             _marker: PhantomData,
         };
@@ -919,7 +918,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     pub const unsafe fn from_buf_and_len_unchecked(buf: MaybeUninit<[T; N]>, len: usize) -> Self {
         debug_assert!(len <= N);
         Self {
-            len: TaggedLen::new(len, false, Self::is_zst()),
+            len: TaggedLen::new::<T>(len, false),
             raw: RawSmallVec::new_inline(buf),
             _marker: PhantomData,
         }
@@ -927,10 +926,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 }
 
 impl<T, const N: usize> SmallVec<T, N> {
-    #[inline]
-    const fn is_zst() -> bool {
-        size_of::<T>() == 0
-    }
+    const IS_ZST: bool = size_of::<T>() == 0;
 
     #[inline]
     pub fn from_vec(vec: Vec<T>) -> Self {
@@ -938,7 +934,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             return Self::new();
         }
 
-        if Self::is_zst() {
+        if Self::IS_ZST {
             // "Move" elements to stack buffer. They're ZST so we don't actually have to do
             // anything. Just make sure they're not dropped.
             // We don't wrap the vector in ManuallyDrop so that when it's dropped, the memory is
@@ -950,7 +946,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             // old_len..new_len is an empty range. So there are no uninitialized elements
             unsafe { vec.set_len(0) };
             Self {
-                len: TaggedLen::new(len, false, Self::is_zst()),
+                len: TaggedLen::new::<T>(len, false),
                 raw: RawSmallVec::new(),
                 _marker: PhantomData,
             }
@@ -963,7 +959,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             let ptr = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
 
             Self {
-                len: TaggedLen::new(len, true, Self::is_zst()),
+                len: TaggedLen::new::<T>(len, true),
                 raw: RawSmallVec::new_heap(ptr, cap),
                 _marker: PhantomData,
             }
@@ -977,7 +973,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// The active union member must be the self.raw.heap
     #[inline]
     unsafe fn set_on_heap(&mut self) {
-        self.len = TaggedLen::new(self.len(), true, Self::is_zst());
+        self.len = TaggedLen::new::<T>(self.len(), true);
     }
 
     /// Sets the tag to be inline
@@ -987,7 +983,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// The active union member must be the self.raw.inline
     #[inline]
     unsafe fn set_inline(&mut self) {
-        self.len = TaggedLen::new(self.len(), false, Self::is_zst());
+        self.len = TaggedLen::new::<T>(self.len(), false);
     }
 
     /// Sets the length of a vector.
@@ -1002,13 +998,13 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub unsafe fn set_len(&mut self, new_len: usize) {
         debug_assert!(new_len <= self.capacity());
-        let on_heap = self.len.on_heap(Self::is_zst());
-        self.len = TaggedLen::new(new_len, on_heap, Self::is_zst());
+        let on_heap = self.len.on_heap::<T>();
+        self.len = TaggedLen::new::<T>(new_len, on_heap);
     }
 
     #[inline]
     pub const fn inline_size() -> usize {
-        if Self::is_zst() {
+        if Self::IS_ZST {
             usize::MAX
         } else {
             N
@@ -1017,7 +1013,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub const fn len(&self) -> usize {
-        self.len.value(Self::is_zst())
+        self.len.value::<T>()
     }
 
     #[must_use]
@@ -1028,7 +1024,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub const fn capacity(&self) -> usize {
-        if self.len.on_heap(Self::is_zst()) {
+        if self.len.on_heap::<T>() {
             // SAFETY: raw.heap is active
             unsafe { self.raw.heap.1 }
         } else {
@@ -1038,7 +1034,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub const fn spilled(&self) -> bool {
-        self.len.on_heap(Self::is_zst())
+        self.len.on_heap::<T>()
     }
 
     /// Splits the collection into two at the given index.
@@ -1271,7 +1267,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[cold]
     pub fn try_grow(&mut self, new_capacity: usize) -> Result<(), CollectionAllocErr> {
-        if Self::is_zst() {
+        if Self::IS_ZST {
             return Ok(());
         }
 
@@ -1521,7 +1517,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub const fn as_ptr(&self) -> *const T {
-        if self.len.on_heap(Self::is_zst()) {
+        if self.len.on_heap::<T>() {
             // SAFETY: heap member is active
             unsafe { self.raw.as_ptr_heap() }
         } else {
@@ -1531,7 +1527,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub const fn as_mut_ptr(&mut self) -> *mut T {
-        if self.len.on_heap(Self::is_zst()) {
+        if self.len.on_heap::<T>() {
             // SAFETY: see above
             unsafe { self.raw.as_mut_ptr_heap() }
         } else {
@@ -1758,7 +1754,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// ```
     #[inline]
     pub unsafe fn from_raw_parts(ptr: *mut T, length: usize, capacity: usize) -> SmallVec<T, N> {
-        assert!(!Self::is_zst());
+        assert!(!Self::IS_ZST);
 
         // SAFETY: We require caller to provide same ptr as we alloc
         // and we never alloc null pointer.
@@ -1768,7 +1764,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         };
 
         SmallVec {
-            len: TaggedLen::new(length, true, Self::is_zst()),
+            len: TaggedLen::new::<T>(length, true),
             raw: RawSmallVec::new_heap(ptr, capacity),
             _marker: PhantomData,
         }
@@ -1981,10 +1977,9 @@ impl<T, const N: usize> Drop for IntoIter<T, N> {
     fn drop(&mut self) {
         // SAFETY: see above
         unsafe {
-            let is_zst = size_of::<T>() == 0;
-            let on_heap = self.end.on_heap(is_zst);
+            let on_heap = self.end.on_heap::<T>();
             let begin = self.begin;
-            let end = self.end.value(is_zst);
+            let end = self.end.value::<T>();
             let ptr = self.as_mut_ptr();
             let _drop_dealloc = if on_heap {
                 let capacity = self.raw.heap.1;
@@ -2160,7 +2155,7 @@ mod spec_traits {
             }
 
             // Mark the iterator as fully consumed.
-            iter.begin = iter.end.value(Self::is_zst());
+            iter.begin = iter.end.value(Self::IS_ZST);
         }
     }
 
