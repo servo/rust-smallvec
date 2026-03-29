@@ -34,6 +34,24 @@ pub fn test_push_mut() {
 }
 
 #[test]
+pub fn test_insert_mut() {
+    let mut v = SmallVec::<_, 16>::new();
+    v.push("hello".to_owned());
+    v.push("there".to_owned());
+
+    let second_elem = v.insert_mut(1, ",".to_owned());
+    assert_eq!(&*second_elem, &",".to_owned());
+
+    *second_elem = ";".to_owned();
+    assert_eq!(&*second_elem, &";".to_owned());
+
+    assert_eq!(
+        &*v,
+        &["hello".to_owned(), ";".to_owned(), "there".to_owned(),][..]
+    );
+}
+
+#[test]
 pub fn test_inline() {
     let mut v = SmallVec::<_, 16>::new();
     v.push("hello".to_owned());

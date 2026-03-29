@@ -1505,24 +1505,33 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn insert(&mut self, index: usize, value: T) {
+        _ = self.insert_mut(index, value);
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn insert_mut(&mut self, index: usize, value: T) -> &mut T {
         let len = self.len();
         assert!(
             index <= len,
             "insertion index (is {index}) should be <= len (is {len})"
         );
         self.reserve(1);
-        let ptr = self.as_mut_ptr();
+        let mut ptr = self.as_mut_ptr();
         unsafe {
             // the elements at `index + 1..len + 1` are now initialized
             if index < len {
                 copy(ptr.add(index), ptr.add(index + 1), len - index);
             }
             // the element at `index` is now initialized
-            ptr.add(index).write(value);
+            ptr = ptr.add(index);
+            ptr.write(value);
 
             // SAFETY: all the elements are initialized
             self.set_len(len + 1);
         }
+        let result = unsafe { ptr.as_mut() };
+        unsafe { result.unwrap_unchecked() }
     }
 
     #[inline]
