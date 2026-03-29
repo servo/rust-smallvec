@@ -1208,16 +1208,26 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn push(&mut self, value: T) {
+        _ = self.push_mut(value);
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn push_mut(&mut self, value: T) -> &mut T {
         let len = self.len();
         if len == self.capacity() {
             self.reserve(1);
         }
+
         // SAFETY: both the input and output are within the allocation
         let ptr = unsafe { self.as_mut_ptr().add(len) };
         // SAFETY: we allocated enough space in case it wasn't enough, so the address is valid for
         // writes.
         unsafe { ptr.write(value) };
         unsafe { self.set_len(len + 1) }
+
+        let result = unsafe { ptr.as_mut() };
+        unsafe { result.unwrap_unchecked() }
     }
 
     #[inline]

@@ -20,6 +20,20 @@ pub fn test_zero() {
 // We heap allocate all these strings so that double frees will show up under valgrind.
 
 #[test]
+pub fn test_push_mut() {
+    let mut v = SmallVec::<_, 16>::new();
+
+    let first_elem = v.push_mut("hello".to_owned());
+    assert_eq!(&*first_elem, &"hello".to_owned());
+
+    *first_elem = "hi".to_owned();
+    assert_eq!(&*first_elem, &"hi".to_owned());
+
+    v.push("there".to_owned());
+    assert_eq!(&*v, &["hi".to_owned(), "there".to_owned(),][..]);
+}
+
+#[test]
 pub fn test_inline() {
     let mut v = SmallVec::<_, 16>::new();
     v.push("hello".to_owned());
