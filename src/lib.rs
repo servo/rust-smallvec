@@ -292,7 +292,7 @@ impl<T> Clone for TaggedLen<T> {
     fn clone(&self) -> Self {
         Self(self.0, PhantomData)
     }
-
+    
     #[inline]
     fn clone_from(&mut self, source: &Self) {
         self.0 = source.0;
@@ -493,10 +493,7 @@ impl<T, const N: usize> Drain<'_, T, N> {
         let range_start = vec.len();
         let range_end = self.tail_start;
         let range_slice = unsafe {
-            core::slice::from_raw_parts_mut(
-                vec.as_mut_ptr().add(range_start),
-                range_end - range_start,
-            )
+            core::slice::from_raw_parts_mut(vec.as_mut_ptr().add(range_start), range_end - range_start)
         };
 
         for place in range_slice {
@@ -692,11 +689,7 @@ impl<I: Iterator, const N: usize> Drop for Splice<'_, I, N> {
             }
 
             // Collect any remaining elements.
-            let mut collected = self
-                .replace_with
-                .by_ref()
-                .collect::<SmallVec<I::Item, N>>()
-                .into_iter();
+            let mut collected = self.replace_with.by_ref().collect::<SmallVec<I::Item, N>>().into_iter();
             // Now we have an exact count.
             if collected.len() > 0 {
                 self.drain.move_tail(collected.len());
@@ -732,6 +725,7 @@ unsafe impl<T, const N: usize> Send for IntoIter<T, N> where T: Send {}
 unsafe impl<T, const N: usize> Sync for IntoIter<T, N> where T: Sync {}
 
 impl<T, const N: usize> IntoIter<T, N> {
+
     #[inline]
     const fn as_ptr(&self) -> *const T {
         let on_heap = self.end.on_heap();
@@ -760,7 +754,10 @@ impl<T, const N: usize> IntoIter<T, N> {
         // So the pointer arithmetic is valid, and so is the construction of the slice
         unsafe {
             let ptr = self.as_ptr();
-            core::slice::from_raw_parts(ptr.add(self.begin), self.end.value() - self.begin)
+            core::slice::from_raw_parts(
+                ptr.add(self.begin),
+                self.end.value() - self.begin,
+            )
         }
     }
 
@@ -769,7 +766,10 @@ impl<T, const N: usize> IntoIter<T, N> {
         // SAFETY: see above
         unsafe {
             let ptr = self.as_mut_ptr();
-            core::slice::from_raw_parts_mut(ptr.add(self.begin), self.end.value() - self.begin)
+            core::slice::from_raw_parts_mut(
+                ptr.add(self.begin),
+                self.end.value() - self.begin,
+            )
         }
     }
 }
@@ -842,9 +842,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub const fn from_buf<const S: usize>(elements: [T; S]) -> Self {
-        const {
-            assert!(S <= N);
-        }
+        const { assert!(S <= N); }
 
         // Although we create a new buffer, since S and N are known at compile time,
         // even with `-C opt-level=1`, it gets optimized as best as it could be. (Checked with <godbolt.org>)
@@ -1200,10 +1198,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         R: core::ops::RangeBounds<usize>,
         I: IntoIterator<Item = T>,
     {
-        Splice {
-            drain: self.drain(range),
-            replace_with: replace_with.into_iter(),
-        }
+        Splice { drain: self.drain(range), replace_with: replace_with.into_iter() }
     }
 
     #[inline]
@@ -1218,16 +1213,13 @@ impl<T, const N: usize> SmallVec<T, N> {
         if len == self.capacity() {
             self.reserve(1);
         }
-
         // SAFETY: both the input and output are within the allocation
         let ptr = unsafe { self.as_mut_ptr().add(len) };
         // SAFETY: we allocated enough space in case it wasn't enough, so the address is valid for
         // writes.
         unsafe { ptr.write(value) };
         unsafe { self.set_len(len + 1) }
-
-        let result = unsafe { ptr.as_mut() };
-        unsafe { result.unwrap_unchecked() }
+        unsafe { &mut *ptr }
     }
 
     #[inline]
@@ -1248,11 +1240,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn pop_if(&mut self, predicate: impl FnOnce(&mut T) -> bool) -> Option<T> {
         let last = self.last_mut()?;
-        if predicate(last) {
-            self.pop()
-        } else {
-            None
-        }
+        if predicate(last) { self.pop() } else { None }
     }
 
     #[inline]
@@ -1417,10 +1405,7 @@ impl<T, const N: usize> SmallVec<T, N> {
                     self.set_inline();
                     alloc::alloc::dealloc(
                         ptr.cast().as_ptr(),
-                        Layout::from_size_align_unchecked(
-                            capacity * size_of::<T>(),
-                            align_of::<T>(),
-                        ),
+                        Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>()),
                     );
                 }
             } else if target < self.capacity() {
@@ -1451,10 +1436,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn swap_remove(&mut self, index: usize) -> T {
         let len = self.len();
-        assert!(
-            index < len,
-            "swap_remove index (is {index}) should be < len (is {len})"
-        );
+        assert!(index < len, "swap_remove index (is {index}) should be < len (is {len})");
         // This can't overflow since `len > index >= 0`
         let new_len = len - 1;
         unsafe {
@@ -1486,10 +1468,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn remove(&mut self, index: usize) -> T {
         let len = self.len();
-        assert!(
-            index < len,
-            "removal index (is {index}) should be < len (is {len})"
-        );
+        assert!(index < len, "removal index (is {index}) should be < len (is {len})");
         let new_len = len - 1;
         unsafe {
             // SAFETY: new_len < len
@@ -1512,10 +1491,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[must_use]
     pub fn insert_mut(&mut self, index: usize, value: T) -> &mut T {
         let len = self.len();
-        assert!(
-            index <= len,
-            "insertion index (is {index}) should be <= len (is {len})"
-        );
+        assert!(index <= len, "insertion index (is {index}) should be <= len (is {len})");
         self.reserve(1);
         let mut ptr = self.as_mut_ptr();
         unsafe {
@@ -1529,9 +1505,9 @@ impl<T, const N: usize> SmallVec<T, N> {
 
             // SAFETY: all the elements are initialized
             self.set_len(len + 1);
+
+            &mut *ptr
         }
-        let result = unsafe { ptr.as_mut() };
-        unsafe { result.unwrap_unchecked() }
     }
 
     #[inline]
@@ -1714,9 +1690,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     pub fn leak<'a>(self) -> &'a mut [T] {
         if !self.spilled() {
-            panic!(
-                "SmallVec::leak() called on inline (stack) SmallVec, which cannot be safely leaked"
-            );
+            panic!("SmallVec::leak() called on inline (stack) SmallVec, which cannot be safely leaked");
         }
         let mut me = ManuallyDrop::new(self);
         unsafe { core::slice::from_raw_parts_mut(me.as_mut_ptr(), me.len()) }
@@ -1849,11 +1823,12 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn extend_from_slice_copy(&mut self, other: &[T])
     where
-        T: Copy,
+        T: Copy
     {
+        
         let len = other.len();
         let src = other.as_ptr();
-
+        
         let l = self.len();
         self.reserve(len);
 
@@ -1869,7 +1844,7 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
     pub fn extend_from_within_copy<R>(&mut self, src: R)
     where
         R: core::ops::RangeBounds<usize>,
-        T: Copy,
+        T: Copy
     {
         let src = slice_range(src, ..self.len());
         let core::ops::Range { start, end } = src;
@@ -1888,7 +1863,7 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
 
     pub fn insert_from_slice_copy(&mut self, index: usize, other: &[T])
     where
-        T: Copy,
+        T: Copy
     {
         let l = self.len();
         let len = other.len();
@@ -1912,7 +1887,7 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
     /// for types with the [`Copy`] trait.
     pub fn from_slice_copy(slice: &[T]) -> Self
     where
-        T: Copy,
+        T: Copy
     {
         let src = slice.as_ptr();
         let len = slice.len();
