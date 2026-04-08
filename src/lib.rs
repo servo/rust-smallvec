@@ -602,7 +602,7 @@ where
 
         unsafe {
             // ZSTs have no identity, so we don't need to move them around.
-            let needs_move = mem::size_of::<T>() != 0;
+            let needs_move = mem::size_of::<T::Item>() != 0;
 
             if needs_move && this.idx < this.old_len && this.del > 0 {
                 let ptr = this.vec.as_mut_ptr();
