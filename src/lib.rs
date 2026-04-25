@@ -1203,12 +1203,6 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn push(&mut self, value: T) {
-        _ = self.push_mut(value);
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn push_mut(&mut self, value: T) -> &mut T {
         let len = self.len();
         if len == self.capacity() {
             self.reserve(1);
@@ -1218,7 +1212,15 @@ impl<T, const N: usize> SmallVec<T, N> {
         // SAFETY: we allocated enough space in case it wasn't enough, so the address is valid for
         // writes.
         unsafe { ptr.write(value) };
-        unsafe { self.set_len(len + 1) }
+        unsafe { self.set_len(len + 1) };
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn push_mut(&mut self, value: T) -> &mut T {
+        let idx = self.len();
+        let () = self.push(value);
+        let ptr = unsafe { self.as_mut_ptr().add(idx) };
         unsafe { &mut *ptr }
     }
 
@@ -1484,30 +1486,32 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn insert(&mut self, index: usize, value: T) {
-        _ = self.insert_mut(index, value);
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn insert_mut(&mut self, index: usize, value: T) -> &mut T {
         let len = self.len();
-        assert!(index <= len, "insertion index (is {index}) should be <= len (is {len})");
+        assert!(
+            index <= len,
+            "insertion index (is {index}) should be <= len (is {len})"
+        );
         self.reserve(1);
-        let mut ptr = self.as_mut_ptr();
+        let ptr = self.as_mut_ptr();
         unsafe {
             // the elements at `index + 1..len + 1` are now initialized
             if index < len {
                 copy(ptr.add(index), ptr.add(index + 1), len - index);
             }
             // the element at `index` is now initialized
-            ptr = ptr.add(index);
-            ptr.write(value);
+            ptr.add(index).write(value);
 
             // SAFETY: all the elements are initialized
             self.set_len(len + 1);
-
-            &mut *ptr
         }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn insert_mut(&mut self, index: usize, value: T) -> &mut T {
+        let () = self.insert(index, value);
+        let ptr = unsafe { self.as_mut_ptr().add(index) };
+        unsafe { &mut *ptr }
     }
 
     #[inline]
