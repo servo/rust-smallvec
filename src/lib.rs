@@ -166,7 +166,7 @@ use core::mem::ManuallyDrop;
 /// ```
 /// # use smallvec::{smallvec, SmallVec};
 /// # fn main() {
-/// let v: SmallVec<[_; 0x8000]> = smallvec![1; 3];
+/// let v: SmallVec<[_; 10]> = smallvec![1; 3];
 /// assert_eq!(v, SmallVec::from_buf([1, 1, 1]));
 /// # }
 /// ```
