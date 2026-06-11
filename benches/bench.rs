@@ -310,3 +310,14 @@ fn bench_macro_from_list_vec(b: &mut Bencher) {
         vec
     });
 }
+
+// Regression bench for https://github.com/rust-lang/rust/issues/157743:
+// rustc 1.93+ emits a memset over the entire struct instead of a single
+// store to the capacity field when a SmallVec is wrapped in a newtype.
+// Uses a capacity large enough that the memset becomes a function call
+// rather than inline SSE stores, making the regression clearly measurable.
+#[bench]
+fn bench_new_in_newtype(b: &mut Bencher) {
+    struct Wrap(SmallVec<[u64; 32]>);
+    b.iter(|| test::black_box(Wrap(SmallVec::new())))
+}
