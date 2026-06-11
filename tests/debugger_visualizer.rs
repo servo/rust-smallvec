@@ -4,6 +4,7 @@ use smallvec::{smallvec, SmallVec};
 #[inline(never)]
 fn __break() {}
 
+/* Disabled, see https://github.com/servo/rust-smallvec/issues/413
 #[debugger_test(
     debugger = "cdb",
     commands = r#"
@@ -66,3 +67,4 @@ fn test_debugger_visualizer() {
     sv.sort();
     __break();
 }
+*/
