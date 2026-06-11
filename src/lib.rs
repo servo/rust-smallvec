@@ -647,9 +647,16 @@ impl<A: Array> SmallVecData<A> {
     }
     #[inline]
     fn from_inline(inline: MaybeUninit<A>) -> SmallVecData<A> {
-        SmallVecData {
-            inline: core::mem::ManuallyDrop::new(inline),
-        }
+        // Workaround for https://github.com/rust-lang/rust/issues/157743: constructing the
+        // union directly with `ManuallyDrop::new(inline)` causes rustc 1.93+ to materialize
+        // `MaybeUninit::uninit()` as a global constant, which LLVM then collapses into a
+        // memset over the whole struct. Initializing the field via a raw pointer write breaks
+        // the GVN constant-propagation chain and restores the expected codegen.
+        let mut data = SmallVecData {
+            inline: unsafe { MaybeUninit::uninit().assume_init() },
+        };
+        unsafe { core::ptr::addr_of_mut!(*data.inline).write(inline) };
+        data
     }
     #[inline]
     unsafe fn into_inline(self) -> MaybeUninit<A> {
@@ -711,7 +718,17 @@ impl<A: Array> SmallVecData<A> {
     }
     #[inline]
     fn from_inline(inline: MaybeUninit<A>) -> SmallVecData<A> {
-        SmallVecData::Inline(inline)
+        // Workaround for https://github.com/rust-lang/rust/issues/157743: constructing the
+        // enum variant directly with the inline argument causes rustc 1.93+ to materialize
+        // `MaybeUninit::uninit()` as a global constant, which LLVM then collapses into a
+        // memset over the whole struct. Constructing with a fresh uninit payload first and
+        // then overwriting via a raw pointer write breaks the GVN chain.
+        let mut data = SmallVecData::Inline(unsafe { MaybeUninit::uninit().assume_init() });
+        match &mut data {
+            SmallVecData::Inline(a) => unsafe { core::ptr::write(a as *mut _, inline) },
+            _ => unsafe { core::hint::unreachable_unchecked() },
+        }
+        data
     }
     #[inline]
     unsafe fn into_inline(self) -> MaybeUninit<A> {
