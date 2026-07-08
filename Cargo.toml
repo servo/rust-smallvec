@@ -10,7 +10,7 @@ keywords = ["small", "vec", "vector", "stack", "no_std"]
 categories = ["data-structures"]
 readme = "README.md"
 documentation = "https://docs.rs/smallvec/"
-include = ["Cargo.toml", "LICENSE-MIT", "LICENSE-APACHE", "README.md", "src/**/*.rs"]
+include = ["Cargo.toml", "LICENSE-MIT", "LICENSE-APACHE", "README.md", "src/**/*.rs", "debug_metadata/*.natvis"]
 
 [features]
 const_generics = []
