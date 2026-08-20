@@ -2667,7 +2667,7 @@ macro_rules! smallvec {
         $crate::from_elem($elem, $n)
     });
     ($($($x:expr),+$(,)?)?) => ({
-        $crate::SmallVec::from([$($($x,)+)?])
+        $crate::SmallVec::from([$($($x),+)?])
     });
 }
 
@@ -2680,7 +2680,7 @@ macro_rules! smallvec_inline {
     });
     ($($x:expr),+ $(,)?) => ({
         const N: usize = 0usize $(+ $crate::smallvec_inline!(@one $x))*;
-        $crate::SmallVec::<_, N>::from_buf([$($x,)*])
+        $crate::SmallVec::<_, N>::from_buf([$($x),*])
     });
 }
 
