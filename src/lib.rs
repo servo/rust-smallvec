@@ -205,11 +205,15 @@ impl<T, const N: usize> RawSmallVec<T, N> {
 
     #[inline]
     const fn as_ptr_inline(&self) -> *const T {
+        // SAFETY: it is safe because we aren't reading the value, just getting a
+        // reference to it. reading it would be UB potentially, but for that downstream
+        // unsafe is required
         (unsafe {&raw const self.inline}) as *mut T
     }
 
     #[inline]
     const fn as_mut_ptr_inline(&mut self) -> *mut T {
+        // SAFETY: same as above
         (unsafe {&raw mut self.inline}) as *mut T
     }
 
