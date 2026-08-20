@@ -60,14 +60,6 @@ jobs:
         if: matrix.toolchain == 'beta'
         run: cargo test --verbose --features union
 
-      - name: Cargo test w/ debugger_visualizer
-        if: matrix.toolchain == 'nightly'
-        run: cargo test --test debugger_visualizer --verbose --features debugger_visualizer -- --test-threads=1
-
-      - name: Cargo test w/ debugger_visualizer and union
-        if: matrix.toolchain == 'nightly'
-        run: cargo test --test debugger_visualizer --verbose --features 'debugger_visualizer,union' -- --test-threads=1
-
       - name: Cargo test all features
         if: matrix.toolchain == 'nightly'
         run: cargo test --verbose --all-features
