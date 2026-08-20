@@ -370,7 +370,7 @@ fn test_invalid_grow() {
 #[should_panic]
 fn drain_overflow() {
     let mut v: SmallVec<u8, 8> = smallvec![0];
-    v.drain(..=std::usize::MAX);
+    v.drain(..=usize::MAX);
 }
 
 #[test]

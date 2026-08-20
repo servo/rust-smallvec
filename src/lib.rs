@@ -86,8 +86,6 @@ use core::mem::align_of;
 use core::mem::size_of;
 use core::mem::ManuallyDrop;
 use core::mem::MaybeUninit;
-use core::ptr::addr_of;
-use core::ptr::addr_of_mut;
 use core::ptr::copy;
 use core::ptr::copy_nonoverlapping;
 use core::ptr::NonNull;
@@ -207,16 +205,12 @@ impl<T, const N: usize> RawSmallVec<T, N> {
 
     #[inline]
     const fn as_ptr_inline(&self) -> *const T {
-        // SAFETY: This is safe because we don't read the value. We only get a pointer to the data.
-        // Dereferencing the pointer is unsafe so unsafe code is required to misuse the return
-        // value.
-        (unsafe { addr_of!(self.inline) }) as *const T
+        &raw const self.inline as *const T
     }
 
     #[inline]
     const fn as_mut_ptr_inline(&mut self) -> *mut T {
-        // SAFETY: See above.
-        (unsafe { addr_of_mut!(self.inline) }) as *mut T
+        &raw mut self.inline as *mut T
     }
 
     /// # Safety
