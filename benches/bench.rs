@@ -80,7 +80,7 @@ impl<T: Copy> Vector<T> for SmallVec<T, VEC_SIZE> {
     }
 
     fn from_elems(val: &[T]) -> Self {
-        SmallVec::from_slice(val)
+        SmallVec::from(val)
     }
 
     fn extend_from_slice(&mut self, other: &[T]) {
@@ -274,17 +274,6 @@ fn gen_pushpop<V: Vector<u64>>(b: &mut Bencher) {
 fn gen_from_elem<V: Vector<u64>>(n: usize, b: &mut Bencher) {
     b.iter(|| {
         let vec = V::from_elem(42, n);
-        vec
-    });
-}
-
-#[bench]
-fn bench_insert_from_slice(b: &mut Bencher) {
-    let v: Vec<u64> = (0..SPILLED_SIZE as _).collect();
-    b.iter(|| {
-        let mut vec = SmallVec::<u64, VEC_SIZE>::new();
-        vec.insert_from_slice(0, &v);
-        vec.insert_from_slice(0, &v);
         vec
     });
 }
