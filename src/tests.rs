@@ -587,7 +587,10 @@ fn test_from() {
 #[test]
 fn test_from_slice() {
     assert_eq!(&SmallVec::<u32, 2>::from(&[1][..])[..], [1]);
-    assert_eq!(&SmallVec::<u32, 2>::from(&[1, 2, 3][..])[..], [1, 2, 3]);
+    assert_eq!(
+        &SmallVec::<u32, 2>::from(&[1, 2, 3][..])[..],
+        [1, 2, 3]
+    );
 }
 
 #[test]
@@ -993,11 +996,7 @@ fn collect_from_iter() {
 
     // A length of 3 is fine to trigger this bug under valgrind, but making the vector 1 million
     // elements makes it crash - which is much easier to detect.
-    #[cfg(miri)]
-    const ELEMENTS: usize = 1000;
-    #[cfg(not(miri))]
-    const ELEMENTS: usize = 1_000_000;
-    let iter = IterNoHint(std::iter::repeat(1u8).take(ELEMENTS));
+    let iter = IterNoHint(std::iter::repeat(1u8).take(1_000_000));
 
     let _y: SmallVec<u8, 1> = SmallVec::from_iter(iter);
 }
