@@ -14,7 +14,7 @@ rust-smallvec
 [#183]: https://github.com/servo/rust-smallvec/issues/183
 [#240]: https://github.com/servo/rust-smallvec/issues/240
 [#284]: https://github.com/servo/rust-smallvec/issues/284
-[#284]: https://github.com/servo/rust-smallvec/issues/425
+[#425]: https://github.com/servo/rust-smallvec/issues/425
 
 ## About smallvec
 
