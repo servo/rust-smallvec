@@ -17,7 +17,6 @@ include = ["Cargo.toml", "LICENSE-MIT", "LICENSE-APACHE", "README.md", "src/**/*
 std = []
 specialization = []
 may_dangle = []
-extract_if = []
 serde = ["dep:serde_core"]
 
 [dependencies]

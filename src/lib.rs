@@ -30,13 +30,6 @@
 //! When this optional dependency is enabled, `SmallVec` implements the `serde::Serialize` and
 //! `serde::Deserialize` traits.
 //!
-//! ### `extract_if`
-//!
-//! **This feature is unstable.** It may change to match the unstable `extract_if` method in libstd.
-//!
-//! Enables the `extract_if` method, which produces an iterator that calls a user-provided
-//! closure to determine which elements of the vector to remove and yield from the iterator.
-//!
 //! ### `specialization`
 //!
 //! **This feature is unstable and requires a nightly build of the Rust toolchain.**
@@ -544,7 +537,6 @@ impl<T, const N: usize> Drain<'_, T, N> {
     }
 }
 
-#[cfg(feature = "extract_if")]
 /// An iterator which uses a closure to determine if an element should be removed.
 ///
 /// Returned from [`SmallVec::extract_if`][1].
@@ -567,7 +559,6 @@ where
     pred: F,
 }
 
-#[cfg(feature = "extract_if")]
 impl<T, const N: usize, F> core::fmt::Debug for ExtractIf<'_, T, N, F>
 where
     F: FnMut(&mut T) -> bool,
@@ -580,7 +571,6 @@ where
     }
 }
 
-#[cfg(feature = "extract_if")]
 impl<T, F, const N: usize> Iterator for ExtractIf<'_, T, N, F>
 where
     F: FnMut(&mut T) -> bool,
@@ -616,7 +606,6 @@ where
     }
 }
 
-#[cfg(feature = "extract_if")]
 impl<T, F, const N: usize> Drop for ExtractIf<'_, T, N, F>
 where
     F: FnMut(&mut T) -> bool,
@@ -1120,7 +1109,6 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 
-    #[cfg(feature = "extract_if")]
     /// Creates an iterator which uses a closure to determine if element in the range should be removed.
     ///
     /// If the closure returns true, then the element is removed and yielded.
