@@ -499,7 +499,10 @@ impl<T, const N: usize> Drain<'_, T, N> {
         let range_start = vec.len();
         let range_end = self.tail_start;
         let range_slice = unsafe {
-            core::slice::from_raw_parts_mut(vec.as_mut_ptr().add(range_start), range_end - range_start)
+            core::slice::from_raw_parts_mut(
+                vec.as_mut_ptr().add(range_start),
+                range_end - range_start,
+            )
         };
 
         for place in range_slice {
@@ -695,7 +698,11 @@ impl<I: Iterator, const N: usize> Drop for Splice<'_, I, N> {
             }
 
             // Collect any remaining elements.
-            let mut collected = self.replace_with.by_ref().collect::<SmallVec<I::Item, N>>().into_iter();
+            let mut collected = self
+                .replace_with
+                .by_ref()
+                .collect::<SmallVec<I::Item, N>>()
+                .into_iter();
             // Now we have an exact count.
             if collected.len() > 0 {
                 self.drain.move_tail(collected.len());
@@ -848,7 +855,9 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub const fn from_buf<const S: usize>(elements: [T; S]) -> Self {
-        const { assert!(S <= N); }
+        const {
+            assert!(S <= N);
+        }
 
         // Although we create a new buffer, since S and N are known at compile time,
         // even with `-C opt-level=1`, it gets optimized as best as it could be. (Checked with <godbolt.org>)
@@ -1204,7 +1213,10 @@ impl<T, const N: usize> SmallVec<T, N> {
         R: core::ops::RangeBounds<usize>,
         I: IntoIterator<Item = T>,
     {
-        Splice { drain: self.drain(range), replace_with: replace_with.into_iter() }
+        Splice {
+            drain: self.drain(range),
+            replace_with: replace_with.into_iter(),
+        }
     }
 
     #[inline]
@@ -1223,15 +1235,16 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn pop(&mut self) -> Option<T> {
-        if self.is_empty() {
+        let len = self.len();
+        if len == 0 {
             None
         } else {
-            let len = self.len() - 1;
-            // SAFETY: len < old_len since this can't overflow, because the old length is non zero
-            unsafe { self.set_len(len) };
+            let new_len = len - 1;
+            // SAFETY: new_len < len since len is non-zero
+            unsafe { self.set_len(new_len) };
             // SAFETY: this element was initialized and we just gave up ownership of it, so we can
             // give it away
-            let value = unsafe { self.as_mut_ptr().add(len).read() };
+            let value = unsafe { self.as_mut_ptr().add(new_len).read() };
             Some(value)
         }
     }
@@ -1239,7 +1252,11 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn pop_if(&mut self, predicate: impl FnOnce(&mut T) -> bool) -> Option<T> {
         let last = self.last_mut()?;
-        if predicate(last) { self.pop() } else { None }
+        if predicate(last) {
+            self.pop()
+        } else {
+            None
+        }
     }
 
     #[inline]
@@ -1308,16 +1325,26 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn reserve(&mut self, additional: usize) {
-        // can't overflow since len <= capacity
-        if additional > self.capacity() - self.len() {
+        // Callers expect this function to be very cheap when there is already sufficient capacity.
+        // Therefore, we move all the resizing and error-handling logic behind a call, while making
+        // sure that this function is likely to be inlined as just a comparison and a call if the
+        // comparison fails.
+        #[cold]
+        fn do_reserve_and_handle<T, const N: usize>(slf: &mut SmallVec<T, N>, additional: usize) {
             let new_capacity = infallible(
-                self.len()
+                slf.len()
                     .checked_add(additional)
                     .and_then(usize::checked_next_power_of_two)
                     .ok_or(CollectionAllocErr::CapacityOverflow),
             );
-            self.grow(new_capacity);
+            slf.grow(new_capacity);
+        }
+
+        // can't overflow since len <= capacity
+        if additional > self.capacity() - self.len() {
+            do_reserve_and_handle(self, additional);
         }
     }
 
@@ -1329,22 +1356,30 @@ impl<T, const N: usize> SmallVec<T, N> {
                 .checked_add(additional)
                 .and_then(usize::checked_next_power_of_two)
                 .ok_or(CollectionAllocErr::CapacityOverflow)?;
-            self.try_grow(new_capacity)
-        } else {
-            Ok(())
+            self.try_grow(new_capacity)?;
         }
+        Ok(())
     }
 
     #[inline]
+    #[track_caller]
     pub fn reserve_exact(&mut self, additional: usize) {
-        // can't overflow since len <= capacity
-        if additional > self.capacity() - self.len() {
+        #[cold]
+        fn do_reserve_exact_and_handle<T, const N: usize>(
+            slf: &mut SmallVec<T, N>,
+            additional: usize,
+        ) {
             let new_capacity = infallible(
-                self.len()
+                slf.len()
                     .checked_add(additional)
                     .ok_or(CollectionAllocErr::CapacityOverflow),
             );
-            self.grow(new_capacity);
+            slf.grow(new_capacity);
+        }
+
+        // can't overflow since len <= capacity
+        if additional > self.capacity() - self.len() {
+            do_reserve_exact_and_handle(self, additional);
         }
     }
 
@@ -1355,10 +1390,9 @@ impl<T, const N: usize> SmallVec<T, N> {
                 .len()
                 .checked_add(additional)
                 .ok_or(CollectionAllocErr::CapacityOverflow)?;
-            self.try_grow(new_capacity)
-        } else {
-            Ok(())
+            self.try_grow(new_capacity)?;
         }
+        Ok(())
     }
 
     #[inline]
@@ -1404,7 +1438,10 @@ impl<T, const N: usize> SmallVec<T, N> {
                     self.set_inline();
                     alloc::alloc::dealloc(
                         ptr.cast().as_ptr(),
-                        Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>()),
+                        Layout::from_size_align_unchecked(
+                            capacity * size_of::<T>(),
+                            align_of::<T>(),
+                        ),
                     );
                 }
             } else if target < self.capacity() {
@@ -1435,7 +1472,10 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn swap_remove(&mut self, index: usize) -> T {
         let len = self.len();
-        assert!(index < len, "swap_remove index (is {index}) should be < len (is {len})");
+        assert!(
+            index < len,
+            "swap_remove index (is {index}) should be < len (is {len})"
+        );
         // This can't overflow since `len > index >= 0`
         let new_len = len - 1;
         unsafe {
@@ -1467,7 +1507,10 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn remove(&mut self, index: usize) -> T {
         let len = self.len();
-        assert!(index < len, "removal index (is {index}) should be < len (is {len})");
+        assert!(
+            index < len,
+            "removal index (is {index}) should be < len (is {len})"
+        );
         let new_len = len - 1;
         unsafe {
             // SAFETY: new_len < len
@@ -1484,7 +1527,10 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn insert(&mut self, index: usize, value: T) {
         let len = self.len();
-        assert!(index <= len, "insertion index (is {index}) should be <= len (is {len})");
+        assert!(
+            index <= len,
+            "insertion index (is {index}) should be <= len (is {len})"
+        );
         self.reserve(1);
         let ptr = self.as_mut_ptr();
         unsafe {
@@ -1595,21 +1641,28 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn retain_mut<F: FnMut(&mut T) -> bool>(&mut self, mut f: F) {
-        let mut del = 0;
         let len = self.len();
+
+        if len == 0 {
+            // return early as hint to llvm, like what std does
+            return;
+        }
+
         let ptr = self.as_mut_ptr();
-        for i in 0..len {
+        let mut write_idx = 0;
+
+        for read_idx in 0..len {
             // SAFETY: all the pointers are in bounds
-            // `i - del` never overflows since `del <= i` is a maintained invariant
             unsafe {
-                if !f(&mut *ptr.add(i)) {
-                    del += 1;
-                } else if del > 0 {
-                    core::ptr::swap(ptr.add(i), ptr.add(i - del));
+                if f(&mut *ptr.add(read_idx)) {
+                    if write_idx < read_idx {
+                        core::ptr::swap(ptr.add(read_idx), ptr.add(write_idx));
+                    }
+                    write_idx += 1;
                 }
             }
         }
-        self.truncate(len - del);
+        self.truncate(write_idx);
     }
 
     #[inline]
@@ -1680,7 +1733,9 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     pub fn leak<'a>(self) -> &'a mut [T] {
         if !self.spilled() {
-            panic!("SmallVec::leak() called on inline (stack) SmallVec, which cannot be safely leaked");
+            panic!(
+                "SmallVec::leak() called on inline (stack) SmallVec, which cannot be safely leaked"
+            );
         }
         let mut me = ManuallyDrop::new(self);
         unsafe { core::slice::from_raw_parts_mut(me.as_mut_ptr(), me.len()) }
@@ -1813,12 +1868,11 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn extend_from_slice_copy(&mut self, other: &[T])
     where
-        T: Copy
+        T: Copy,
     {
-        
         let len = other.len();
         let src = other.as_ptr();
-        
+
         let l = self.len();
         self.reserve(len);
 
@@ -1834,7 +1888,7 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
     pub fn extend_from_within_copy<R>(&mut self, src: R)
     where
         R: core::ops::RangeBounds<usize>,
-        T: Copy
+        T: Copy,
     {
         let src = slice_range(src, ..self.len());
         let core::ops::Range { start, end } = src;
@@ -1853,7 +1907,7 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
 
     pub fn insert_from_slice_copy(&mut self, index: usize, other: &[T])
     where
-        T: Copy
+        T: Copy,
     {
         let l = self.len();
         let len = other.len();
@@ -1877,7 +1931,7 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
     /// for types with the [`Copy`] trait.
     pub fn from_slice_copy(slice: &[T]) -> Self
     where
-        T: Copy
+        T: Copy,
     {
         let src = slice.as_ptr();
         let len = slice.len();
@@ -2590,7 +2644,7 @@ impl<T: Clone, const N: usize> Clone for SmallVec<T, N> {
 
         #[cfg(not(feature = "specialization"))]
         {
-            self.clone_from_fallback(&*source);
+            self.clone_from_fallback(source);
         }
     }
 }
