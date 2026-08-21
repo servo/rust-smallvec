@@ -1,10 +1,8 @@
-#![feature(test)]
 #![allow(deprecated)]
 
-extern crate test;
-
+use criterion::{criterion_group, criterion_main, Bencher, Criterion};
 use smallvec::{smallvec, SmallVec};
-use test::Bencher;
+use std::hint::black_box;
 
 const VEC_SIZE: usize = 16;
 const SPILLED_SIZE: usize = 100;
@@ -18,39 +16,41 @@ trait Vector<T>: for<'a> From<&'a [T]> + Extend<T> {
     fn from_elem(val: T, n: usize) -> Self;
     fn from_elems(val: &[T]) -> Self;
     fn extend_from_slice(&mut self, other: &[T]);
+    fn retain_mut<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut T) -> bool;
 }
 
 impl<T: Copy> Vector<T> for Vec<T> {
     fn new() -> Self {
         Self::with_capacity(VEC_SIZE)
     }
-
     fn push(&mut self, val: T) {
         self.push(val)
     }
-
     fn pop(&mut self) -> Option<T> {
         self.pop()
     }
-
     fn remove(&mut self, p: usize) -> T {
         self.remove(p)
     }
-
     fn insert(&mut self, n: usize, val: T) {
         self.insert(n, val)
     }
-
     fn from_elem(val: T, n: usize) -> Self {
         vec![val; n]
     }
-
     fn from_elems(val: &[T]) -> Self {
         val.to_owned()
     }
-
     fn extend_from_slice(&mut self, other: &[T]) {
         Vec::extend_from_slice(self, other)
+    }
+    fn retain_mut<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut T) -> bool,
+    {
+        self.retain_mut(f)
     }
 }
 
@@ -58,47 +58,48 @@ impl<T: Copy> Vector<T> for SmallVec<T, VEC_SIZE> {
     fn new() -> Self {
         Self::new()
     }
-
     fn push(&mut self, val: T) {
         self.push(val)
     }
-
     fn pop(&mut self) -> Option<T> {
         self.pop()
     }
-
     fn remove(&mut self, p: usize) -> T {
         self.remove(p)
     }
-
     fn insert(&mut self, n: usize, val: T) {
         self.insert(n, val)
     }
-
     fn from_elem(val: T, n: usize) -> Self {
         smallvec![val; n]
     }
-
     fn from_elems(val: &[T]) -> Self {
         SmallVec::from(val)
     }
-
     fn extend_from_slice(&mut self, other: &[T]) {
         SmallVec::extend_from_slice(self, other)
+    }
+    fn retain_mut<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut T) -> bool,
+    {
+        self.retain_mut(f)
     }
 }
 
 macro_rules! make_benches {
     ($typ:ty { $($b_name:ident => $g_name:ident($($args:expr),*),)* }) => {
         $(
-            #[bench]
-            fn $b_name(b: &mut Bencher) {
-                $g_name::<$typ>($($args,)* b)
+            fn $b_name(c: &mut Criterion) {
+                c.bench_function(stringify!($b_name), |b: &mut Bencher| {
+                    $g_name::<$typ>($($args,)* b)
+                });
             }
         )*
     }
 }
 
+/* ----------  Bench generation (same list, just using the new macro) ---------- */
 make_benches! {
     SmallVec<u64, VEC_SIZE> {
         bench_push => gen_push(SPILLED_SIZE as _),
@@ -122,6 +123,12 @@ make_benches! {
         bench_macro_from_elem => gen_from_elem(SPILLED_SIZE as _),
         bench_macro_from_elem_small => gen_from_elem(VEC_SIZE as _),
         bench_pushpop => gen_pushpop(),
+        bench_retain_mut_half => gen_retain_mut_half(SPILLED_SIZE as _),
+        bench_retain_mut_half_small => gen_retain_mut_half(VEC_SIZE as _),
+        bench_retain_mut_all => gen_retain_mut_all(SPILLED_SIZE as _),
+        bench_retain_mut_all_small => gen_retain_mut_all(VEC_SIZE as _),
+        bench_retain_mut_none => gen_retain_mut_none(SPILLED_SIZE as _),
+        bench_retain_mut_none_small => gen_retain_mut_none(VEC_SIZE as _),
     }
 }
 
@@ -148,156 +155,257 @@ make_benches! {
         bench_macro_from_elem_vec => gen_from_elem(SPILLED_SIZE as _),
         bench_macro_from_elem_vec_small => gen_from_elem(VEC_SIZE as _),
         bench_pushpop_vec => gen_pushpop(),
+        bench_retain_mut_vec_half => gen_retain_mut_half(SPILLED_SIZE as _),
+        bench_retain_mut_vec_half_small => gen_retain_mut_half(VEC_SIZE as _),
+        bench_retain_mut_vec_all => gen_retain_mut_all(SPILLED_SIZE as _),
+        bench_retain_mut_vec_all_small => gen_retain_mut_all(VEC_SIZE as _),
+        bench_retain_mut_vec_none => gen_retain_mut_none(SPILLED_SIZE as _),
+        bench_retain_mut_vec_none_small => gen_retain_mut_none(VEC_SIZE as _),
     }
 }
 
+/* ----------  Benchmark helpers – unchanged except for Bencher type ---------- */
 fn gen_push<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     #[inline(never)]
     fn push_noinline<V: Vector<u64>>(vec: &mut V, x: u64) {
-        vec.push(x);
+        vec.push(black_box(x));
     }
 
     b.iter(|| {
+        let n = black_box(n);
         let mut vec = V::new();
         for x in 0..n {
             push_noinline(&mut vec, x);
         }
-        vec
+        black_box(vec)
     });
 }
 
 fn gen_insert_push<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     #[inline(never)]
     fn insert_push_noinline<V: Vector<u64>>(vec: &mut V, x: u64) {
-        vec.insert(x as usize, x);
+        vec.insert(black_box(x) as usize, black_box(x));
     }
 
     b.iter(|| {
+        let n = black_box(n);
         let mut vec = V::new();
         for x in 0..n {
             insert_push_noinline(&mut vec, x);
         }
-        vec
+        black_box(vec)
     });
 }
 
 fn gen_insert<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     #[inline(never)]
     fn insert_noinline<V: Vector<u64>>(vec: &mut V, p: usize, x: u64) {
-        vec.insert(p, x)
+        vec.insert(black_box(p), black_box(x))
     }
 
     b.iter(|| {
+        let n = black_box(n);
         let mut vec = V::new();
-        // Always insert at position 0 so that we are subject to shifts of
-        // many different lengths.
         vec.push(0);
         for x in 0..n {
             insert_noinline(&mut vec, 0, x);
         }
-        vec
+        black_box(vec)
     });
 }
 
 fn gen_remove<V: Vector<u64>>(n: usize, b: &mut Bencher) {
     #[inline(never)]
     fn remove_noinline<V: Vector<u64>>(vec: &mut V, p: usize) -> u64 {
-        vec.remove(p)
+        vec.remove(black_box(p))
     }
 
     b.iter(|| {
+        let n = black_box(n);
         let mut vec = V::from_elem(0, n as _);
-
         for _ in 0..n {
-            remove_noinline(&mut vec, 0);
+            black_box(remove_noinline(&mut vec, 0));
         }
+        black_box(vec)
     });
 }
 
 fn gen_extend<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     b.iter(|| {
+        let n = black_box(n);
         let mut vec = V::new();
         vec.extend(0..n);
-        vec
+        black_box(vec)
     });
 }
 
 fn gen_extend_filtered<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     b.iter(|| {
         let mut vec = V::new();
-        vec.extend((0..n).filter(|i| i % 2 == 0));
-        vec
+        vec.extend((0..black_box(n)).filter(|i| black_box(*i) % 2 == 0));
+        black_box(vec)
     });
 }
 
 fn gen_from_iter<V: Vector<u64>>(n: u64, b: &mut Bencher) {
-    let v: Vec<u64> = (0..n).collect();
+    let v: Vec<u64> = (0..black_box(n)).collect();
     b.iter(|| {
-        let vec = V::from(&v);
-        vec
+        let vec = V::from(black_box(&v));
+        black_box(vec)
     });
 }
 
 fn gen_from_slice<V: Vector<u64>>(n: u64, b: &mut Bencher) {
-    let v: Vec<u64> = (0..n).collect();
+    let v: Vec<u64> = (0..black_box(n)).collect();
     b.iter(|| {
-        let vec = V::from_elems(&v);
-        vec
+        let vec = V::from_elems(black_box(&v));
+        black_box(vec)
     });
 }
 
 fn gen_extend_from_slice<V: Vector<u64>>(n: u64, b: &mut Bencher) {
-    let v: Vec<u64> = (0..n).collect();
+    let v: Vec<u64> = (0..black_box(n)).collect();
     b.iter(|| {
         let mut vec = V::new();
-        vec.extend_from_slice(&v);
-        vec
+        vec.extend_from_slice(black_box(&v));
+        black_box(vec)
     });
 }
 
 fn gen_pushpop<V: Vector<u64>>(b: &mut Bencher) {
     #[inline(never)]
     fn pushpop_noinline<V: Vector<u64>>(vec: &mut V, x: u64) -> Option<u64> {
-        vec.push(x);
+        vec.push(black_box(x));
         vec.pop()
     }
 
     b.iter(|| {
         let mut vec = V::new();
         for x in 0..SPILLED_SIZE as _ {
-            pushpop_noinline(&mut vec, x);
+            black_box(pushpop_noinline(&mut vec, x));
         }
-        vec
+        black_box(vec)
     });
 }
 
 fn gen_from_elem<V: Vector<u64>>(n: usize, b: &mut Bencher) {
     b.iter(|| {
-        let vec = V::from_elem(42, n);
-        vec
+        let n = black_box(n);
+        let vec = V::from_elem(black_box(42), n);
+        black_box(vec)
     });
 }
 
-#[bench]
-fn bench_macro_from_list(b: &mut Bencher) {
+fn gen_retain_mut_half<V: Vector<u64>>(n: usize, b: &mut Bencher) {
     b.iter(|| {
-        let vec: SmallVec<u64, 16> = smallvec![
-            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 36, 0x40, 0x80,
-            0x100, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000, 0x10000, 0x20000, 0x40000,
-            0x80000, 0x100000,
-        ];
-        vec
+        let n = black_box(n);
+        let mut vec = V::from_elem(16, n);
+        vec.retain_mut(|x| black_box(*x) % 2 == 0);
+        black_box(vec)
     });
 }
 
-#[bench]
-fn bench_macro_from_list_vec(b: &mut Bencher) {
+fn gen_retain_mut_all<V: Vector<u64>>(n: usize, b: &mut Bencher) {
     b.iter(|| {
-        let vec: Vec<u64> = vec![
-            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 36, 0x40, 0x80,
-            0x100, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000, 0x10000, 0x20000, 0x40000,
-            0x80000, 0x100000,
-        ];
-        vec
+        let n = black_box(n);
+        let mut vec = V::from_elem(16, n);
+        vec.retain_mut(|_| true);
+        black_box(vec)
     });
 }
+
+fn gen_retain_mut_none<V: Vector<u64>>(n: usize, b: &mut Bencher) {
+    b.iter(|| {
+        let n = black_box(n);
+        let mut vec = V::from_elem(16, n);
+        vec.retain_mut(|_| false);
+        black_box(vec)
+    });
+}
+
+fn bench_macro_from_list(c: &mut Criterion) {
+    c.bench_function("bench_macro_from_list", |b| {
+        b.iter(|| {
+            let vec: SmallVec<u64, 16> = smallvec![
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 36, 0x40,
+                0x80, 0x100, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000, 0x10000, 0x20000,
+                0x40000, 0x80000, 0x100000,
+            ];
+            vec
+        })
+    });
+}
+
+fn bench_macro_from_list_vec(c: &mut Criterion) {
+    c.bench_function("bench_macro_from_list_vec", |b| {
+        b.iter(|| {
+            let vec: Vec<u64> = vec![
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 36, 0x40,
+                0x80, 0x100, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000, 0x10000, 0x20000,
+                0x40000, 0x80000, 0x100000,
+            ];
+            vec
+        })
+    });
+}
+
+criterion_group!(
+    benches,
+    bench_push,
+    bench_push_small,
+    bench_insert_push,
+    bench_insert_push_small,
+    bench_insert,
+    bench_insert_small,
+    bench_remove,
+    bench_remove_small,
+    bench_extend,
+    bench_extend_small,
+    bench_extend_filtered,
+    bench_extend_filtered_small,
+    bench_from_iter,
+    bench_from_iter_small,
+    bench_from_slice,
+    bench_from_slice_small,
+    bench_extend_from_slice,
+    bench_extend_from_slice_small,
+    bench_macro_from_elem,
+    bench_macro_from_elem_small,
+    bench_pushpop,
+    bench_retain_mut_half,
+    bench_retain_mut_half_small,
+    bench_retain_mut_all,
+    bench_retain_mut_all_small,
+    bench_retain_mut_none,
+    bench_retain_mut_none_small,
+    bench_push_vec,
+    bench_push_vec_small,
+    bench_insert_push_vec,
+    bench_insert_push_vec_small,
+    bench_insert_vec,
+    bench_insert_vec_small,
+    bench_remove_vec,
+    bench_remove_vec_small,
+    bench_extend_vec,
+    bench_extend_vec_small,
+    bench_extend_vec_filtered,
+    bench_extend_vec_filtered_small,
+    bench_from_iter_vec,
+    bench_from_iter_vec_small,
+    bench_from_slice_vec,
+    bench_from_slice_vec_small,
+    bench_extend_from_slice_vec,
+    bench_extend_from_slice_vec_small,
+    bench_macro_from_elem_vec,
+    bench_macro_from_elem_vec_small,
+    bench_pushpop_vec,
+    bench_retain_mut_vec_half,
+    bench_retain_mut_vec_half_small,
+    bench_retain_mut_vec_all,
+    bench_retain_mut_vec_all_small,
+    bench_retain_mut_vec_none,
+    bench_retain_mut_vec_none_small,
+    bench_macro_from_list,
+    bench_macro_from_list_vec
+);
+criterion_main!(benches);
