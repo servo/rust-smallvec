@@ -199,15 +199,17 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     #[inline]
     const fn as_ptr_inline(&self) -> *const T {
         // SAFETY: it is safe because we aren't reading the value, just getting a
-        // reference to it. reading it would be UB potentially, but for that downstream
-        // unsafe is required
-        (unsafe {&raw const self.inline}) as *mut T
+        // pointer to it. reading it would be UB potentially, but for that downstream
+        // unsafe is required. This is no longer unsafe as of Rust 1.92.0.
+        #[allow(unused_unsafe, reason = "requires unsafe in MSRV 1.83.0")]
+        (unsafe { &raw const self.inline }).cast::<T>()
     }
 
     #[inline]
     const fn as_mut_ptr_inline(&mut self) -> *mut T {
         // SAFETY: same as above
-        (unsafe {&raw mut self.inline}) as *mut T
+        #[allow(unused_unsafe, reason = "requires unsafe in MSRV 1.83.0")]
+        (unsafe { &raw mut self.inline }).cast::<T>()
     }
 
     /// # Safety
