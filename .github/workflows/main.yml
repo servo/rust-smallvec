@@ -19,7 +19,9 @@ jobs:
           - toolchain: stable
             fuzz: 1
           - toolchain: beta
-            fuzz: 1
+            fuzz: 1          
+          - toolchain: nightly
+            components: rustfmt
     steps:
       - uses: actions/checkout@v4
 
@@ -33,6 +35,7 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
         
       - name: Style check
+        if: matrix.toolchain == 'nightly'
         run: cargo fmt --all --check
 
       - name: Cargo build
