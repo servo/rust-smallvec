@@ -62,6 +62,7 @@ pub extern crate alloc;
 #[cfg(any(test, feature = "std"))]
 extern crate std;
 
+mod rawsmallvec;
 #[cfg(test)]
 mod tests;
 
@@ -95,6 +96,11 @@ use serde_core::{
 #[cfg(feature = "std")]
 use std::io;
 
+#[cfg(feature = "internals")]
+pub use rawsmallvec::RawSmallVec;
+#[cfg(not(feature = "internals"))]
+use rawsmallvec::RawSmallVec;
+
 /// Error type for APIs with fallible heap allocation
 #[derive(Debug)]
 pub enum CollectionAllocErr {
@@ -113,18 +119,6 @@ impl core::fmt::Display for CollectionAllocErr {
 }
 
 impl core::error::Error for CollectionAllocErr {}
-
-/// Either a stack array with `length <= N` or a heap array
-/// whose pointer and capacity are stored here.
-///
-/// We store a `NonNull<T>` instead of a `*mut T`, so that
-/// niche-optimization can be performed and the type is covariant
-/// with respect to `T`.
-#[repr(C)]
-pub union RawSmallVec<T, const N: usize> {
-    inline: ManuallyDrop<MaybeUninit<[T; N]>>,
-    heap: (NonNull<T>, usize),
-}
 
 #[inline]
 fn infallible<T>(result: Result<T, CollectionAllocErr>) -> T {

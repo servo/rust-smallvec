@@ -18,6 +18,7 @@ std = []
 specialization = []
 may_dangle = []
 serde = ["dep:serde_core"]
+internals = []
 
 [dependencies]
 bytes = { version = "1", optional = true, default-features = false }
