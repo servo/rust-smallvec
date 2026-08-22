@@ -20,8 +20,6 @@ jobs:
             fuzz: 1
           - toolchain: beta
             fuzz: 1          
-          - toolchain: nightly
-            components: rustfmt
     steps:
       - uses: actions/checkout@v4
 
@@ -33,6 +31,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
+          components: rustfmt
         
       - name: Style check
         if: matrix.toolchain == 'nightly'
