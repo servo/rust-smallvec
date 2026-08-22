@@ -31,6 +31,9 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
+        
+      - name: Style check
+        run: cargo fmt --all --check
 
       - name: Cargo build
         run: cargo build --verbose
