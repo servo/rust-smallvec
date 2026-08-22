@@ -11,7 +11,7 @@ keywords = ["small", "vec", "vector", "stack", "no_std"]
 categories = ["data-structures"]
 readme = "README.md"
 documentation = "https://docs.rs/smallvec/"
-include = ["Cargo.toml", "LICENSE-MIT", "LICENSE-APACHE", "README.md", "src/**/*.rs"]
+exclude = [".gitignore", "tests/", "scripts/", "fuzz/", "benches/", ".github/"]
 
 [features]
 std = []
@@ -25,7 +25,7 @@ serde_core = { version = "1.0.221", optional = true, default-features = false }
 malloc_size_of = { version = "0.1.1", optional = true, default-features = false }
 
 [dev-dependencies]
-bincode = "1.0.1"
+serde_json = "1.0"
 
 [package.metadata.docs.rs]
 all-features = true

@@ -155,7 +155,7 @@ fn splice() {
     let new = [7, 8, 9, 10];
     let u: SmallVec<u8, 1> = v.splice(1..1, new).collect();
     assert_eq!(v, [0, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6]);
-    assert_eq!(u, []);
+    assert_eq!(u, [0u8; 0]);
 
     // The range is at the beginning and nonempty.
     let mut v: SmallVec<u8, 1> = smallvec![0, 1, 2, 3, 4, 5, 6];
@@ -328,7 +328,7 @@ fn test_split_off_take_all() {
     let orig_capacity: usize = vec.capacity();
 
     let split_off = vec.split_off(0);
-    assert_eq!(&vec[..], &[]);
+    assert_eq!(&vec[..], &[0u32; 0]);
     assert_eq!(&split_off[..], &[1, 2, 3, 4, 5, 6]);
     assert_eq!(vec.capacity(), orig_capacity);
     assert_eq!(vec.as_ptr(), orig_ptr);
@@ -538,7 +538,7 @@ fn test_from() {
 
     let vec = vec![];
     let small_vec: SmallVec<u8, 3> = SmallVec::from(vec);
-    assert_eq!(&*small_vec, &[]);
+    assert_eq!(&*small_vec, &[0u8; 0]);     
     drop(small_vec);
 
     let vec = vec![1, 2, 3, 4, 5];
@@ -687,12 +687,12 @@ fn test_into_inner() {
 fn test_from_vec() {
     let vec = vec![];
     let small_vec: SmallVec<u8, 3> = SmallVec::from_vec(vec);
-    assert_eq!(&*small_vec, &[]);
+    assert_eq!(&*small_vec, &[0u8; 0]);
     drop(small_vec);
 
     let vec = vec![];
     let small_vec: SmallVec<u8, 1> = SmallVec::from_vec(vec);
-    assert_eq!(&*small_vec, &[]);
+    assert_eq!(&*small_vec, &[0u8; 0]);
     drop(small_vec);
 
     let vec = vec![1];
@@ -801,19 +801,26 @@ fn test_write() {
 #[cfg(feature = "serde")]
 #[test]
 fn test_serde() {
-    use bincode::{config, deserialize};
+    use serde_core::{Serialize, Deserialize};
+    use serde_json::{Serializer, Deserializer};
+    let mut bytes = Vec::<u8>::new();
+    let mut serializer = Serializer::new(&mut bytes);
     let mut small_vec: SmallVec<i32, 2> = SmallVec::new();
     small_vec.push(1);
-    let encoded = config().limit(100).serialize(&small_vec).unwrap();
-    let decoded: SmallVec<i32, 2> = deserialize(&encoded).unwrap();
+    let _ = small_vec.serialize(&mut serializer);
+    let mut deserializer = Deserializer::from_slice(bytes.as_slice());
+    let decoded: SmallVec<i32, 2> = SmallVec::deserialize(&mut deserializer).unwrap();
     assert_eq!(small_vec, decoded);
-    small_vec.push(2);
     // Spill the vec
+    small_vec.push(2);
     small_vec.push(3);
     small_vec.push(4);
     // Check again after spilling.
-    let encoded = config().limit(100).serialize(&small_vec).unwrap();
-    let decoded: SmallVec<i32, 2> = deserialize(&encoded).unwrap();
+    let mut bytes = Vec::<u8>::new();
+    let mut serializer = Serializer::new(&mut bytes);
+    let _ = small_vec.serialize(&mut serializer);
+    let mut deserializer = Deserializer::from_slice(bytes.as_slice());
+    let decoded: SmallVec<i32, 2> = SmallVec::deserialize(&mut deserializer).unwrap();
     assert_eq!(small_vec, decoded);
 }
 
