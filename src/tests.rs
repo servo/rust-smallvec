@@ -538,7 +538,7 @@ fn test_from() {
 
     let vec = vec![];
     let small_vec: SmallVec<u8, 3> = SmallVec::from(vec);
-    assert_eq!(&*small_vec, &[0u8; 0]);     
+    assert_eq!(&*small_vec, &[0u8; 0]);
     drop(small_vec);
 
     let vec = vec![1, 2, 3, 4, 5];
@@ -587,10 +587,7 @@ fn test_from() {
 #[test]
 fn test_from_slice() {
     assert_eq!(&SmallVec::<u32, 2>::from(&[1][..])[..], [1]);
-    assert_eq!(
-        &SmallVec::<u32, 2>::from(&[1, 2, 3][..])[..],
-        [1, 2, 3]
-    );
+    assert_eq!(&SmallVec::<u32, 2>::from(&[1, 2, 3][..])[..], [1, 2, 3]);
 }
 
 #[test]
@@ -801,33 +798,26 @@ fn test_write() {
 #[cfg(feature = "serde")]
 #[test]
 fn test_serde() {
-    use serde_test::{Token, assert_tokens};
+    use serde_test::{assert_tokens, Token};
     let mut small_vec: SmallVec<i32, 2> = SmallVec::new();
-    assert_tokens(&small_vec, &[
-        Token::Seq {
-            len: Some(0)
-        },
-        Token::SeqEnd
-    ]);
+    assert_tokens(&small_vec, &[Token::Seq { len: Some(0) }, Token::SeqEnd]);
     small_vec.push(1);
-    assert_tokens(&small_vec, &[
-        Token::Seq {
-            len: Some(1)
-        },
-        Token::I32(1),
-        Token::SeqEnd
-    ]);
+    assert_tokens(
+        &small_vec,
+        &[Token::Seq { len: Some(1) }, Token::I32(1), Token::SeqEnd],
+    );
     small_vec.extend([2, 3, 4]);
-    assert_tokens(&small_vec, &[
-        Token::Seq {
-            len: Some(4)
-        },
-        Token::I32(1),
-        Token::I32(2),
-        Token::I32(3),
-        Token::I32(4),
-        Token::SeqEnd
-    ]);
+    assert_tokens(
+        &small_vec,
+        &[
+            Token::Seq { len: Some(4) },
+            Token::I32(1),
+            Token::I32(2),
+            Token::I32(3),
+            Token::I32(4),
+            Token::SeqEnd,
+        ],
+    );
 }
 
 #[test]
