@@ -1,9 +1,9 @@
-use core::mem::{ManuallyDrop, MaybeUninit};
-use core::ptr::NonNull;
-use super::TaggedLen;
 use super::allocationerror::AllocationError;
-use core::ptr::copy_nonoverlapping;
+use super::TaggedLen;
 use alloc::alloc::Layout;
+use core::mem::{ManuallyDrop, MaybeUninit};
+use core::ptr::copy_nonoverlapping;
+use core::ptr::NonNull;
 
 /// Either a stack array with `length <= N` or a heap array
 /// whose pointer and capacity are stored here.

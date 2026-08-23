@@ -86,15 +86,9 @@ use core::ptr::NonNull;
 #[cfg(feature = "malloc_size_of")]
 use malloc_size_of::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps};
 #[cfg(feature = "internals")]
-pub use {
-    rawsmallvec::RawSmallVec,
-    taggedlen::TaggedLen
-};
+pub use {rawsmallvec::RawSmallVec, taggedlen::TaggedLen};
 #[cfg(not(feature = "internals"))]
-use {
-    rawsmallvec::RawSmallVec,
-    taggedlen::TaggedLen
-};
+use {rawsmallvec::RawSmallVec, taggedlen::TaggedLen};
 
 #[inline]
 fn infallible<T>(result: Result<T, AllocationError>) -> T {
