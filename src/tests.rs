@@ -1,3 +1,5 @@
+extern crate std;
+
 use crate::{smallvec, SmallVec};
 use alloc::borrow::ToOwned;
 use alloc::boxed::Box;

@@ -1,9 +1,3 @@
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 //! Small vectors in various sizes. These store a certain number of elements
 //! inline, and fall back to the heap for larger allocations.  This can be a
 //! useful optimization for improving cache locality and reducing allocator
@@ -22,7 +16,6 @@
 //! When this feature is enabled, traits available from `std` are implemented:
 //!
 //! * `SmallVec<u8, _>` implements the [`std::io::Write`] trait.
-//! * [`CollectionAllocErr`] implements [`std::error::Error`].
 //!
 //! This feature is not compatible with `#![no_std]` programs.
 //!
@@ -54,7 +47,6 @@
 //! Tracking issue: [rust-lang/rust#34761](https://github.com/rust-lang/rust/issues/34761)
 
 #![no_std]
-#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization, trusted_len))]
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
@@ -62,10 +54,15 @@
 #[doc(hidden)]
 pub extern crate alloc;
 
-#[cfg(any(test, feature = "std"))]
-extern crate std;
-
+mod allocationerror;
+#[cfg(feature = "bytes")]
+mod bytes;
 mod rawsmallvec;
+#[cfg(feature = "serde")]
+mod serde;
+#[cfg(feature = "std")]
+mod std;
+mod taggedlen;
 #[cfg(test)]
 mod tests;
 
@@ -73,8 +70,7 @@ use alloc::alloc::Layout;
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
-#[cfg(feature = "bytes")]
-use bytes::{buf::UninitSlice, BufMut};
+use allocationerror::AllocationError;
 use core::borrow::Borrow;
 use core::borrow::BorrowMut;
 use core::fmt::Debug;
@@ -90,49 +86,23 @@ use core::ptr::NonNull;
 #[cfg(feature = "malloc_size_of")]
 use malloc_size_of::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps};
 #[cfg(feature = "internals")]
-pub use rawsmallvec::RawSmallVec;
-#[cfg(not(feature = "internals"))]
-use rawsmallvec::RawSmallVec;
-#[cfg(feature = "serde")]
-use serde_core::{
-    de::{Deserialize, Deserializer, SeqAccess, Visitor},
-    ser::{Serialize, SerializeSeq, Serializer},
+pub use {
+    rawsmallvec::RawSmallVec,
+    taggedlen::TaggedLen
 };
-#[cfg(feature = "std")]
-use std::io;
-
-/// Error type for APIs with fallible heap allocation
-#[derive(Debug)]
-pub enum CollectionAllocErr {
-    /// Overflow `usize::MAX` or other error during size computation
-    CapacityOverflow,
-    /// The allocator return an error
-    AllocErr {
-        /// The layout that was passed to the allocator
-        layout: Layout,
-    },
-}
-impl core::fmt::Display for CollectionAllocErr {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Allocation error: {:?}", self)
-    }
-}
-
-impl core::error::Error for CollectionAllocErr {}
+#[cfg(not(feature = "internals"))]
+use {
+    rawsmallvec::RawSmallVec,
+    taggedlen::TaggedLen
+};
 
 #[inline]
-fn infallible<T>(result: Result<T, CollectionAllocErr>) -> T {
+fn infallible<T>(result: Result<T, AllocationError>) -> T {
     match result {
         Ok(x) => x,
-        Err(CollectionAllocErr::CapacityOverflow) => panic!("capacity overflow"),
-        Err(CollectionAllocErr::AllocErr { layout }) => alloc::alloc::handle_alloc_error(layout),
+        Err(AllocationError::CapacityOverflow) => panic!("capacity overflow"),
+        Err(AllocationError::Failure { layout }) => alloc::alloc::handle_alloc_error(layout),
     }
-}
-
-/// Helper function to check if a type is a ZST.
-#[inline]
-const fn is_zst<T>() -> bool {
-    const { size_of::<T>() == 0 }
 }
 
 #[inline]
@@ -168,173 +138,6 @@ where
     }
 
     core::ops::Range { start, end }
-}
-
-impl<T, const N: usize> RawSmallVec<T, N> {
-    const IS_ZST: bool = is_zst::<T>();
-
-    #[inline]
-    const fn new() -> Self {
-        Self::new_inline(MaybeUninit::uninit())
-    }
-    #[inline]
-    const fn new_inline(inline: MaybeUninit<[T; N]>) -> Self {
-        Self {
-            inline: ManuallyDrop::new(inline),
-        }
-    }
-    #[inline]
-    const fn new_heap(ptr: NonNull<T>, capacity: usize) -> Self {
-        Self {
-            heap: (ptr, capacity),
-        }
-    }
-
-    #[inline]
-    const fn as_ptr_inline(&self) -> *const T {
-        // SAFETY: it is safe because we aren't reading the value, just getting a
-        // reference to it. reading it would be UB potentially, but for that downstream
-        // unsafe is required
-        (unsafe { &raw const self.inline }) as *mut T
-    }
-
-    #[inline]
-    const fn as_mut_ptr_inline(&mut self) -> *mut T {
-        // SAFETY: same as above
-        (unsafe { &raw mut self.inline }) as *mut T
-    }
-
-    /// # Safety
-    ///
-    /// The vector must be on the heap
-    #[inline]
-    const unsafe fn as_ptr_heap(&self) -> *const T {
-        self.heap.0.as_ptr()
-    }
-
-    /// # Safety
-    ///
-    /// The vector must be on the heap
-    #[inline]
-    const unsafe fn as_mut_ptr_heap(&mut self) -> *mut T {
-        self.heap.0.as_ptr()
-    }
-
-    /// # Safety
-    ///
-    /// `new_capacity` must be non zero, and greater or equal to the length.
-    /// T must not be a ZST.
-    unsafe fn try_grow_raw(
-        &mut self,
-        len: TaggedLen<T>,
-        new_capacity: usize,
-    ) -> Result<(), CollectionAllocErr> {
-        use alloc::alloc::{alloc, realloc};
-        debug_assert!(!Self::IS_ZST);
-        debug_assert!(new_capacity > 0);
-        debug_assert!(new_capacity >= len.value());
-
-        let was_on_heap = len.on_heap();
-        let ptr = if was_on_heap {
-            self.as_mut_ptr_heap()
-        } else {
-            self.as_mut_ptr_inline()
-        };
-        let len = len.value();
-
-        let new_layout =
-            Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
-        if new_layout.size() > isize::MAX as usize {
-            return Err(CollectionAllocErr::CapacityOverflow);
-        }
-
-        let new_ptr = if len == 0 || !was_on_heap {
-            // get a fresh allocation
-            let new_ptr = alloc(new_layout) as *mut T; // `new_layout` has nonzero size.
-            let new_ptr =
-                NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr { layout: new_layout })?;
-            copy_nonoverlapping(ptr, new_ptr.as_ptr(), len);
-            new_ptr
-        } else {
-            // use realloc
-
-            // this can't overflow since we already constructed an equivalent layout during
-            // the previous allocation
-            let old_layout =
-                Layout::from_size_align_unchecked(self.heap.1 * size_of::<T>(), align_of::<T>());
-
-            // SAFETY: ptr was allocated with this allocator
-            // old_layout is the same as the layout used to allocate the previous memory
-            // block new_layout.size() is greater than zero
-            // does not overflow when rounded up to alignment. since it was constructed
-            // with Layout::array
-            let new_ptr = realloc(ptr as *mut u8, old_layout, new_layout.size()) as *mut T;
-            NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr { layout: new_layout })?
-        };
-        *self = Self::new_heap(new_ptr, new_capacity);
-        Ok(())
-    }
-}
-
-/// Vec guarantees that its length is always less than [`isize::MAX`] in
-/// *bytes*.
-///
-/// For a non ZST, this means that the length is less than `isize::MAX` objects,
-/// which implies we have at least one free bit we can use. We use the least
-/// significant bit for the tag. And store the length in the `usize::BITS - 1`
-/// most significant bits.
-///
-/// For a ZST, we never use the heap, so we just store the length directly.
-#[repr(transparent)]
-struct TaggedLen<T>(usize, PhantomData<T>);
-
-// Clone and Copy must be manually implemented because the generic interferes
-// with the derive attribute implementations.
-impl<T> Clone for TaggedLen<T> {
-    #[inline]
-    fn clone(&self) -> Self {
-        Self(self.0, PhantomData)
-    }
-
-    #[inline]
-    fn clone_from(&mut self, source: &Self) {
-        self.0 = source.0;
-    }
-}
-
-impl<T> Copy for TaggedLen<T> {}
-
-impl<T> TaggedLen<T> {
-    const IS_ZST: bool = is_zst::<T>();
-    #[inline]
-    pub const fn new(len: usize, on_heap: bool) -> Self {
-        if Self::IS_ZST {
-            debug_assert!(!on_heap);
-            Self(len, PhantomData)
-        } else {
-            debug_assert!(len < isize::MAX as usize);
-            Self((len << 1) | on_heap as usize, PhantomData)
-        }
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn on_heap(self) -> bool {
-        if Self::IS_ZST {
-            false
-        } else {
-            (self.0 & 1_usize) == 1
-        }
-    }
-
-    #[inline]
-    pub const fn value(self) -> usize {
-        if Self::IS_ZST {
-            self.0
-        } else {
-            self.0 >> 1
-        }
-    }
 }
 
 #[repr(C)]
@@ -937,7 +740,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 }
 
 impl<T, const N: usize> SmallVec<T, N> {
-    const IS_ZST: bool = is_zst::<T>();
+    const IS_ZST: bool = size_of::<T>() == 0;
 
     #[inline]
     pub fn from_vec(vec: Vec<T>) -> Self {
@@ -1304,7 +1107,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[cold]
-    pub fn try_grow(&mut self, new_capacity: usize) -> Result<(), CollectionAllocErr> {
+    pub fn try_grow(&mut self, new_capacity: usize) -> Result<(), AllocationError> {
         if Self::IS_ZST {
             return Ok(());
         }
@@ -1352,20 +1155,20 @@ impl<T, const N: usize> SmallVec<T, N> {
                 self.len()
                     .checked_add(additional)
                     .and_then(usize::checked_next_power_of_two)
-                    .ok_or(CollectionAllocErr::CapacityOverflow),
+                    .ok_or(AllocationError::CapacityOverflow),
             );
             self.grow(new_capacity);
         }
     }
 
     #[inline]
-    pub fn try_reserve(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
+    pub fn try_reserve(&mut self, additional: usize) -> Result<(), AllocationError> {
         if additional > self.capacity() - self.len() {
             let new_capacity = self
                 .len()
                 .checked_add(additional)
                 .and_then(usize::checked_next_power_of_two)
-                .ok_or(CollectionAllocErr::CapacityOverflow)?;
+                .ok_or(AllocationError::CapacityOverflow)?;
             self.try_grow(new_capacity)
         } else {
             Ok(())
@@ -1379,19 +1182,19 @@ impl<T, const N: usize> SmallVec<T, N> {
             let new_capacity = infallible(
                 self.len()
                     .checked_add(additional)
-                    .ok_or(CollectionAllocErr::CapacityOverflow),
+                    .ok_or(AllocationError::CapacityOverflow),
             );
             self.grow(new_capacity);
         }
     }
 
     #[inline]
-    pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
+    pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), AllocationError> {
         if additional > self.capacity() - self.len() {
             let new_capacity = self
                 .len()
                 .checked_add(additional)
-                .ok_or(CollectionAllocErr::CapacityOverflow)?;
+                .ok_or(AllocationError::CapacityOverflow)?;
             self.try_grow(new_capacity)
         } else {
             Ok(())
@@ -2904,67 +2707,6 @@ impl<T: Debug, const N: usize> Debug for Drain<'_, T, N> {
     }
 }
 
-#[cfg(feature = "serde")]
-#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
-impl<T, const N: usize> Serialize for SmallVec<T, N>
-where
-    T: Serialize,
-{
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut state = serializer.serialize_seq(Some(self.len()))?;
-        for item in self {
-            state.serialize_element(item)?;
-        }
-        state.end()
-    }
-}
-
-#[cfg(feature = "serde")]
-#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
-impl<'de, T, const N: usize> Deserialize<'de> for SmallVec<T, N>
-where
-    T: Deserialize<'de>,
-{
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_seq(SmallVecVisitor {
-            phantom: PhantomData,
-        })
-    }
-}
-
-#[cfg(feature = "serde")]
-struct SmallVecVisitor<T, const N: usize> {
-    phantom: PhantomData<T>,
-}
-
-#[cfg(feature = "serde")]
-impl<'de, T, const N: usize> Visitor<'de> for SmallVecVisitor<T, N>
-where
-    T: Deserialize<'de>,
-{
-    type Value = SmallVec<T, N>;
-
-    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        formatter.write_str("a sequence")
-    }
-
-    fn visit_seq<B>(self, mut seq: B) -> Result<Self::Value, B::Error>
-    where
-        B: SeqAccess<'de>,
-    {
-        use serde_core::de::Error;
-        let len = seq.size_hint().unwrap_or(0);
-        let mut values = SmallVec::new();
-        values.try_reserve(len).map_err(B::Error::custom)?;
-
-        while let Some(value) = seq.next_element()? {
-            values.push(value);
-        }
-
-        Ok(values)
-    }
-}
-
 #[cfg(feature = "malloc_size_of")]
 impl<T, const N: usize> MallocShallowSizeOf for SmallVec<T, N> {
     fn shallow_size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
@@ -2984,94 +2726,5 @@ impl<T: MallocSizeOf, const N: usize> MallocSizeOf for SmallVec<T, N> {
             n += elem.size_of(ops);
         }
         n
-    }
-}
-
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl<const N: usize> io::Write for SmallVec<u8, N> {
-    #[inline]
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    #[inline]
-    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        self.extend_from_slice(buf);
-        Ok(())
-    }
-
-    #[inline]
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-
-#[cfg(feature = "bytes")]
-unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
-    #[inline]
-    fn remaining_mut(&self) -> usize {
-        // A vector can never have more than isize::MAX bytes
-        isize::MAX as usize - self.len()
-    }
-
-    #[inline]
-    unsafe fn advance_mut(&mut self, cnt: usize) {
-        let len = self.len();
-        let remaining = self.capacity() - len;
-
-        if remaining < cnt {
-            panic!("advance out of bounds: the len is {remaining} but advancing by {cnt}");
-        }
-
-        // Addition will not overflow since the sum is at most the capacity.
-        self.set_len(len + cnt);
-    }
-
-    #[inline]
-    fn chunk_mut(&mut self) -> &mut UninitSlice {
-        if self.capacity() == self.len() {
-            self.reserve(64); // Grow the smallvec
-        }
-
-        let cap = self.capacity();
-        let len = self.len();
-
-        let ptr = self.as_mut_ptr();
-        // SAFETY: Since `ptr` is valid for `cap` bytes, `ptr.add(len)` must be
-        // valid for `cap - len` bytes. The subtraction will not underflow since
-        // `len <= cap`.
-        unsafe { UninitSlice::from_raw_parts_mut(ptr.add(len), cap - len) }
-    }
-
-    // Specialize these methods so they can skip checking `remaining_mut`
-    // and `advance_mut`.
-    #[inline]
-    fn put<T: bytes::Buf>(&mut self, mut src: T)
-    where
-        Self: Sized,
-    {
-        // In case the src isn't contiguous, reserve upfront.
-        self.reserve(src.remaining());
-
-        while src.has_remaining() {
-            let s = src.chunk();
-            let l = s.len();
-            self.extend_from_slice(s);
-            src.advance(l);
-        }
-    }
-
-    #[inline]
-    fn put_slice(&mut self, src: &[u8]) {
-        self.extend_from_slice(src);
-    }
-
-    #[inline]
-    fn put_bytes(&mut self, val: u8, cnt: usize) {
-        // If the addition overflows, then the `resize` will fail.
-        let new_len = self.len().saturating_add(cnt);
-        self.resize(new_len, val);
     }
 }
