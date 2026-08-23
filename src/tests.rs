@@ -1,12 +1,6 @@
 use {
     crate::{smallvec, SmallVec},
-    alloc::{
-        borrow::ToOwned,
-        boxed::Box,
-        rc::Rc,
-        vec,
-        vec::Vec,
-    },
+    alloc::{borrow::ToOwned, boxed::Box, rc::Rc, vec, vec::Vec},
     std::iter::FromIterator,
 };
 
@@ -841,7 +835,7 @@ fn test_write() {
 #[cfg(feature = "serde")]
 #[test]
 fn test_serde() {
-    use bincode1::{Options, deserialize, options};
+    use bincode1::{deserialize, options, Options};
     let mut small_vec: SmallVec<[i32; 2]> = SmallVec::new();
     small_vec.push(1);
     let encoded = options().with_limit(100).serialize(&small_vec).unwrap();

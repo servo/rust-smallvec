@@ -113,8 +113,6 @@ extern crate std;
 #[cfg(test)]
 mod tests;
 
-
-use alloc::alloc::{Layout, LayoutError};
 #[cfg(feature = "serde")]
 use core::marker::PhantomData;
 #[cfg(feature = "drain_keep_rest")]
@@ -130,6 +128,7 @@ use serde::{
 use std::io;
 use {
     alloc::{
+        alloc::{Layout, LayoutError},
         boxed::Box,
         vec,
         vec::Vec,
