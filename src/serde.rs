@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 use {
     super::SmallVec,
     core::marker::PhantomData,
@@ -7,6 +8,11 @@ use {
         Deserialize, Deserializer, Serialize, Serializer,
     },
 };
+=======
+use serde_core::{Serialize, Deserialize, Serializer, Deserializer, de::{Visitor, SeqAccess}, ser::SerializeSeq};
+use super::SmallVec;
+use core::marker::PhantomData;
+>>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
 
 impl<T, const N: usize> Serialize for SmallVec<T, N>
 where
@@ -41,9 +47,17 @@ where
     T: Deserialize<'de>,
 {
     type Value = SmallVec<T, N>;
+<<<<<<< HEAD
     fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         formatter.write_str("a sequence")
     }
+=======
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("a sequence")
+    }
+
+>>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
     fn visit_seq<B>(self, mut seq: B) -> Result<Self::Value, B::Error>
     where
         B: SeqAccess<'de>,
@@ -52,9 +66,20 @@ where
         let len = seq.size_hint().unwrap_or(0);
         let mut values = SmallVec::new();
         values.try_reserve(len).map_err(B::Error::custom)?;
+<<<<<<< HEAD
         while let Some(value) = seq.next_element()? {
             values.push(value);
         }
         Ok(values)
     }
 }
+=======
+
+        while let Some(value) = seq.next_element()? {
+            values.push(value);
+        }
+
+        Ok(values)
+    }
+}
+>>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)

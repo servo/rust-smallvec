@@ -52,15 +52,11 @@
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 #[doc(hidden)]
 pub extern crate alloc;
+
 mod allocationerror;
 #[cfg(feature = "bytes")]
 mod bytes;
-mod comparisons;
-mod conversions;
-#[cfg(feature = "malloc_size_of")]
-mod mallocsizeof;
 mod rawsmallvec;
-mod references;
 #[cfg(feature = "serde")]
 mod serde;
 #[cfg(feature = "std")]
@@ -68,21 +64,37 @@ mod std;
 mod taggedlen;
 #[cfg(test)]
 mod tests;
-pub use allocationerror::AllocationError;
-use {
-    alloc::{alloc::Layout, boxed::Box, vec::Vec},
-    core::{
-        fmt::Debug,
-        hash::{Hash, Hasher},
-        marker::PhantomData,
-        mem::{align_of, size_of, ManuallyDrop, MaybeUninit},
-        ptr::{copy, copy_nonoverlapping, NonNull},
-    },
-};
+
+use alloc::alloc::Layout;
+use alloc::boxed::Box;
+use alloc::vec;
+use alloc::vec::Vec;
+use allocationerror::AllocationError;
+use core::borrow::Borrow;
+use core::borrow::BorrowMut;
+use core::fmt::Debug;
+use core::hash::{Hash, Hasher};
+use core::marker::PhantomData;
+use core::mem::align_of;
+use core::mem::size_of;
+use core::mem::ManuallyDrop;
+use core::mem::MaybeUninit;
+use core::ptr::copy;
+use core::ptr::copy_nonoverlapping;
+use core::ptr::NonNull;
+#[cfg(feature = "malloc_size_of")]
+use malloc_size_of::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps};
 #[cfg(feature = "internals")]
-pub use {rawsmallvec::RawSmallVec, taggedlen::TaggedLen};
+pub use {
+    rawsmallvec::RawSmallVec,
+    taggedlen::TaggedLen
+};
 #[cfg(not(feature = "internals"))]
-use {rawsmallvec::RawSmallVec, taggedlen::TaggedLen};
+use {
+    rawsmallvec::RawSmallVec,
+    taggedlen::TaggedLen
+};
+
 #[inline]
 fn infallible<T>(result: Result<T, AllocationError>) -> T {
     match result {
@@ -678,6 +690,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
 impl<T, const N: usize> SmallVec<T, N> {
     const IS_ZST: bool = size_of::<T>() == 0;
+
     #[inline]
     pub fn from_vec(vec: Vec<T>) -> Self {
         if vec.capacity() == 0 {
@@ -2290,5 +2303,177 @@ impl<T: Debug, const N: usize> Debug for IntoIter<T, N> {
 impl<T: Debug, const N: usize> Debug for Drain<'_, T, N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("Drain").field(&self.iter.as_slice()).finish()
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<T, const N: usize> Serialize for SmallVec<T, N>
+where
+    T: Serialize,
+{
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut state = serializer.serialize_seq(Some(self.len()))?;
+        for item in self {
+            state.serialize_element(item)?;
+        }
+        state.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+impl<'de, T, const N: usize> Deserialize<'de> for SmallVec<T, N>
+where
+    T: Deserialize<'de>,
+{
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_seq(SmallVecVisitor {
+            phantom: PhantomData,
+        })
+    }
+}
+
+#[cfg(feature = "serde")]
+struct SmallVecVisitor<T, const N: usize> {
+    phantom: PhantomData<T>,
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T, const N: usize> Visitor<'de> for SmallVecVisitor<T, N>
+where
+    T: Deserialize<'de>,
+{
+    type Value = SmallVec<T, N>;
+
+    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str("a sequence")
+    }
+
+    fn visit_seq<B>(self, mut seq: B) -> Result<Self::Value, B::Error>
+    where
+        B: SeqAccess<'de>,
+    {
+        use serde_core::de::Error;
+        let len = seq.size_hint().unwrap_or(0);
+        let mut values = SmallVec::new();
+        values.try_reserve(len).map_err(B::Error::custom)?;
+
+        while let Some(value) = seq.next_element()? {
+            values.push(value);
+        }
+
+        Ok(values)
+    }
+}
+
+#[cfg(feature = "malloc_size_of")]
+impl<T, const N: usize> MallocShallowSizeOf for SmallVec<T, N> {
+    fn shallow_size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
+        if self.spilled() {
+            unsafe { ops.malloc_size_of(self.as_ptr()) }
+        } else {
+            0
+        }
+    }
+}
+
+#[cfg(feature = "malloc_size_of")]
+impl<T: MallocSizeOf, const N: usize> MallocSizeOf for SmallVec<T, N> {
+    fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
+        let mut n = self.shallow_size_of(ops);
+        for elem in self.iter() {
+            n += elem.size_of(ops);
+        }
+        n
+    }
+}
+
+#[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+impl<const N: usize> io::Write for SmallVec<u8, N> {
+    #[inline]
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    #[inline]
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        self.extend_from_slice(buf);
+        Ok(())
+    }
+
+    #[inline]
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[cfg(feature = "bytes")]
+unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
+    #[inline]
+    fn remaining_mut(&self) -> usize {
+        // A vector can never have more than isize::MAX bytes
+        isize::MAX as usize - self.len()
+    }
+
+    #[inline]
+    unsafe fn advance_mut(&mut self, cnt: usize) {
+        let len = self.len();
+        let remaining = self.capacity() - len;
+
+        if remaining < cnt {
+            panic!("advance out of bounds: the len is {remaining} but advancing by {cnt}");
+        }
+
+        // Addition will not overflow since the sum is at most the capacity.
+        self.set_len(len + cnt);
+    }
+
+    #[inline]
+    fn chunk_mut(&mut self) -> &mut UninitSlice {
+        if self.capacity() == self.len() {
+            self.reserve(64); // Grow the smallvec
+        }
+
+        let cap = self.capacity();
+        let len = self.len();
+
+        let ptr = self.as_mut_ptr();
+        // SAFETY: Since `ptr` is valid for `cap` bytes, `ptr.add(len)` must be
+        // valid for `cap - len` bytes. The subtraction will not underflow since
+        // `len <= cap`.
+        unsafe { UninitSlice::from_raw_parts_mut(ptr.add(len), cap - len) }
+    }
+
+    // Specialize these methods so they can skip checking `remaining_mut`
+    // and `advance_mut`.
+    #[inline]
+    fn put<T: bytes::Buf>(&mut self, mut src: T)
+    where
+        Self: Sized,
+    {
+        // In case the src isn't contiguous, reserve upfront.
+        self.reserve(src.remaining());
+
+        while src.has_remaining() {
+            let s = src.chunk();
+            let l = s.len();
+            self.extend_from_slice(s);
+            src.advance(l);
+        }
+    }
+
+    #[inline]
+    fn put_slice(&mut self, src: &[u8]) {
+        self.extend_from_slice(src);
+    }
+
+    #[inline]
+    fn put_bytes(&mut self, val: u8, cnt: usize) {
+        // If the addition overflows, then the `resize` will fail.
+        let new_len = self.len().saturating_add(cnt);
+        self.resize(new_len, val);
     }
 }

@@ -1,9 +1,20 @@
 extern crate std;
+<<<<<<< HEAD
 use {
     crate::{smallvec, SmallVec},
     alloc::{borrow::ToOwned, boxed::Box, rc::Rc, vec::Vec},
     core::{hash::Hasher, iter::FromIterator},
 };
+=======
+
+use crate::{smallvec, SmallVec};
+use alloc::borrow::ToOwned;
+use alloc::boxed::Box;
+use alloc::rc::Rc;
+use alloc::{vec, vec::Vec};
+use core::hash::Hasher;
+use core::iter::FromIterator;
+>>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
 
 #[test]
 pub fn test_zero() {

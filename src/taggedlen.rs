@@ -11,6 +11,10 @@ use core::marker::PhantomData;
 /// For a ZST, we never use the heap, so we just store the length directly.
 #[repr(transparent)]
 pub struct TaggedLen<T>(usize, PhantomData<T>);
+<<<<<<< HEAD
+=======
+
+>>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
 // Clone and Copy must be manually implemented because the generic interferes
 // with the derive attribute implementations.
 impl<T> Clone for TaggedLen<T> {
@@ -18,6 +22,10 @@ impl<T> Clone for TaggedLen<T> {
     fn clone(&self) -> Self {
         Self(self.0, PhantomData)
     }
+<<<<<<< HEAD
+=======
+
+>>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
     #[inline]
     fn clone_from(&mut self, source: &Self) {
         self.0 = source.0;
@@ -38,6 +46,10 @@ impl<T> TaggedLen<T> {
             Self((len << 1) | on_heap as usize, PhantomData)
         }
     }
+<<<<<<< HEAD
+=======
+
+>>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
     #[inline]
     #[must_use]
     pub const fn on_heap(self) -> bool {
@@ -47,6 +59,10 @@ impl<T> TaggedLen<T> {
             (self.0 & 1_usize) == 1
         }
     }
+<<<<<<< HEAD
+=======
+
+>>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
     #[inline]
     pub const fn value(self) -> usize {
         if Self::IS_ZST {
@@ -55,4 +71,8 @@ impl<T> TaggedLen<T> {
             self.0 >> 1
         }
     }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
