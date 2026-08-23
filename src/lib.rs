@@ -58,6 +58,7 @@ mod allocationerror;
 #[cfg(feature = "bytes")]
 mod bytes;
 mod rawsmallvec;
+mod references;
 #[cfg(feature = "serde")]
 mod serde;
 #[cfg(feature = "std")]
@@ -71,8 +72,6 @@ use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 use allocationerror::AllocationError;
-use core::borrow::Borrow;
-use core::borrow::BorrowMut;
 use core::fmt::Debug;
 use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
@@ -1856,21 +1855,6 @@ impl<T, const N: usize> Drop for IntoIter<T, N> {
     }
 }
 
-impl<T, const N: usize> core::ops::Deref for SmallVec<T, N> {
-    type Target = [T];
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        self.as_slice()
-    }
-}
-impl<T, const N: usize> core::ops::DerefMut for SmallVec<T, N> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.as_mut_slice()
-    }
-}
-
 /// This function is used in the [`smallvec`] macro.
 /// It is recommended to use the macro instead of using thís function.
 #[doc(hidden)]
@@ -2652,34 +2636,6 @@ where
 impl<T: Hash, const N: usize> Hash for SmallVec<T, N> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.as_slice().hash(state)
-    }
-}
-
-impl<T, const N: usize> Borrow<[T]> for SmallVec<T, N> {
-    #[inline]
-    fn borrow(&self) -> &[T] {
-        self.as_slice()
-    }
-}
-
-impl<T, const N: usize> BorrowMut<[T]> for SmallVec<T, N> {
-    #[inline]
-    fn borrow_mut(&mut self) -> &mut [T] {
-        self.as_mut_slice()
-    }
-}
-
-impl<T, const N: usize> AsRef<[T]> for SmallVec<T, N> {
-    #[inline]
-    fn as_ref(&self) -> &[T] {
-        self.as_slice()
-    }
-}
-
-impl<T, const N: usize> AsMut<[T]> for SmallVec<T, N> {
-    #[inline]
-    fn as_mut(&mut self) -> &mut [T] {
-        self.as_mut_slice()
     }
 }
 
