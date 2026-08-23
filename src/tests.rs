@@ -836,7 +836,7 @@ fn test_write() {
 #[test]
 fn test_serde() {
     #[allow(deprecated)]
-    use bincode1::{deserialize, config};
+    use bincode1::{config, deserialize};
     let mut small_vec: SmallVec<[i32; 2]> = SmallVec::new();
     small_vec.push(1);
     #[allow(deprecated)]
