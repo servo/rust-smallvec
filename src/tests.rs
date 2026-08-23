@@ -835,10 +835,12 @@ fn test_write() {
 #[cfg(feature = "serde")]
 #[test]
 fn test_serde() {
-    use bincode1::{deserialize, options, Options};
+    #[allow(deprecated)]
+    use bincode1::{deserialize, config};
     let mut small_vec: SmallVec<[i32; 2]> = SmallVec::new();
     small_vec.push(1);
-    let encoded = options().with_limit(100).serialize(&small_vec).unwrap();
+    #[allow(deprecated)]
+    let encoded = config().limit(100).serialize(&small_vec).unwrap();
     let decoded: SmallVec<[i32; 2]> = deserialize(&encoded).unwrap();
     assert_eq!(small_vec, decoded);
     small_vec.push(2);
@@ -846,7 +848,8 @@ fn test_serde() {
     small_vec.push(3);
     small_vec.push(4);
     // Check again after spilling.
-    let encoded = options().with_limit(100).serialize(&small_vec).unwrap();
+    #[allow(deprecated)]
+    let encoded = config().limit(100).serialize(&small_vec).unwrap();
     let decoded: SmallVec<[i32; 2]> = deserialize(&encoded).unwrap();
     assert_eq!(small_vec, decoded);
 }
