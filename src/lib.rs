@@ -126,9 +126,10 @@ use serde::{
 };
 #[cfg(feature = "write")]
 use std::io;
+#[allow(deprecated)]
 use {
     alloc::{
-        alloc::{Layout, LayoutError},
+        alloc::{Layout, LayoutErr},
         boxed::Box,
         vec,
         vec::Vec,
@@ -317,8 +318,9 @@ impl fmt::Display for CollectionAllocErr {
     }
 }
 
-impl From<LayoutError> for CollectionAllocErr {
-    fn from(_: LayoutError) -> Self {
+#[allow(deprecated)]
+impl From<LayoutErr> for CollectionAllocErr {
+    fn from(_: LayoutErr) -> Self {
         CollectionAllocErr::CapacityOverflow
     }
 }
