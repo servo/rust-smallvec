@@ -17,5 +17,4 @@ rustup component add miri
 cargo miri setup
 
 cargo miri test --verbose
-cargo clean
 cargo miri test --verbose --all-features

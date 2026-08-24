@@ -4,7 +4,6 @@ rust-smallvec
 > **⚠️ Note:**
 > This is the code for smallvec 2.0, which is not yet ready for release.  For
 > details about the changes in version 2.0, please see [#183], [#240], and [#284].
-> The status of the v2 branch is tracked on [#425].
 >
 > The source code for the latest smallvec 1.x.y release can be found on the
 > [v1 branch].  Bug fixes for smallvec 1 should be based on that branch, while
@@ -14,7 +13,6 @@ rust-smallvec
 [#183]: https://github.com/servo/rust-smallvec/issues/183
 [#240]: https://github.com/servo/rust-smallvec/issues/240
 [#284]: https://github.com/servo/rust-smallvec/issues/284
-[#425]: https://github.com/servo/rust-smallvec/issues/425
 
 ## About smallvec
 

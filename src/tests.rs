@@ -155,7 +155,7 @@ fn splice() {
     let new = [7, 8, 9, 10];
     let u: SmallVec<u8, 1> = v.splice(1..1, new).collect();
     assert_eq!(v, [0, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6]);
-    assert_eq!(u, [0u8; 0]);
+    assert_eq!(u, []);
 
     // The range is at the beginning and nonempty.
     let mut v: SmallVec<u8, 1> = smallvec![0, 1, 2, 3, 4, 5, 6];
@@ -328,7 +328,7 @@ fn test_split_off_take_all() {
     let orig_capacity: usize = vec.capacity();
 
     let split_off = vec.split_off(0);
-    assert_eq!(&vec[..], &[0u32; 0]);
+    assert_eq!(&vec[..], &[]);
     assert_eq!(&split_off[..], &[1, 2, 3, 4, 5, 6]);
     assert_eq!(vec.capacity(), orig_capacity);
     assert_eq!(vec.as_ptr(), orig_ptr);
@@ -370,7 +370,7 @@ fn test_invalid_grow() {
 #[should_panic]
 fn drain_overflow() {
     let mut v: SmallVec<u8, 8> = smallvec![0];
-    v.drain(..=usize::MAX);
+    v.drain(..=std::usize::MAX);
 }
 
 #[test]
@@ -538,7 +538,7 @@ fn test_from() {
 
     let vec = vec![];
     let small_vec: SmallVec<u8, 3> = SmallVec::from(vec);
-    assert_eq!(&*small_vec, &[0u8; 0]);
+    assert_eq!(&*small_vec, &[]);
     drop(small_vec);
 
     let vec = vec![1, 2, 3, 4, 5];
@@ -684,12 +684,12 @@ fn test_into_inner() {
 fn test_from_vec() {
     let vec = vec![];
     let small_vec: SmallVec<u8, 3> = SmallVec::from_vec(vec);
-    assert_eq!(&*small_vec, &[0u8; 0]);
+    assert_eq!(&*small_vec, &[]);
     drop(small_vec);
 
     let vec = vec![];
     let small_vec: SmallVec<u8, 1> = SmallVec::from_vec(vec);
-    assert_eq!(&*small_vec, &[0u8; 0]);
+    assert_eq!(&*small_vec, &[]);
     drop(small_vec);
 
     let vec = vec![1];
@@ -798,26 +798,20 @@ fn test_write() {
 #[cfg(feature = "serde")]
 #[test]
 fn test_serde() {
-    use serde_test::{assert_tokens, Token};
+    use bincode::{config, deserialize};
     let mut small_vec: SmallVec<i32, 2> = SmallVec::new();
-    assert_tokens(&small_vec, &[Token::Seq { len: Some(0) }, Token::SeqEnd]);
     small_vec.push(1);
-    assert_tokens(
-        &small_vec,
-        &[Token::Seq { len: Some(1) }, Token::I32(1), Token::SeqEnd],
-    );
-    small_vec.extend([2, 3, 4]);
-    assert_tokens(
-        &small_vec,
-        &[
-            Token::Seq { len: Some(4) },
-            Token::I32(1),
-            Token::I32(2),
-            Token::I32(3),
-            Token::I32(4),
-            Token::SeqEnd,
-        ],
-    );
+    let encoded = config().limit(100).serialize(&small_vec).unwrap();
+    let decoded: SmallVec<i32, 2> = deserialize(&encoded).unwrap();
+    assert_eq!(small_vec, decoded);
+    small_vec.push(2);
+    // Spill the vec
+    small_vec.push(3);
+    small_vec.push(4);
+    // Check again after spilling.
+    let encoded = config().limit(100).serialize(&small_vec).unwrap();
+    let decoded: SmallVec<i32, 2> = deserialize(&encoded).unwrap();
+    assert_eq!(small_vec, decoded);
 }
 
 #[test]
@@ -932,6 +926,7 @@ fn test_clone_from() {
     assert_eq!(&*b, &[20, 21, 22]);
 }
 
+#[cfg(feature = "extract_if")]
 #[test]
 fn test_extract_if() {
     let mut a: SmallVec<u8, 2> = smallvec![0, 1u8, 2, 3, 4, 5, 6, 7, 8, 0];
@@ -992,7 +987,11 @@ fn collect_from_iter() {
 
     // A length of 3 is fine to trigger this bug under valgrind, but making the vector 1 million
     // elements makes it crash - which is much easier to detect.
-    let iter = IterNoHint(std::iter::repeat(1u8).take(1_000_000));
+    #[cfg(miri)]
+    const ELEMENTS: usize = 1000;
+    #[cfg(not(miri))]
+    const ELEMENTS: usize = 1_000_000;
+    let iter = IterNoHint(std::iter::repeat(1u8).take(ELEMENTS));
 
     let _y: SmallVec<u8, 1> = SmallVec::from_iter(iter);
 }

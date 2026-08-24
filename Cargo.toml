@@ -11,14 +11,13 @@ keywords = ["small", "vec", "vector", "stack", "no_std"]
 categories = ["data-structures"]
 readme = "README.md"
 documentation = "https://docs.rs/smallvec/"
-exclude = [".gitignore", "tests/", "scripts/", "fuzz/", "benches/", ".github/"]
 
 [features]
 std = []
 specialization = []
 may_dangle = []
+extract_if = []
 serde = ["dep:serde_core"]
-internals = []
 
 [dependencies]
 bytes = { version = "1", optional = true, default-features = false }
@@ -26,8 +25,14 @@ serde_core = { version = "1.0.221", optional = true, default-features = false }
 malloc_size_of = { version = "0.1.1", optional = true, default-features = false }
 
 [dev-dependencies]
-serde_test = "1.0"
+bincode = "1.0.1"
+criterion = "0.8"
 
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[[bench]]
+name = "bench"
+path = "benches/bench.rs"
+harness = false
