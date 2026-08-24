@@ -7,6 +7,7 @@ use {
         ptr::{copy_nonoverlapping, NonNull},
     },
 };
+<<<<<<< HEAD
 =======
 use core::mem::{ManuallyDrop, MaybeUninit};
 use core::ptr::NonNull;
@@ -16,6 +17,8 @@ use core::ptr::copy_nonoverlapping;
 use alloc::alloc::Layout;
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
 
+=======
+>>>>>>> 239c751 (refactor: conversions file)
 /// Either a stack array with `length <= N` or a heap array
 /// whose pointer and capacity are stored here.
 ///
@@ -26,13 +29,15 @@ pub union RawSmallVec<T, const N: usize> {
     pub inline: ManuallyDrop<MaybeUninit<[T; N]>>,
     pub heap: (NonNull<T>, usize),
 }
-
 impl<T, const N: usize> RawSmallVec<T, N> {
     pub const IS_ZST: bool = size_of::<T>() == 0;
+<<<<<<< HEAD
 <<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
     #[inline]
     pub const fn new() -> Self {
         Self::new_inline(MaybeUninit::uninit())
@@ -50,9 +55,12 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         }
     }
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
     #[inline]
     pub const fn as_ptr_inline(&self) -> *const T {
         // SAFETY: it is safe because we aren't reading the value, just getting a
@@ -62,9 +70,12 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         (unsafe { &raw const self.inline }).cast::<T>()
     }
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
     #[inline]
     pub const fn as_mut_ptr_inline(&mut self) -> *mut T {
         // SAFETY: same as above
@@ -72,9 +83,12 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         (unsafe { &raw mut self.inline }).cast::<T>()
     }
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
     /// # Safety
     ///
     /// The vector must be on the heap
@@ -83,9 +97,12 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         self.heap.0.as_ptr()
     }
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
     /// # Safety
     ///
     /// The vector must be on the heap
@@ -94,9 +111,12 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         self.heap.0.as_ptr()
     }
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
     /// # Safety
     ///
     /// `new_capacity` must be non zero, and greater or equal to the length.
@@ -111,9 +131,12 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         debug_assert!(new_capacity > 0);
         debug_assert!(new_capacity >= len.value());
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
         let was_on_heap = len.on_heap();
         let ptr = if was_on_heap {
             self.as_mut_ptr_heap()
@@ -122,18 +145,24 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         };
         let len = len.value();
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
         let new_layout =
             Layout::array::<T>(new_capacity).map_err(|_| AllocationError::CapacityOverflow)?;
         if new_layout.size() > isize::MAX as usize {
             return Err(AllocationError::CapacityOverflow);
         }
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
         let new_ptr = if len == 0 || !was_on_heap {
             // get a fresh allocation
             let new_ptr = alloc(new_layout) as *mut T; // `new_layout` has nonzero size.
@@ -144,17 +173,23 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         } else {
             // use realloc
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
             // this can't overflow since we already constructed an equivalent layout during
             // the previous allocation
             let old_layout =
                 Layout::from_size_align_unchecked(self.heap.1 * size_of::<T>(), align_of::<T>());
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
             // SAFETY: ptr was allocated with this allocator
             // old_layout is the same as the layout used to allocate the previous memory
             // block new_layout.size() is greater than zero

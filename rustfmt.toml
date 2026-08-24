@@ -4,7 +4,11 @@ group_imports = "One"
 format_code_in_doc_comments = true
 match_arm_blocks = false
 blank_lines_lower_bound = 0
+<<<<<<< HEAD
 blank_lines_upper_bound = 1
+=======
+blank_lines_upper_bound = 0
+>>>>>>> 239c751 (refactor: conversions file)
 condense_wildcard_suffixes = true
 error_on_unformatted = true
 error_on_line_overflow = true

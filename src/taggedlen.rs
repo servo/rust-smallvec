@@ -1,5 +1,4 @@
 use core::marker::PhantomData;
-
 /// Vec guarantees that its length is always less than [`isize::MAX`] in
 /// *bytes*.
 ///
@@ -12,9 +11,12 @@ use core::marker::PhantomData;
 #[repr(transparent)]
 pub struct TaggedLen<T>(usize, PhantomData<T>);
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
 // Clone and Copy must be manually implemented because the generic interferes
 // with the derive attribute implementations.
 impl<T> Clone for TaggedLen<T> {
@@ -23,17 +25,18 @@ impl<T> Clone for TaggedLen<T> {
         Self(self.0, PhantomData)
     }
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
     #[inline]
     fn clone_from(&mut self, source: &Self) {
         self.0 = source.0;
     }
 }
-
 impl<T> Copy for TaggedLen<T> {}
-
 impl<T> TaggedLen<T> {
     const IS_ZST: bool = size_of::<T>() == 0;
     #[inline]
@@ -47,9 +50,12 @@ impl<T> TaggedLen<T> {
         }
     }
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
     #[inline]
     #[must_use]
     pub const fn on_heap(self) -> bool {
@@ -60,9 +66,12 @@ impl<T> TaggedLen<T> {
         }
     }
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+>>>>>>> 239c751 (refactor: conversions file)
     #[inline]
     pub const fn value(self) -> usize {
         if Self::IS_ZST {
