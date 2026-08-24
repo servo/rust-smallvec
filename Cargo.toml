@@ -26,7 +26,7 @@ malloc_size_of = { version = "0.1.1", optional = true, default-features = false 
 
 [dev-dependencies]
 bincode = "1.0.1"
-criterion = "0.8"
+criterion = "0.7"
 
 [package.metadata.docs.rs]
 all-features = true
