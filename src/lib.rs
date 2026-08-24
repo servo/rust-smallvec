@@ -68,9 +68,9 @@ mod std;
 mod taggedlen;
 #[cfg(test)]
 mod tests;
+pub use allocationerror::AllocationError;
 use {
     alloc::{alloc::Layout, boxed::Box, vec::Vec},
-    allocationerror::AllocationError,
     core::{
         fmt::Debug,
         hash::{Hash, Hasher},
