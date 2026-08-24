@@ -1,16 +1,12 @@
 #![feature(test)]
 #![allow(deprecated)]
-
 extern crate test;
-
 use {
     smallvec::{smallvec, SmallVec},
     test::Bencher,
 };
-
 const VEC_SIZE: usize = 16;
 const SPILLED_SIZE: usize = 100;
-
 trait Vector<T>: for<'a> From<&'a [T]> + Extend<T> {
     fn new() -> Self;
     fn push(&mut self, val: T);
@@ -21,75 +17,58 @@ trait Vector<T>: for<'a> From<&'a [T]> + Extend<T> {
     fn from_elems(val: &[T]) -> Self;
     fn extend_from_slice(&mut self, other: &[T]);
 }
-
 impl<T: Copy> Vector<T> for Vec<T> {
     fn new() -> Self {
         Self::with_capacity(VEC_SIZE)
     }
-
     fn push(&mut self, val: T) {
         self.push(val)
     }
-
     fn pop(&mut self) -> Option<T> {
         self.pop()
     }
-
     fn remove(&mut self, p: usize) -> T {
         self.remove(p)
     }
-
     fn insert(&mut self, n: usize, val: T) {
         self.insert(n, val)
     }
-
     fn from_elem(val: T, n: usize) -> Self {
         vec![val; n]
     }
-
     fn from_elems(val: &[T]) -> Self {
         val.to_owned()
     }
-
     fn extend_from_slice(&mut self, other: &[T]) {
         Vec::extend_from_slice(self, other)
     }
 }
-
 impl<T: Copy> Vector<T> for SmallVec<T, VEC_SIZE> {
     fn new() -> Self {
         Self::new()
     }
-
     fn push(&mut self, val: T) {
         self.push(val)
     }
-
     fn pop(&mut self) -> Option<T> {
         self.pop()
     }
-
     fn remove(&mut self, p: usize) -> T {
         self.remove(p)
     }
-
     fn insert(&mut self, n: usize, val: T) {
         self.insert(n, val)
     }
-
     fn from_elem(val: T, n: usize) -> Self {
         smallvec![val; n]
     }
-
     fn from_elems(val: &[T]) -> Self {
         SmallVec::from(val)
     }
-
     fn extend_from_slice(&mut self, other: &[T]) {
         SmallVec::extend_from_slice(self, other)
     }
 }
-
 macro_rules! make_benches {
     ($typ:ty { $($b_name:ident => $g_name:ident($($args:expr),*),)* }) => {
         $(
@@ -100,7 +79,6 @@ macro_rules! make_benches {
         )*
     }
 }
-
 make_benches! {
     SmallVec<u64, VEC_SIZE> {
         bench_push => gen_push(SPILLED_SIZE as _),
@@ -126,7 +104,6 @@ make_benches! {
         bench_pushpop => gen_pushpop(),
     }
 }
-
 make_benches! {
     Vec<u64> {
         bench_push_vec => gen_push(SPILLED_SIZE as _),
@@ -152,13 +129,11 @@ make_benches! {
         bench_pushpop_vec => gen_pushpop(),
     }
 }
-
 fn gen_push<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     #[inline(never)]
     fn push_noinline<V: Vector<u64>>(vec: &mut V, x: u64) {
         vec.push(x);
     }
-
     b.iter(|| {
         let mut vec = V::new();
         for x in 0..n {
@@ -167,13 +142,11 @@ fn gen_push<V: Vector<u64>>(n: u64, b: &mut Bencher) {
         vec
     });
 }
-
 fn gen_insert_push<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     #[inline(never)]
     fn insert_push_noinline<V: Vector<u64>>(vec: &mut V, x: u64) {
         vec.insert(x as usize, x);
     }
-
     b.iter(|| {
         let mut vec = V::new();
         for x in 0..n {
@@ -182,13 +155,11 @@ fn gen_insert_push<V: Vector<u64>>(n: u64, b: &mut Bencher) {
         vec
     });
 }
-
 fn gen_insert<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     #[inline(never)]
     fn insert_noinline<V: Vector<u64>>(vec: &mut V, p: usize, x: u64) {
         vec.insert(p, x)
     }
-
     b.iter(|| {
         let mut vec = V::new();
         // Always insert at position 0 so that we are subject to shifts of
@@ -200,22 +171,18 @@ fn gen_insert<V: Vector<u64>>(n: u64, b: &mut Bencher) {
         vec
     });
 }
-
 fn gen_remove<V: Vector<u64>>(n: usize, b: &mut Bencher) {
     #[inline(never)]
     fn remove_noinline<V: Vector<u64>>(vec: &mut V, p: usize) -> u64 {
         vec.remove(p)
     }
-
     b.iter(|| {
         let mut vec = V::from_elem(0, n as _);
-
         for _ in 0..n {
             remove_noinline(&mut vec, 0);
         }
     });
 }
-
 fn gen_extend<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     b.iter(|| {
         let mut vec = V::new();
@@ -223,7 +190,6 @@ fn gen_extend<V: Vector<u64>>(n: u64, b: &mut Bencher) {
         vec
     });
 }
-
 fn gen_extend_filtered<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     b.iter(|| {
         let mut vec = V::new();
@@ -231,7 +197,6 @@ fn gen_extend_filtered<V: Vector<u64>>(n: u64, b: &mut Bencher) {
         vec
     });
 }
-
 fn gen_from_iter<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     let v: Vec<u64> = (0..n).collect();
     b.iter(|| {
@@ -239,7 +204,6 @@ fn gen_from_iter<V: Vector<u64>>(n: u64, b: &mut Bencher) {
         vec
     });
 }
-
 fn gen_from_slice<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     let v: Vec<u64> = (0..n).collect();
     b.iter(|| {
@@ -247,7 +211,6 @@ fn gen_from_slice<V: Vector<u64>>(n: u64, b: &mut Bencher) {
         vec
     });
 }
-
 fn gen_extend_from_slice<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     let v: Vec<u64> = (0..n).collect();
     b.iter(|| {
@@ -256,14 +219,12 @@ fn gen_extend_from_slice<V: Vector<u64>>(n: u64, b: &mut Bencher) {
         vec
     });
 }
-
 fn gen_pushpop<V: Vector<u64>>(b: &mut Bencher) {
     #[inline(never)]
     fn pushpop_noinline<V: Vector<u64>>(vec: &mut V, x: u64) -> Option<u64> {
         vec.push(x);
         vec.pop()
     }
-
     b.iter(|| {
         let mut vec = V::new();
         for x in 0..SPILLED_SIZE as _ {
@@ -272,14 +233,12 @@ fn gen_pushpop<V: Vector<u64>>(b: &mut Bencher) {
         vec
     });
 }
-
 fn gen_from_elem<V: Vector<u64>>(n: usize, b: &mut Bencher) {
     b.iter(|| {
         let vec = V::from_elem(42, n);
         vec
     });
 }
-
 #[bench]
 fn bench_macro_from_list(b: &mut Bencher) {
     b.iter(|| {
@@ -291,7 +250,6 @@ fn bench_macro_from_list(b: &mut Bencher) {
         vec
     });
 }
-
 #[bench]
 fn bench_macro_from_list_vec(b: &mut Bencher) {
     b.iter(|| {
