@@ -1,6 +1,10 @@
-use alloc::alloc::Layout;
-use core::error::Error;
-use core::fmt::{Display, Formatter, Result as Format};
+use {
+    alloc::alloc::Layout,
+    core::{
+        error::Error,
+        fmt::{Display, Formatter, Result as Format},
+    },
+};
 
 /// Error type for APIs with fallible heap allocation
 #[derive(Debug)]

@@ -1,5 +1,7 @@
-use super::SmallVec;
-use core::borrow::{Borrow, BorrowMut};
+use {
+    super::SmallVec,
+    core::borrow::{Borrow, BorrowMut},
+};
 
 impl<T, const N: usize> core::ops::Deref for SmallVec<T, N> {
     type Target = [T];

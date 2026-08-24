@@ -1,5 +1,7 @@
-use super::SmallVec;
-use bytes::{buf::UninitSlice, BufMut};
+use {
+    super::SmallVec,
+    bytes::{buf::UninitSlice, BufMut},
+};
 
 unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
     #[inline]

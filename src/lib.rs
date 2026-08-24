@@ -57,6 +57,9 @@ pub extern crate alloc;
 mod allocationerror;
 #[cfg(feature = "bytes")]
 mod bytes;
+mod comparisons;
+#[cfg(feature = "malloc_size_of")]
+mod mallocsizeof;
 mod rawsmallvec;
 mod references;
 #[cfg(feature = "serde")]
@@ -67,23 +70,17 @@ mod taggedlen;
 #[cfg(test)]
 mod tests;
 
-use alloc::alloc::Layout;
-use alloc::boxed::Box;
-use alloc::vec;
-use alloc::vec::Vec;
-use allocationerror::AllocationError;
-use core::fmt::Debug;
-use core::hash::{Hash, Hasher};
-use core::marker::PhantomData;
-use core::mem::align_of;
-use core::mem::size_of;
-use core::mem::ManuallyDrop;
-use core::mem::MaybeUninit;
-use core::ptr::copy;
-use core::ptr::copy_nonoverlapping;
-use core::ptr::NonNull;
-#[cfg(feature = "malloc_size_of")]
-use malloc_size_of::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps};
+use {
+    alloc::{alloc::Layout, boxed::Box, vec::Vec},
+    allocationerror::AllocationError,
+    core::{
+        fmt::Debug,
+        hash::{Hash, Hasher},
+        marker::PhantomData,
+        mem::{align_of, size_of, ManuallyDrop, MaybeUninit},
+        ptr::{copy, copy_nonoverlapping, NonNull},
+    },
+};
 #[cfg(feature = "internals")]
 pub use {rawsmallvec::RawSmallVec, taggedlen::TaggedLen};
 #[cfg(not(feature = "internals"))]
@@ -709,8 +706,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// # Examples
     ///
     /// ```
-    /// use smallvec::SmallVec;
-    /// use std::mem::MaybeUninit;
+    /// use {smallvec::SmallVec, std::mem::MaybeUninit};
     ///
     /// let buf = [1, 2, 3, 4, 5, 0, 0, 0];
     /// let small_vec = unsafe { SmallVec::from_buf_and_len_unchecked(MaybeUninit::new(buf), 5) };
@@ -1862,7 +1858,8 @@ impl<T, const N: usize> Drop for IntoIter<T, N> {
 pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N> {
     if n > SmallVec::<T, N>::inline_size() {
         // Standard Rust vectors are already specialized.
-        SmallVec::<T, N>::from_vec(vec![elem; n])
+        use core::iter::repeat_n;
+        SmallVec::from(Vec::from_iter(repeat_n(elem, n)))
     } else {
         #[cfg(feature = "specialization")]
         {
@@ -2552,87 +2549,6 @@ impl<'a, T, const N: usize> IntoIterator for &'a mut SmallVec<T, N> {
     }
 }
 
-impl<T, U, const N: usize, const M: usize> PartialEq<SmallVec<U, M>> for SmallVec<T, N>
-where
-    T: PartialEq<U>,
-{
-    #[inline]
-    fn eq(&self, other: &SmallVec<U, M>) -> bool {
-        self.as_slice().eq(other.as_slice())
-    }
-}
-impl<T, const N: usize> Eq for SmallVec<T, N> where T: Eq {}
-
-impl<T, U, const N: usize, const M: usize> PartialEq<[U; M]> for SmallVec<T, N>
-where
-    T: PartialEq<U>,
-{
-    #[inline]
-    fn eq(&self, other: &[U; M]) -> bool {
-        self[..] == other[..]
-    }
-}
-
-impl<T, U, const N: usize, const M: usize> PartialEq<&[U; M]> for SmallVec<T, N>
-where
-    T: PartialEq<U>,
-{
-    #[inline]
-    fn eq(&self, other: &&[U; M]) -> bool {
-        self[..] == other[..]
-    }
-}
-
-impl<T, U, const N: usize> PartialEq<[U]> for SmallVec<T, N>
-where
-    T: PartialEq<U>,
-{
-    #[inline]
-    fn eq(&self, other: &[U]) -> bool {
-        self[..] == other[..]
-    }
-}
-
-impl<T, U, const N: usize> PartialEq<&[U]> for SmallVec<T, N>
-where
-    T: PartialEq<U>,
-{
-    #[inline]
-    fn eq(&self, other: &&[U]) -> bool {
-        self[..] == other[..]
-    }
-}
-
-impl<T, U, const N: usize> PartialEq<&mut [U]> for SmallVec<T, N>
-where
-    T: PartialEq<U>,
-{
-    #[inline]
-    fn eq(&self, other: &&mut [U]) -> bool {
-        self[..] == other[..]
-    }
-}
-
-impl<T, const N: usize> PartialOrd for SmallVec<T, N>
-where
-    T: PartialOrd,
-{
-    #[inline]
-    fn partial_cmp(&self, other: &SmallVec<T, N>) -> Option<core::cmp::Ordering> {
-        self.as_slice().partial_cmp(other.as_slice())
-    }
-}
-
-impl<T, const N: usize> Ord for SmallVec<T, N>
-where
-    T: Ord,
-{
-    #[inline]
-    fn cmp(&self, other: &SmallVec<T, N>) -> core::cmp::Ordering {
-        self.as_slice().cmp(other.as_slice())
-    }
-}
-
 impl<T: Hash, const N: usize> Hash for SmallVec<T, N> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.as_slice().hash(state)
@@ -2654,27 +2570,5 @@ impl<T: Debug, const N: usize> Debug for IntoIter<T, N> {
 impl<T: Debug, const N: usize> Debug for Drain<'_, T, N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("Drain").field(&self.iter.as_slice()).finish()
-    }
-}
-
-#[cfg(feature = "malloc_size_of")]
-impl<T, const N: usize> MallocShallowSizeOf for SmallVec<T, N> {
-    fn shallow_size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
-        if self.spilled() {
-            unsafe { ops.malloc_size_of(self.as_ptr()) }
-        } else {
-            0
-        }
-    }
-}
-
-#[cfg(feature = "malloc_size_of")]
-impl<T: MallocSizeOf, const N: usize> MallocSizeOf for SmallVec<T, N> {
-    fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
-        let mut n = self.shallow_size_of(ops);
-        for elem in self.iter() {
-            n += elem.size_of(ops);
-        }
-        n
     }
 }

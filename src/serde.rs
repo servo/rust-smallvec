@@ -1,9 +1,11 @@
-use super::SmallVec;
-use core::marker::PhantomData;
-use serde_core::{
-    de::{SeqAccess, Visitor},
-    ser::SerializeSeq,
-    Deserialize, Deserializer, Serialize, Serializer,
+use {
+    super::SmallVec,
+    core::marker::PhantomData,
+    serde_core::{
+        de::{SeqAccess, Visitor},
+        ser::SerializeSeq,
+        Deserialize, Deserializer, Serialize, Serializer,
+    },
 };
 
 impl<T, const N: usize> Serialize for SmallVec<T, N>

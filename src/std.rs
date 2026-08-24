@@ -1,7 +1,6 @@
 extern crate std;
 
-use super::SmallVec;
-use std::io;
+use {super::SmallVec, std::io};
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
