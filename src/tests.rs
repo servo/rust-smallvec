@@ -1,5 +1,6 @@
 use crate::{smallvec, SmallVec};
 
+use core::cell::{Cell, RefCell};
 use core::hash::Hasher;
 use core::iter::FromIterator;
 
@@ -746,6 +747,111 @@ fn test_retain() {
     assert_eq!(Rc::strong_count(&one), 2);
     sv.retain(|_| false);
     assert_eq!(Rc::strong_count(&one), 1);
+}
+
+fn check_retain_mut_predicate_panic_matches_vec<const N: usize>() {
+    struct Counted {
+        value: i32,
+        drops: Rc<Cell<usize>>,
+    }
+
+    impl Drop for Counted {
+        fn drop(&mut self) {
+            self.drops.set(self.drops.get() + 1);
+        }
+    }
+
+    let drops = Rc::new(Cell::new(0));
+    let mut values = SmallVec::<Counted, N>::new();
+    values.extend((1..=4).map(|value| Counted {
+        value,
+        drops: Rc::clone(&drops),
+    }));
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        values.retain_mut(|item| match item.value {
+            1 => false,
+            3 => panic!("predicate panic"),
+            _ => true,
+        });
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(drops.get(), 1);
+    assert_eq!(
+        values.iter().map(|item| item.value).collect::<Vec<_>>(),
+        vec![2, 3, 4]
+    );
+
+    drop(values);
+    assert_eq!(drops.get(), 4);
+}
+
+#[test]
+fn test_retain_mut_predicate_panic_inline() {
+    check_retain_mut_predicate_panic_matches_vec::<4>();
+}
+
+#[test]
+fn test_retain_mut_predicate_panic_spilled() {
+    check_retain_mut_predicate_panic_matches_vec::<2>();
+}
+
+fn check_retain_mut_drop_panic_stops_visiting<const N: usize>() {
+    struct PanicOnDrop {
+        value: i32,
+        drops: Rc<RefCell<Vec<i32>>>,
+        panic_once: Rc<Cell<bool>>,
+    }
+
+    impl Drop for PanicOnDrop {
+        fn drop(&mut self) {
+            self.drops.borrow_mut().push(self.value);
+            if self.value == 1 && !self.panic_once.replace(true) {
+                panic!("drop panic");
+            }
+        }
+    }
+
+    let drops = Rc::new(RefCell::new(Vec::new()));
+    let visited = Rc::new(RefCell::new(Vec::new()));
+    let panic_once = Rc::new(Cell::new(false));
+    let mut values = SmallVec::<PanicOnDrop, N>::new();
+    values.extend((1..=4).map(|value| PanicOnDrop {
+        value,
+        drops: Rc::clone(&drops),
+        panic_once: Rc::clone(&panic_once),
+    }));
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        values.retain_mut(|item| {
+            visited.borrow_mut().push(item.value);
+            item.value != 1
+        });
+    }));
+
+    assert!(result.is_err());
+    assert_eq!(&*visited.borrow(), &[1]);
+    assert_eq!(&*drops.borrow(), &[1]);
+    assert_eq!(
+        values.iter().map(|item| item.value).collect::<Vec<_>>(),
+        vec![2, 3, 4]
+    );
+
+    drop(values);
+    let mut dropped = drops.borrow().clone();
+    dropped.sort_unstable();
+    assert_eq!(dropped, [1, 2, 3, 4]);
+}
+
+#[test]
+fn test_retain_mut_drop_panic_inline() {
+    check_retain_mut_drop_panic_stops_visiting::<4>();
+}
+
+#[test]
+fn test_retain_mut_drop_panic_spilled() {
+    check_retain_mut_drop_panic_stops_visiting::<2>();
 }
 
 #[test]

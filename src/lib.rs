@@ -1610,21 +1610,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn retain_mut<F: FnMut(&mut T) -> bool>(&mut self, mut f: F) {
-        let mut del = 0;
-        let len = self.len();
-        let ptr = self.as_mut_ptr();
-        for i in 0..len {
-            // SAFETY: all the pointers are in bounds
-            // `i - del` never overflows since `del <= i` is a maintained invariant
-            unsafe {
-                if !f(&mut *ptr.add(i)) {
-                    del += 1;
-                } else if del > 0 {
-                    core::ptr::swap(ptr.add(i), ptr.add(i - del));
-                }
-            }
-        }
-        self.truncate(len - del);
+        self.extract_if(.., |element| !f(element)).for_each(drop);
     }
 
     #[inline]
