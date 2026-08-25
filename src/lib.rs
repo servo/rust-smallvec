@@ -2641,6 +2641,7 @@ impl<T, const N: usize> core::iter::FromIterator<T> for SmallVec<T, N> {
     }
 }
 
+#[deprecated]
 #[macro_export]
 macro_rules! smallvec {
     ($elem:expr; $n:expr) => ({
@@ -2651,16 +2652,14 @@ macro_rules! smallvec {
     });
 }
 
+#[deprecated]
 #[macro_export]
 macro_rules! smallvec_inline {
-    // count helper: transform any expression into 1
-    (@one $x:expr) => (1usize);
     ($elem:expr; $n:expr) => ({
         $crate::SmallVec::<_, $n>::from_buf([$elem; $n])
     });
     ($($x:expr),+ $(,)?) => ({
-        const N: usize = 0usize $(+ $crate::smallvec_inline!(@one $x))*;
-        $crate::SmallVec::<_, N>::from_buf([$($x),*])
+        $crate::SmallVec::from_buf([$($x),*])
     });
 }
 
