@@ -2658,8 +2658,8 @@ macro_rules! smallvec_inline {
     ($elem:expr; $n:expr) => ({
         $crate::SmallVec::<_, $n>::from_buf([$elem; $n])
     });
-    ($($x:expr),+ $(,)?) => ({
-        $crate::SmallVec::from_buf([$($x),*])
+    ($($($x:expr),+$(,)?)?) => ({
+        $crate::SmallVec::from_buf([$($($x),+)?])
     });
 }
 
