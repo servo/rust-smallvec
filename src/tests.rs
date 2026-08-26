@@ -19,6 +19,38 @@ pub fn test_zero() {
 // valgrind.
 
 #[test]
+pub fn test_push_mut() {
+    let mut v = SmallVec::<_, 16>::new();
+
+    let first_elem = v.push_mut("hello".to_owned());
+    assert_eq!(&*first_elem, &"hello".to_owned());
+
+    *first_elem = "hi".to_owned();
+    assert_eq!(&*first_elem, &"hi".to_owned());
+
+    v.push("there".to_owned());
+    assert_eq!(&*v, &["hi".to_owned(), "there".to_owned(),][..]);
+}
+
+#[test]
+pub fn test_insert_mut() {
+    let mut v = SmallVec::<_, 16>::new();
+    v.push("hello".to_owned());
+    v.push("there".to_owned());
+
+    let second_elem = v.insert_mut(1, ",".to_owned());
+    assert_eq!(&*second_elem, &",".to_owned());
+
+    *second_elem = ";".to_owned();
+    assert_eq!(&*second_elem, &";".to_owned());
+
+    assert_eq!(
+        &*v,
+        &["hello".to_owned(), ";".to_owned(), "there".to_owned(),][..]
+    );
+}
+
+#[test]
 pub fn test_inline() {
     let mut v = SmallVec::<_, 16>::new();
     v.push("hello".to_owned());
