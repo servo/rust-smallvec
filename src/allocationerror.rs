@@ -7,6 +7,7 @@ use {
     },
 };
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 use alloc::alloc::Layout;
 use core::error::Error;
@@ -15,6 +16,9 @@ use core::fmt::{Display, Formatter, Result as Format};
 
 =======
 >>>>>>> 239c751 (refactor: conversions file)
+=======
+
+>>>>>>> 716921a (fix: newline amount)
 /// Error type for APIs with fallible heap allocation
 #[derive(Debug)]
 pub enum AllocationError {
@@ -26,9 +30,11 @@ pub enum AllocationError {
         layout: Layout,
     },
 }
+
 impl Display for AllocationError {
     fn fmt(&self, f: &mut Formatter) -> Format {
         write!(f, "Allocation error: {:?}", self)
     }
 }
+
 impl Error for AllocationError {}

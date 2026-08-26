@@ -2,6 +2,7 @@ use {
     super::SmallVec,
     malloc_size_of::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps},
 };
+
 impl<T, const N: usize> MallocShallowSizeOf for SmallVec<T, N> {
     fn shallow_size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         if self.spilled() {
@@ -11,6 +12,7 @@ impl<T, const N: usize> MallocShallowSizeOf for SmallVec<T, N> {
         }
     }
 }
+
 impl<T: MallocSizeOf, const N: usize> MallocSizeOf for SmallVec<T, N> {
     fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         let mut n = self.shallow_size_of(ops);

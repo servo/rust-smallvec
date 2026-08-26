@@ -6,9 +6,13 @@ use {
     core::{mem::ManuallyDrop, ptr::copy_nonoverlapping},
 };
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> 239c751 (refactor: conversions file)
+=======
+
+>>>>>>> 716921a (fix: newline amount)
 impl<T: Clone, const M: usize, const N: usize> From<&mut [T; M]> for SmallVec<T, N> {
     #[inline]
     fn from(slice: &mut [T; M]) -> Self {
@@ -16,9 +20,13 @@ impl<T: Clone, const M: usize, const N: usize> From<&mut [T; M]> for SmallVec<T,
     }
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> 239c751 (refactor: conversions file)
+=======
+
+>>>>>>> 716921a (fix: newline amount)
 impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N> {
     fn from(array: [T; M]) -> Self {
         if M > N {
@@ -40,18 +48,26 @@ impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N> {
     }
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> 239c751 (refactor: conversions file)
+=======
+
+>>>>>>> 716921a (fix: newline amount)
 impl<T, const N: usize> From<Vec<T>> for SmallVec<T, N> {
     fn from(array: Vec<T>) -> Self {
         Self::from_vec(array)
     }
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> 239c751 (refactor: conversions file)
+=======
+
+>>>>>>> 716921a (fix: newline amount)
 impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N> {
     #[inline]
     fn from(slice: &[T]) -> Self {
@@ -74,9 +90,13 @@ impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N> {
     }
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> 239c751 (refactor: conversions file)
+=======
+
+>>>>>>> 716921a (fix: newline amount)
 impl<T: Clone, const N: usize> From<&mut [T]> for SmallVec<T, N> {
     #[inline]
     fn from(slice: &mut [T]) -> Self {
@@ -84,9 +104,13 @@ impl<T: Clone, const N: usize> From<&mut [T]> for SmallVec<T, N> {
     }
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> 239c751 (refactor: conversions file)
+=======
+
+>>>>>>> 716921a (fix: newline amount)
 impl<T: Clone, const M: usize, const N: usize> From<&[T; M]> for SmallVec<T, N> {
     #[inline]
     fn from(slice: &[T; M]) -> Self {

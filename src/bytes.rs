@@ -4,6 +4,7 @@ use {
     bytes::{buf::UninitSlice, BufMut},
 };
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 use bytes::{buf::UninitSlice, BufMut};
 use super::SmallVec;
@@ -11,6 +12,9 @@ use super::SmallVec;
 
 =======
 >>>>>>> 239c751 (refactor: conversions file)
+=======
+
+>>>>>>> 716921a (fix: newline amount)
 unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
     #[inline]
     fn remaining_mut(&self) -> usize {

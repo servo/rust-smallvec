@@ -9,6 +9,7 @@ use {
     },
 };
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 use serde_core::{Serialize, Deserialize, Serializer, Deserializer, de::{Visitor, SeqAccess}, ser::SerializeSeq};
 use super::SmallVec;
@@ -17,6 +18,9 @@ use core::marker::PhantomData;
 
 =======
 >>>>>>> 239c751 (refactor: conversions file)
+=======
+
+>>>>>>> 716921a (fix: newline amount)
 impl<T, const N: usize> Serialize for SmallVec<T, N>
 where
     T: Serialize,
@@ -29,6 +33,7 @@ where
         state.end()
     }
 }
+
 impl<'de, T, const N: usize> Deserialize<'de> for SmallVec<T, N>
 where
     T: Deserialize<'de>,
@@ -39,9 +44,11 @@ where
         })
     }
 }
+
 struct SmallVecVisitor<T, const N: usize> {
     phantom: PhantomData<T>,
 }
+
 impl<'de, T, const N: usize> Visitor<'de> for SmallVecVisitor<T, N>
 where
     T: Deserialize<'de>,
@@ -80,6 +87,7 @@ where
         Ok(values)
     }
 }
+<<<<<<< HEAD
 =======
 
 =======
@@ -91,3 +99,6 @@ where
     }
 }
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+
+>>>>>>> 716921a (fix: newline amount)

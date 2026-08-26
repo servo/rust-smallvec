@@ -1,5 +1,6 @@
 extern crate std;
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 use {super::SmallVec, std::io};
@@ -11,6 +12,11 @@ use std::io;
 =======
 use {super::SmallVec, std::io};
 >>>>>>> 239c751 (refactor: conversions file)
+=======
+
+use {super::SmallVec, std::io};
+
+>>>>>>> 716921a (fix: newline amount)
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl<const N: usize> io::Write for SmallVec<u8, N> {
@@ -43,7 +49,11 @@ impl<const N: usize> io::Write for SmallVec<u8, N> {
         Ok(())
     }
 <<<<<<< HEAD
+<<<<<<< HEAD
 }
 =======
 }
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+}
+>>>>>>> 716921a (fix: newline amount)

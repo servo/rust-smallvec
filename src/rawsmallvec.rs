@@ -8,6 +8,7 @@ use {
     },
 };
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 use core::mem::{ManuallyDrop, MaybeUninit};
 use core::ptr::NonNull;
@@ -19,6 +20,9 @@ use alloc::alloc::Layout;
 
 =======
 >>>>>>> 239c751 (refactor: conversions file)
+=======
+
+>>>>>>> 716921a (fix: newline amount)
 /// Either a stack array with `length <= N` or a heap array
 /// whose pointer and capacity are stored here.
 ///
@@ -29,6 +33,7 @@ pub union RawSmallVec<T, const N: usize> {
     pub inline: ManuallyDrop<MaybeUninit<[T; N]>>,
     pub heap: (NonNull<T>, usize),
 }
+
 impl<T, const N: usize> RawSmallVec<T, N> {
     pub const IS_ZST: bool = size_of::<T>() == 0;
 <<<<<<< HEAD
@@ -202,7 +207,11 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         Ok(())
     }
 <<<<<<< HEAD
+<<<<<<< HEAD
 }
 =======
 }
 >>>>>>> 7fa0992 (feat: added bytes, serde, std, taggedlen files)
+=======
+}
+>>>>>>> 716921a (fix: newline amount)
