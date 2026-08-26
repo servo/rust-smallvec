@@ -1214,13 +1214,15 @@ impl<T, const N: usize> SmallVec<T, N> {
             self.reserve(1);
         }
 
-        // SAFETY: both the input and output are within the allocation
+        // SAFETY: `len < capacity` after the reserve,
+        //         so the offset stays in bounds of the allocation.
         let ptr = unsafe { self.as_mut_ptr().add(len) };
-        // SAFETY: we allocated enough space in case it wasn't enough,
-        //         so the address is valid for writes.
+
+        // SAFETY: the slot at `len` is free and properly aligned for `T`.
         unsafe { ptr.write(value) };
 
-        // unsafe { self.set_len(len + 1) };
+        // SAFETY: all elements in `0..len + 1` are initialized.
+        //unsafe { self.set_len(len + 1) };
         {
             // This block is an exact copy of `self.set_len`.
             // We have to do this so that Miri doesn't report a "Stacked Borrows" rule violation.
@@ -1232,6 +1234,8 @@ impl<T, const N: usize> SmallVec<T, N> {
             self.len = TaggedLen::new(new_len, on_heap);
         }
 
+        // SAFETY: `ptr` is aligned, non-null and points to the element initialized above;
+        //         the borrow is tied to `&mut self`, so it is exclusive.
         unsafe { &mut *ptr }
     }
 
@@ -1497,31 +1501,48 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn insert(&mut self, index: usize, value: T) {
+        _ = self.insert_mut(index, value);
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn insert_mut(&mut self, index: usize, value: T) -> &mut T {
         let len = self.len();
         assert!(
             index <= len,
             "insertion index (is {index}) should be <= len (is {len})"
         );
         self.reserve(1);
-        let ptr = self.as_mut_ptr();
-        unsafe {
-            // the elements at `index + 1..len + 1` are now initialized
-            if index < len {
-                copy(ptr.add(index), ptr.add(index + 1), len - index);
-            }
-            // the element at `index` is now initialized
-            ptr.add(index).write(value);
 
-            // SAFETY: all the elements are initialized
-            self.set_len(len + 1);
-        }
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn insert_mut(&mut self, index: usize, value: T) -> &mut T {
-        let () = self.insert(index, value);
+        // SAFETY: `index <= len <= capacity`,
+        //         so the offset stays in bounds of the allocation.
         let ptr = unsafe { self.as_mut_ptr().add(index) };
+
+        if index < len {
+            // SAFETY: `reserve(1)` guarantees capacity for `len + 1` elements,
+            //         so shifting `len - index` elements one slot up stays in bounds.
+            //         Source and destination overlap, hence `copy` instead of `copy_nonoverlapping`.
+            unsafe { copy(ptr, ptr.add(1), len - index) };
+        }
+
+        // SAFETY: the slot at `index` is free and properly aligned for `T`.
+        unsafe { ptr.write(value) };
+
+        // SAFETY: all elements in `0..len + 1` are initialized.
+        //unsafe { self.set_len(len + 1) };
+        {
+            // This block is an exact copy of `self.set_len`.
+            // We have to do this so that Miri doesn't report a "Stacked Borrows" rule violation.
+            // See PR/406
+
+            let new_len = len + 1;
+            debug_assert!(new_len <= self.capacity());
+            let on_heap = self.len.on_heap();
+            self.len = TaggedLen::new(new_len, on_heap);
+        }
+
+        // SAFETY: `ptr` is aligned, non-null and points to the element initialized above;
+        //         the borrow is tied to `&mut self`, so it is exclusive.
         unsafe { &mut *ptr }
     }
 
