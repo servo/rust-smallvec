@@ -1261,8 +1261,8 @@ impl<T, const N: usize> SmallVec<T, N> {
         // LEGAL: all elements in `0..len + 1` are initialized.
         {
             // This block is an exact copy of `self.set_len`.
-            // We have to do this so that Miri doesn't report a "Stacked Borrows" rule violation.
-            // See PR/406
+            // We have to do this so that Miri doesn't report a "Stacked Borrows"
+            // rule violation. See PR/406
 
             let new_len = len + 1;
             debug_assert!(new_len <= self.capacity());
@@ -1270,8 +1270,8 @@ impl<T, const N: usize> SmallVec<T, N> {
             self.len = TaggedLen::new(new_len, on_heap);
         }
 
-        // SAFETY: `ptr` is aligned, non-null and points to the element initialized above;
-        //         the borrow is tied to `&mut self`, so it is exclusive.
+        // SAFETY: `ptr` is aligned, non-null and points to the element initialized
+        //         above; the borrow is tied to `&mut self`, so it is exclusive.
         unsafe { &mut *ptr }
     }
 
@@ -1572,7 +1572,8 @@ impl<T, const N: usize> SmallVec<T, N> {
         if index < len {
             // SAFETY: `reserve(1)` guarantees capacity for `len + 1` elements,
             //         so shifting `len - index` elements one slot up stays in bounds.
-            //         Source and destination overlap, hence `copy` instead of `copy_nonoverlapping`.
+            //         Source and destination overlap, hence `copy` instead of
+            //         `copy_nonoverlapping`.
             unsafe { copy(ptr, ptr.add(1), len - index) };
         }
 
@@ -1582,8 +1583,8 @@ impl<T, const N: usize> SmallVec<T, N> {
         // LEGAL: all elements in `0..len + 1` are initialized.
         {
             // This block is an exact copy of `self.set_len`.
-            // We have to do this so that Miri doesn't report a "Stacked Borrows" rule violation.
-            // See PR/406
+            // We have to do this so that Miri doesn't report a "Stacked Borrows"
+            // rule violation. See PR/406
 
             let new_len = len + 1;
             debug_assert!(new_len <= self.capacity());
@@ -1591,8 +1592,8 @@ impl<T, const N: usize> SmallVec<T, N> {
             self.len = TaggedLen::new(new_len, on_heap);
         }
 
-        // SAFETY: `ptr` is aligned, non-null and points to the element initialized above;
-        //         the borrow is tied to `&mut self`, so it is exclusive.
+        // SAFETY: `ptr` is aligned, non-null and points to the element initialized
+        //         above; the borrow is tied to `&mut self`, so it is exclusive.
         unsafe { &mut *ptr }
     }
 
