@@ -292,7 +292,7 @@ impl<T> Clone for TaggedLen<T> {
     fn clone(&self) -> Self {
         Self(self.0, PhantomData)
     }
-    
+
     #[inline]
     fn clone_from(&mut self, source: &Self) {
         self.0 = source.0;
@@ -1203,24 +1203,35 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn push(&mut self, value: T) {
-        let len = self.len();
-        if len == self.capacity() {
-            self.reserve(1);
-        }
-        // SAFETY: both the input and output are within the allocation
-        let ptr = unsafe { self.as_mut_ptr().add(len) };
-        // SAFETY: we allocated enough space in case it wasn't enough, so the address is valid for
-        // writes.
-        unsafe { ptr.write(value) };
-        unsafe { self.set_len(len + 1) };
+        _ = self.push_mut(value);
     }
 
     #[inline]
     #[must_use]
     pub fn push_mut(&mut self, value: T) -> &mut T {
-        let idx = self.len();
-        let () = self.push(value);
-        let ptr = unsafe { self.as_mut_ptr().add(idx) };
+        let len = self.len();
+        if len == self.capacity() {
+            self.reserve(1);
+        }
+
+        // SAFETY: both the input and output are within the allocation
+        let ptr = unsafe { self.as_mut_ptr().add(len) };
+        // SAFETY: we allocated enough space in case it wasn't enough,
+        //         so the address is valid for writes.
+        unsafe { ptr.write(value) };
+
+        // unsafe { self.set_len(len + 1) };
+        {
+            // This block is an exact copy of `self.set_len`.
+            // We have to do this so that Miri doesn't report a "Stacked Borrows" rule violation.
+            // See PR/406
+
+            let new_len = len + 1;
+            debug_assert!(new_len <= self.capacity());
+            let on_heap = self.len.on_heap();
+            self.len = TaggedLen::new(new_len, on_heap);
+        }
+
         unsafe { &mut *ptr }
     }
 
@@ -1829,10 +1840,10 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
     where
         T: Copy
     {
-        
+
         let len = other.len();
         let src = other.as_ptr();
-        
+
         let l = self.len();
         self.reserve(len);
 
