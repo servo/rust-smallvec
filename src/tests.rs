@@ -165,6 +165,51 @@ fn splice() {
     assert_eq!(u, [0, 1, 2]);
 }
 
+// Splicing an *inline* `SmallVec` used to trigger undefined behavior (a Stacked
+// Borrows aliasing violation): `Drain::fill` and `Drain::move_tail` held a
+// reference/pointer into the inline buffer while reborrowing the whole
+// `SmallVec` (via `set_len`/`as_mut_ptr`), which aliases that buffer. All of
+// these cases keep the vector inline (`N` is large), so they exercise the fix.
+// Run under `cargo miri test` to detect a regression.
+#[test]
+fn splice_inline() {
+    // more replacements than removed -> fill + move_tail + fill
+    let mut v: SmallVec<i32, 16> = smallvec![1, 2, 3, 4, 5];
+    let u: SmallVec<i32, 16> = v.splice(1..3, [10, 11, 12]).collect();
+    assert!(!v.spilled());
+    assert_eq!(u, [2, 3]);
+    assert_eq!(v, [1, 10, 11, 12, 4, 5]);
+
+    // equal count -> fill only
+    let mut v: SmallVec<i32, 16> = smallvec![1, 2, 3, 4, 5];
+    let u: SmallVec<i32, 16> = v.splice(1..3, [20, 21]).collect();
+    assert!(!v.spilled());
+    assert_eq!(u, [2, 3]);
+    assert_eq!(v, [1, 20, 21, 4, 5]);
+
+    // fewer replacements -> partial fill, tail moved back on drop
+    let mut v: SmallVec<i32, 16> = smallvec![1, 2, 3, 4, 5, 6];
+    let u: SmallVec<i32, 16> = v.splice(1..4, [30]).collect();
+    assert!(!v.spilled());
+    assert_eq!(u, [2, 3, 4]);
+    assert_eq!(v, [1, 30, 5, 6]);
+
+    // empty tail, growing -> move_tail with tail_len == 0
+    let mut v: SmallVec<i32, 16> = smallvec![1, 2, 3];
+    let u: SmallVec<i32, 16> = v.splice(2..3, [40, 41, 42, 43]).collect();
+    assert!(!v.spilled());
+    assert_eq!(u, [3]);
+    assert_eq!(v, [1, 2, 40, 41, 42, 43]);
+
+    // loose size_hint -> "collect the remainder" branch of Splice::drop
+    let mut v: SmallVec<i32, 16> = smallvec![1, 2, 3, 4, 5];
+    let repl = (100..110).filter(|x| x % 2 == 0);
+    let u: SmallVec<i32, 16> = v.splice(1..3, repl).collect();
+    assert!(!v.spilled());
+    assert_eq!(u, [2, 3]);
+    assert_eq!(v, [1, 100, 102, 104, 106, 108, 4, 5]);
+}
+
 #[test]
 fn into_iter() {
     let mut v: SmallVec<u8, 2> = SmallVec::new();
