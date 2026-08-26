@@ -101,6 +101,11 @@ use serde_core::{
 #[cfg(feature = "std")]
 use std::io;
 
+#[cfg(feature = "allocator-api2")]
+use allocator_api2::{*, alloc::*};
+#[cfg(not(feature = "allocator-api2"))]
+use core::alloc::*;
+
 /// Error type for APIs with fallible heap allocation
 #[derive(Debug)]
 pub enum CollectionAllocErr {
