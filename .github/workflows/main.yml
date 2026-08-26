@@ -36,6 +36,11 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
+          components: rustfmt
+      
+      - name: Style check
+        if: matrix.toolchain == 'nightly'
+        run: cargo fmt --all --check
 
       - name: Cargo build
         run: cargo build --verbose
