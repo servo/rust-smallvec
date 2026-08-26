@@ -79,6 +79,7 @@ use {
         ptr::{copy, copy_nonoverlapping, NonNull},
     },
 };
+
 #[cfg(feature = "internals")]
 pub use {rawsmallvec::RawSmallVec, taggedlen::TaggedLen};
 #[cfg(not(feature = "internals"))]
@@ -91,6 +92,7 @@ fn infallible<T>(result: Result<T, AllocationError>) -> T {
         Err(AllocationError::Failure { layout }) => alloc::alloc::handle_alloc_error(layout),
     }
 }
+
 #[inline]
 /// A local copy of [`core::slice::range`]. The latter function is unstable
 /// and thus cannot be used yet.
@@ -121,12 +123,14 @@ where
     }
     core::ops::Range { start, end }
 }
+
 #[repr(C)]
 pub struct SmallVec<T, const N: usize> {
     len: TaggedLen<T>,
     raw: RawSmallVec<T, N>,
     _marker: PhantomData<T>,
 }
+
 unsafe impl<T: Send, const N: usize> Send for SmallVec<T, N> {}
 unsafe impl<T: Sync, const N: usize> Sync for SmallVec<T, N> {}
 impl<T, const N: usize> Default for SmallVec<T, N> {
@@ -135,6 +139,7 @@ impl<T, const N: usize> Default for SmallVec<T, N> {
         Self::new()
     }
 }
+
 /// An iterator that removes the items from a `SmallVec` and yields them by
 /// value.
 ///
@@ -154,6 +159,7 @@ pub struct Drain<'a, T: 'a, const N: usize> {
     iter: core::slice::Iter<'a, T>,
     vec: core::ptr::NonNull<SmallVec<T, N>>,
 }
+
 impl<'a, T: 'a, const N: usize> Iterator for Drain<'a, T, N> {
     type Item = T;
     #[inline]
@@ -169,6 +175,7 @@ impl<'a, T: 'a, const N: usize> Iterator for Drain<'a, T, N> {
         self.iter.size_hint()
     }
 }
+
 impl<'a, T: 'a, const N: usize> DoubleEndedIterator for Drain<'a, T, N> {
     #[inline]
     fn next_back(&mut self) -> Option<T> {
@@ -178,12 +185,14 @@ impl<'a, T: 'a, const N: usize> DoubleEndedIterator for Drain<'a, T, N> {
             .map(|reference| unsafe { core::ptr::read(reference) })
     }
 }
+
 impl<T, const N: usize> ExactSizeIterator for Drain<'_, T, N> {
     #[inline]
     fn len(&self) -> usize {
         self.iter.len()
     }
 }
+
 impl<T, const N: usize> core::iter::FusedIterator for Drain<'_, T, N> {}
 impl<'a, T: 'a, const N: usize> Drop for Drain<'a, T, N> {
     fn drop(&mut self) {
@@ -249,6 +258,7 @@ impl<'a, T: 'a, const N: usize> Drop for Drain<'a, T, N> {
         }
     }
 }
+
 impl<T, const N: usize> Drain<'_, T, N> {
     #[must_use]
     pub fn as_slice(&self) -> &[T] {
@@ -298,6 +308,7 @@ impl<T, const N: usize> Drain<'_, T, N> {
         self.tail_start = new_tail_start;
     }
 }
+
 /// An iterator which uses a closure to determine if an element should be
 /// removed.
 ///
@@ -321,6 +332,7 @@ where
     /// The filter test predicate.
     pred: F,
 }
+
 impl<T, const N: usize, F> core::fmt::Debug for ExtractIf<'_, T, N, F>
 where
     F: FnMut(&mut T) -> bool,
@@ -332,6 +344,7 @@ where
             .finish()
     }
 }
+
 impl<T, F, const N: usize> Iterator for ExtractIf<'_, T, N, F>
 where
     F: FnMut(&mut T) -> bool,
@@ -364,6 +377,7 @@ where
         (0, Some(self.end - self.idx))
     }
 }
+
 impl<T, F, const N: usize> Drop for ExtractIf<'_, T, N, F>
 where
     F: FnMut(&mut T) -> bool,
@@ -387,10 +401,12 @@ where
         }
     }
 }
+
 pub struct Splice<'a, I: Iterator + 'a, const N: usize> {
     drain: Drain<'a, I::Item, N>,
     replace_with: I,
 }
+
 impl<'a, I, const N: usize> core::fmt::Debug for Splice<'a, I, N>
 where
     I: Debug + Iterator + 'a,
@@ -400,6 +416,7 @@ where
         f.debug_tuple("Splice").field(&self.drain).finish()
     }
 }
+
 impl<I: Iterator, const N: usize> Iterator for Splice<'_, I, N> {
     type Item = I::Item;
     fn next(&mut self) -> Option<Self::Item> {
@@ -409,11 +426,13 @@ impl<I: Iterator, const N: usize> Iterator for Splice<'_, I, N> {
         self.drain.size_hint()
     }
 }
+
 impl<I: Iterator, const N: usize> DoubleEndedIterator for Splice<'_, I, N> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.drain.next_back()
     }
 }
+
 impl<I: Iterator, const N: usize> ExactSizeIterator for Splice<'_, I, N> {}
 impl<I: Iterator, const N: usize> Drop for Splice<'_, I, N> {
     fn drop(&mut self) {
@@ -460,6 +479,7 @@ impl<I: Iterator, const N: usize> Drop for Splice<'_, I, N> {
         // `vec.len`.
     }
 }
+
 /// An iterator that consumes a `SmallVec` and yields its items by value.
 ///
 /// Returned from [`SmallVec::into_iter`][1].
@@ -476,6 +496,7 @@ pub struct IntoIter<T, const N: usize> {
     end: TaggedLen<T>,
     _marker: PhantomData<T>,
 }
+
 // SAFETY: IntoIter has unique ownership of its contents.  Sending (or sharing)
 // an `IntoIter<T, N>` is equivalent to sending (or sharing) a `SmallVec<T, N>`.
 unsafe impl<T, const N: usize> Send for IntoIter<T, N> where T: Send {}
@@ -519,6 +540,7 @@ impl<T, const N: usize> IntoIter<T, N> {
         }
     }
 }
+
 impl<T, const N: usize> Iterator for IntoIter<T, N> {
     type Item = T;
     #[inline]
@@ -541,6 +563,7 @@ impl<T, const N: usize> Iterator for IntoIter<T, N> {
         (size, Some(size))
     }
 }
+
 impl<T, const N: usize> DoubleEndedIterator for IntoIter<T, N> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -560,6 +583,7 @@ impl<T, const N: usize> DoubleEndedIterator for IntoIter<T, N> {
         }
     }
 }
+
 impl<T, const N: usize> ExactSizeIterator for IntoIter<T, N> {}
 impl<T, const N: usize> core::iter::FusedIterator for IntoIter<T, N> {}
 impl<T, const N: usize> SmallVec<T, N> {
@@ -652,6 +676,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 }
+
 impl<T, const N: usize> SmallVec<T, N> {
     const IS_ZST: bool = size_of::<T>() == 0;
     #[inline]
@@ -1475,6 +1500,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 }
+
 impl<T: Clone, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn resize(&mut self, len: usize, value: T) {
@@ -1581,10 +1607,12 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
         result
     }
 }
+
 struct DropGuard<T> {
     ptr: *mut T,
     len: usize,
 }
+
 impl<T> Drop for DropGuard<T> {
     #[inline]
     fn drop(&mut self) {
@@ -1593,11 +1621,13 @@ impl<T> Drop for DropGuard<T> {
         }
     }
 }
+
 struct DropDealloc {
     ptr: NonNull<u8>,
     size_bytes: usize,
     align: usize,
 }
+
 impl Drop for DropDealloc {
     #[inline]
     fn drop(&mut self) {
@@ -1611,6 +1641,7 @@ impl Drop for DropDealloc {
         }
     }
 }
+
 #[cfg(feature = "may_dangle")]
 unsafe impl<#[may_dangle] T, const N: usize> Drop for SmallVec<T, N> {
     fn drop(&mut self) {
@@ -1634,6 +1665,7 @@ unsafe impl<#[may_dangle] T, const N: usize> Drop for SmallVec<T, N> {
         }
     }
 }
+
 #[cfg(not(feature = "may_dangle"))]
 impl<T, const N: usize> Drop for SmallVec<T, N> {
     fn drop(&mut self) {
@@ -1656,6 +1688,7 @@ impl<T, const N: usize> Drop for SmallVec<T, N> {
         }
     }
 }
+
 impl<T, const N: usize> Drop for IntoIter<T, N> {
     fn drop(&mut self) {
         // SAFETY: see above
@@ -1678,6 +1711,7 @@ impl<T, const N: usize> Drop for IntoIter<T, N> {
         }
     }
 }
+
 /// This function is used in the [`smallvec`] macro.
 /// It is recommended to use the macro instead of using thís function.
 #[doc(hidden)]
@@ -1700,6 +1734,7 @@ pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N> 
         }
     }
 }
+
 #[cfg(feature = "specialization")]
 mod spec_traits {
     use super::*;
@@ -1969,6 +2004,7 @@ mod spec_traits {
         }
     }
 }
+
 /// Fallback functions for various specialized methods. These are kept in
 /// a separate implementation block for easy access whenever specialization is
 /// disabled.
@@ -2109,6 +2145,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         v
     }
 }
+
 impl<T: Clone, const N: usize> Clone for SmallVec<T, N> {
     #[inline]
     fn clone(&self) -> SmallVec<T, N> {
@@ -2126,12 +2163,14 @@ impl<T: Clone, const N: usize> Clone for SmallVec<T, N> {
         }
     }
 }
+
 impl<T: Clone, const N: usize> Clone for IntoIter<T, N> {
     #[inline]
     fn clone(&self) -> IntoIter<T, N> {
         SmallVec::from(self.as_slice()).into_iter()
     }
 }
+
 impl<T, const N: usize> Extend<T> for SmallVec<T, N> {
     #[inline]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
@@ -2145,6 +2184,7 @@ impl<T, const N: usize> Extend<T> for SmallVec<T, N> {
         }
     }
 }
+
 impl<'a, T: Clone + 'a, const N: usize> Extend<&'a T> for SmallVec<T, N> {
     #[inline]
     fn extend<I: IntoIterator<Item = &'a T>>(&mut self, iter: I) {
@@ -2158,6 +2198,7 @@ impl<'a, T: Clone + 'a, const N: usize> Extend<&'a T> for SmallVec<T, N> {
         }
     }
 }
+
 impl<T, const N: usize> core::iter::FromIterator<T> for SmallVec<T, N> {
     #[inline]
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
@@ -2171,6 +2212,7 @@ impl<T, const N: usize> core::iter::FromIterator<T> for SmallVec<T, N> {
         }
     }
 }
+
 #[macro_export]
 macro_rules! smallvec {
     ($elem:expr; $n:expr) => ({
@@ -2180,6 +2222,7 @@ macro_rules! smallvec {
         $crate::SmallVec::from([$($($x),+)?])
     });
 }
+
 #[macro_export]
 macro_rules! smallvec_inline {
     // count helper: transform any expression into 1
@@ -2192,6 +2235,7 @@ macro_rules! smallvec_inline {
         $crate::SmallVec::<_, N>::from_buf([$($x),*])
     });
 }
+
 impl<T, const N: usize> IntoIterator for SmallVec<T, N> {
     type IntoIter = IntoIter<T, N>;
     type Item = T;
@@ -2210,6 +2254,7 @@ impl<T, const N: usize> IntoIterator for SmallVec<T, N> {
         }
     }
 }
+
 impl<'a, T, const N: usize> IntoIterator for &'a SmallVec<T, N> {
     type IntoIter = core::slice::Iter<'a, T>;
     type Item = &'a T;
@@ -2217,6 +2262,7 @@ impl<'a, T, const N: usize> IntoIterator for &'a SmallVec<T, N> {
         self.iter()
     }
 }
+
 impl<'a, T, const N: usize> IntoIterator for &'a mut SmallVec<T, N> {
     type IntoIter = core::slice::IterMut<'a, T>;
     type Item = &'a mut T;
@@ -2224,23 +2270,28 @@ impl<'a, T, const N: usize> IntoIterator for &'a mut SmallVec<T, N> {
         self.iter_mut()
     }
 }
+
 impl<T: Hash, const N: usize> Hash for SmallVec<T, N> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.as_slice().hash(state)
     }
 }
+
 impl<T: Debug, const N: usize> Debug for SmallVec<T, N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_list().entries(self.iter()).finish()
     }
 }
+
 impl<T: Debug, const N: usize> Debug for IntoIter<T, N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("IntoIter").field(&self.as_slice()).finish()
     }
 }
+
 impl<T: Debug, const N: usize> Debug for Drain<'_, T, N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("Drain").field(&self.iter.as_slice()).finish()
     }
 }
+

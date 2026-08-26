@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+
 /// Vec guarantees that its length is always less than [`isize::MAX`] in
 /// *bytes*.
 ///
@@ -22,7 +23,9 @@ impl<T> Clone for TaggedLen<T> {
         self.0 = source.0;
     }
 }
+
 impl<T> Copy for TaggedLen<T> {}
+
 impl<T> TaggedLen<T> {
     const IS_ZST: bool = size_of::<T>() == 0;
     #[inline]

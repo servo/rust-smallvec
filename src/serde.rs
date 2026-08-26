@@ -7,6 +7,7 @@ use {
         Deserialize, Deserializer, Serialize, Serializer,
     },
 };
+
 impl<T, const N: usize> Serialize for SmallVec<T, N>
 where
     T: Serialize,
@@ -19,6 +20,7 @@ where
         state.end()
     }
 }
+
 impl<'de, T, const N: usize> Deserialize<'de> for SmallVec<T, N>
 where
     T: Deserialize<'de>,
@@ -29,9 +31,11 @@ where
         })
     }
 }
+
 struct SmallVecVisitor<T, const N: usize> {
     phantom: PhantomData<T>,
 }
+
 impl<'de, T, const N: usize> Visitor<'de> for SmallVecVisitor<T, N>
 where
     T: Deserialize<'de>,
@@ -54,3 +58,4 @@ where
         Ok(values)
     }
 }
+

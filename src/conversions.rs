@@ -5,12 +5,14 @@ use {
     alloc::vec::Vec,
     core::{mem::ManuallyDrop, ptr::copy_nonoverlapping},
 };
+
 impl<T: Clone, const M: usize, const N: usize> From<&mut [T; M]> for SmallVec<T, N> {
     #[inline]
     fn from(slice: &mut [T; M]) -> Self {
         Self::from(slice as &[T])
     }
 }
+
 impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N> {
     fn from(array: [T; M]) -> Self {
         if M > N {
@@ -31,11 +33,13 @@ impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N> {
         }
     }
 }
+
 impl<T, const N: usize> From<Vec<T>> for SmallVec<T, N> {
     fn from(array: Vec<T>) -> Self {
         Self::from_vec(array)
     }
 }
+
 impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N> {
     #[inline]
     fn from(slice: &[T]) -> Self {
@@ -57,12 +61,14 @@ impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N> {
         }
     }
 }
+
 impl<T: Clone, const N: usize> From<&mut [T]> for SmallVec<T, N> {
     #[inline]
     fn from(slice: &mut [T]) -> Self {
         Self::from(slice as &[T])
     }
 }
+
 impl<T: Clone, const M: usize, const N: usize> From<&[T; M]> for SmallVec<T, N> {
     #[inline]
     fn from(slice: &[T; M]) -> Self {

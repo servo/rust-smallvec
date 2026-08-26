@@ -1,4 +1,5 @@
 use super::SmallVec;
+
 impl<T, U, const N: usize, const M: usize> PartialEq<SmallVec<U, M>> for SmallVec<T, N>
 where
     T: PartialEq<U>,
@@ -8,7 +9,9 @@ where
         self.as_slice().eq(other.as_slice())
     }
 }
+
 impl<T, const N: usize> Eq for SmallVec<T, N> where T: Eq {}
+
 impl<T, U, const N: usize, const M: usize> PartialEq<[U; M]> for SmallVec<T, N>
 where
     T: PartialEq<U>,
@@ -18,6 +21,7 @@ where
         self[..] == other[..]
     }
 }
+
 impl<T, U, const N: usize, const M: usize> PartialEq<&[U; M]> for SmallVec<T, N>
 where
     T: PartialEq<U>,
@@ -27,6 +31,7 @@ where
         self[..] == other[..]
     }
 }
+
 impl<T, U, const N: usize> PartialEq<[U]> for SmallVec<T, N>
 where
     T: PartialEq<U>,
@@ -36,6 +41,7 @@ where
         self[..] == other[..]
     }
 }
+
 impl<T, U, const N: usize> PartialEq<&[U]> for SmallVec<T, N>
 where
     T: PartialEq<U>,
@@ -45,6 +51,7 @@ where
         self[..] == other[..]
     }
 }
+
 impl<T, U, const N: usize> PartialEq<&mut [U]> for SmallVec<T, N>
 where
     T: PartialEq<U>,
@@ -54,6 +61,7 @@ where
         self[..] == other[..]
     }
 }
+
 impl<T, const N: usize> PartialOrd for SmallVec<T, N>
 where
     T: PartialOrd,
@@ -63,6 +71,7 @@ where
         self.as_slice().partial_cmp(other.as_slice())
     }
 }
+
 impl<T, const N: usize> Ord for SmallVec<T, N>
 where
     T: Ord,
@@ -72,3 +81,4 @@ where
         self.as_slice().cmp(other.as_slice())
     }
 }
+

@@ -1,5 +1,7 @@
 extern crate std;
+
 use {super::SmallVec, std::io};
+
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl<const N: usize> io::Write for SmallVec<u8, N> {

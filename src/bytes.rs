@@ -2,6 +2,7 @@ use {
     super::SmallVec,
     bytes::{buf::UninitSlice, BufMut},
 };
+
 unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
     #[inline]
     fn remaining_mut(&self) -> usize {

@@ -6,6 +6,7 @@ use {
         ptr::{copy_nonoverlapping, NonNull},
     },
 };
+
 /// Either a stack array with `length <= N` or a heap array
 /// whose pointer and capacity are stored here.
 ///
@@ -16,6 +17,7 @@ pub union RawSmallVec<T, const N: usize> {
     pub inline: ManuallyDrop<MaybeUninit<[T; N]>>,
     pub heap: (NonNull<T>, usize),
 }
+
 impl<T, const N: usize> RawSmallVec<T, N> {
     pub const IS_ZST: bool = size_of::<T>() == 0;
     #[inline]

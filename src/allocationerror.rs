@@ -5,6 +5,7 @@ use {
         fmt::{Display, Formatter, Result as Format},
     },
 };
+
 /// Error type for APIs with fallible heap allocation
 #[derive(Debug)]
 pub enum AllocationError {
@@ -16,9 +17,11 @@ pub enum AllocationError {
         layout: Layout,
     },
 }
+
 impl Display for AllocationError {
     fn fmt(&self, f: &mut Formatter) -> Format {
         write!(f, "Allocation error: {:?}", self)
     }
 }
+
 impl Error for AllocationError {}
