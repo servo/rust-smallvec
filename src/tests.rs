@@ -820,6 +820,23 @@ fn test_serde() {
     );
 }
 
+#[cfg(feature = "borsh")]
+#[test]
+fn test_borsh() {
+    use borsh::{from_slice, to_vec};
+
+    let mut small_vec: SmallVec<i32, 2> = SmallVec::new();
+    small_vec.extend([1, 2, 3, 4]);
+
+    let bytes = to_vec(&small_vec).unwrap();
+    let decoded: SmallVec<i32, 2> = from_slice(&bytes).unwrap();
+    assert_eq!(small_vec, decoded);
+
+    // Round-trip should also match a plain Vec's encoding.
+    let vec_bytes = to_vec(&alloc::vec![1i32, 2, 3, 4]).unwrap();
+    assert_eq!(bytes, vec_bytes);
+}
+
 #[test]
 fn grow_to_shrink() {
     let mut v: SmallVec<u8, 2> = SmallVec::new();

@@ -30,6 +30,13 @@
 //! When this optional dependency is enabled, `SmallVec` implements the `serde::Serialize` and
 //! `serde::Deserialize` traits.
 //!
+//! ### `borsh`
+//!
+//! When this optional dependency is enabled, `SmallVec` implements the `borsh::BorshSerialize`
+//! and `borsh::BorshDeserialize` traits. Enabling the additional `borsh-unstable__schema`
+//! feature also implements `borsh::BorshSchema`, mirroring borsh's own `unstable__schema`
+//! feature (unstable because it depends on borsh's derive machinery).
+//!
 //! ### `specialization`
 //!
 //! **This feature is unstable and requires a nightly build of the Rust toolchain.**
@@ -93,6 +100,13 @@ use serde_core::{
     de::{Deserialize, Deserializer, SeqAccess, Visitor},
     ser::{Serialize, SerializeSeq, Serializer},
 };
+#[cfg(feature = "borsh")]
+use borsh::{
+    io::{Read, Result as BorshIoResult, Write},
+    BorshDeserialize, BorshSerialize,
+};
+#[cfg(feature = "borsh-unstable__schema")]
+use borsh::BorshSchema;
 #[cfg(feature = "std")]
 use std::io;
 
@@ -2912,6 +2926,48 @@ where
         }
 
         Ok(values)
+    }
+}
+
+#[cfg(feature = "borsh")]
+#[cfg_attr(docsrs, doc(cfg(feature = "borsh")))]
+impl<T, const N: usize> BorshSerialize for SmallVec<T, N>
+where
+    T: BorshSerialize,
+{
+    #[inline]
+    fn serialize<W: Write>(&self, writer: &mut W) -> BorshIoResult<()> {
+        self.as_slice().serialize(writer)
+    }
+}
+
+#[cfg(feature = "borsh")]
+#[cfg_attr(docsrs, doc(cfg(feature = "borsh")))]
+impl<T, const N: usize> BorshDeserialize for SmallVec<T, N>
+where
+    T: BorshDeserialize,
+{
+    #[inline]
+    fn deserialize_reader<R: Read>(reader: &mut R) -> BorshIoResult<Self> {
+        let items = <alloc::vec::Vec<T> as BorshDeserialize>::deserialize_reader(reader)?;
+        Ok(SmallVec::from_vec(items))
+    }
+}
+
+#[cfg(feature = "borsh-unstable__schema")]
+#[cfg_attr(docsrs, doc(cfg(feature = "borsh-unstable__schema")))]
+impl<T, const N: usize> BorshSchema for SmallVec<T, N>
+where
+    T: BorshSchema,
+{
+    fn add_definitions_recursively(
+        definitions: &mut alloc::collections::BTreeMap<borsh::schema::Declaration, borsh::schema::Definition>,
+    ) {
+        <alloc::vec::Vec<T> as BorshSchema>::add_definitions_recursively(definitions);
+    }
+
+    fn declaration() -> borsh::schema::Declaration {
+        <alloc::vec::Vec<T> as BorshSchema>::declaration()
     }
 }
 
