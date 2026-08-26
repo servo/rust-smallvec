@@ -1226,8 +1226,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         // SAFETY: the slot at `len` is free and properly aligned for `T`.
         unsafe { ptr.write(value) };
 
-        // SAFETY: all elements in `0..len + 1` are initialized.
-        //unsafe { self.set_len(len + 1) };
+        // LEGAL: all elements in `0..len + 1` are initialized.
         {
             // This block is an exact copy of `self.set_len`.
             // We have to do this so that Miri doesn't report a "Stacked Borrows" rule violation.
@@ -1546,8 +1545,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         // SAFETY: the slot at `index` is free and properly aligned for `T`.
         unsafe { ptr.write(value) };
 
-        // SAFETY: all elements in `0..len + 1` are initialized.
-        //unsafe { self.set_len(len + 1) };
+        // LEGAL: all elements in `0..len + 1` are initialized.
         {
             // This block is an exact copy of `self.set_len`.
             // We have to do this so that Miri doesn't report a "Stacked Borrows" rule violation.
