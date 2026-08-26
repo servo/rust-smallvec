@@ -79,7 +79,6 @@ use {
         ptr::{copy, copy_nonoverlapping, NonNull},
     },
 };
-
 #[cfg(feature = "internals")]
 pub use {rawsmallvec::RawSmallVec, taggedlen::TaggedLen};
 #[cfg(not(feature = "internals"))]
@@ -2294,4 +2293,3 @@ impl<T: Debug, const N: usize> Debug for Drain<'_, T, N> {
         f.debug_tuple("Drain").field(&self.iter.as_slice()).finish()
     }
 }
-

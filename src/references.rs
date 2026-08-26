@@ -45,4 +45,3 @@ impl<T, const N: usize> BorrowMut<[T]> for SmallVec<T, N> {
         self.as_mut_slice()
     }
 }
-
