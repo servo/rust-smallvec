@@ -248,7 +248,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             return Err(CollectionAllocErr::CapacityOverflow);
         }
 
-        let new_ptr = if len == 0 || !was_on_heap {
+        let new_ptr = if !was_on_heap {
             // get a fresh allocation
             let new_ptr = alloc(new_layout) as *mut T; // `new_layout` has nonzero size.
             let new_ptr =
