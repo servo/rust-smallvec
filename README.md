@@ -1,24 +1,25 @@
 rust-smallvec
 =============
 
-> **⚠️ Note:**
-> This is the code for smallvec 2.0, which is not yet ready for release.  For
-> details about the changes in version 2.0, please see [#183], [#240], and [#284].
-> The status of the v2 branch is tracked on [#425].
+> [!IMPORTANT]
+> This branch contains the code for SmallVec v2, which is not yet ready for release.
+> If your code is using any of the alpha version of SmallVec, beware that the API might
+> change between versions.
+>
+> The status of v2 can be tracked in:
+> - [its tracking issue](https://github.com/servo/rust-smallvec/issues/425)
+> - [the wiki spec](https://github.com/servo/rust-smallvec/wiki)
 >
 > The source code for the latest smallvec 1.x.y release can be found on the
-> [v1 branch].  Bug fixes for smallvec 1 should be based on that branch, while
+> [v1 branch](https://github.com/servo/rust-smallvec/tree/v1).  
+> Bug fixes for smallvec v1 should be based on that branch, while
 > new feature development should go on the v2 branch.
-
-[v1 branch]: https://github.com/servo/rust-smallvec/tree/v1
-[#183]: https://github.com/servo/rust-smallvec/issues/183
-[#240]: https://github.com/servo/rust-smallvec/issues/240
-[#284]: https://github.com/servo/rust-smallvec/issues/284
-[#425]: https://github.com/servo/rust-smallvec/issues/425
 
 ## About smallvec
 
 [Documentation](https://docs.rs/smallvec/)
+
+[Wiki](https://github.com/servo/rust-smallvec/wiki)
 
 [Release notes](https://github.com/servo/rust-smallvec/releases)
 

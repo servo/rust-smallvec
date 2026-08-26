@@ -1,12 +1,10 @@
 use crate::{smallvec, SmallVec};
-
-use core::hash::Hasher;
-use core::iter::FromIterator;
-
 use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::{vec, vec::Vec};
+use core::hash::Hasher;
+use core::iter::FromIterator;
 
 #[test]
 pub fn test_zero() {
@@ -17,7 +15,8 @@ pub fn test_zero() {
     assert_eq!(&*v, &[0]);
 }
 
-// We heap allocate all these strings so that double frees will show up under valgrind.
+// We heap allocate all these strings so that double frees will show up under
+// valgrind.
 
 #[test]
 pub fn test_push_mut() {
@@ -646,8 +645,8 @@ fn test_into_iter_as_slice() {
 
 #[test]
 fn test_into_iter_clone() {
-    // Test that the cloned iterator yields identical elements and that it owns its own copy
-    // (i.e. no use after move errors).
+    // Test that the cloned iterator yields identical elements and that it owns its
+    // own copy (i.e. no use after move errors).
     let mut iter = SmallVec::<u8, 2>::from_iter(0..3).into_iter();
     let mut clone_iter = iter.clone();
     while let Some(x) = iter.next() {
@@ -658,7 +657,8 @@ fn test_into_iter_clone() {
 
 #[test]
 fn test_into_iter_clone_partially_consumed_iterator() {
-    // Test that the cloned iterator only contains the remaining elements of the original iterator.
+    // Test that the cloned iterator only contains the remaining elements of the
+    // original iterator.
     let mut iter = SmallVec::<u8, 2>::from_iter(0..3).into_iter().skip(1);
     let mut clone_iter = iter.clone();
     while let Some(x) = iter.next() {
@@ -974,11 +974,13 @@ fn test_extract_if() {
     assert_eq!(b, SmallVec::<u8, 2>::from(&[3u8, 6]));
 }
 
-/// This assortment of tests, in combination with miri, verifies we handle UB on fishy arguments
-/// given to SmallVec. Draining and extending the allocation are fairly well-tested earlier, but
-/// `smallvec.insert(usize::MAX, val)` once slipped by!
+/// This assortment of tests, in combination with miri, verifies we handle UB on
+/// fishy arguments given to SmallVec. Draining and extending the allocation are
+/// fairly well-tested earlier, but `smallvec.insert(usize::MAX, val)` once
+/// slipped by!
 ///
-/// All code that indexes into SmallVecs should be tested with such "trivially wrong" args.
+/// All code that indexes into SmallVecs should be tested with such "trivially
+/// wrong" args.
 #[test]
 fn max_dont_panic() {
     let mut sv: SmallVec<i32, 2> = smallvec![0];
@@ -1018,12 +1020,13 @@ fn collect_from_iter() {
             self.0.next()
         }
 
-        // no implementation of size_hint means it returns (0, None) - which forces from_iter to
-        // grow the allocated space iteratively.
+        // no implementation of size_hint means it returns (0, None) - which forces
+        // from_iter to grow the allocated space iteratively.
     }
 
-    // A length of 3 is fine to trigger this bug under valgrind, but making the vector 1 million
-    // elements makes it crash - which is much easier to detect.
+    // A length of 3 is fine to trigger this bug under valgrind, but making the
+    // vector 1 million elements makes it crash - which is much easier to
+    // detect.
     let iter = IterNoHint(std::iter::repeat(1u8).take(1_000_000));
 
     let _y: SmallVec<u8, 1> = SmallVec::from_iter(iter);
