@@ -91,6 +91,13 @@ use core::ptr::copy;
 use core::ptr::copy_nonoverlapping;
 use core::ptr::NonNull;
 
+#[cfg(feature = "borsh-unstable__schema")]
+use borsh::BorshSchema;
+#[cfg(feature = "borsh")]
+use borsh::{
+    io::{Read, Result as BorshIoResult, Write},
+    BorshDeserialize, BorshSerialize,
+};
 #[cfg(feature = "bytes")]
 use bytes::{buf::UninitSlice, BufMut};
 #[cfg(feature = "malloc_size_of")]
@@ -100,13 +107,6 @@ use serde_core::{
     de::{Deserialize, Deserializer, SeqAccess, Visitor},
     ser::{Serialize, SerializeSeq, Serializer},
 };
-#[cfg(feature = "borsh")]
-use borsh::{
-    io::{Read, Result as BorshIoResult, Write},
-    BorshDeserialize, BorshSerialize,
-};
-#[cfg(feature = "borsh-unstable__schema")]
-use borsh::BorshSchema;
 #[cfg(feature = "std")]
 use std::io;
 
@@ -2949,8 +2949,20 @@ where
 {
     #[inline]
     fn deserialize_reader<R: Read>(reader: &mut R) -> BorshIoResult<Self> {
-        let items = <alloc::vec::Vec<T> as BorshDeserialize>::deserialize_reader(reader)?;
-        Ok(SmallVec::from_vec(items))
+        // Deserialize element-by-element (same wire format as Vec<T>: a u32 length
+        // prefix followed by that many elements) rather than building a Vec<T> and
+        // converting with `from_vec`, which would always keep the heap allocation -
+        // even a result with `len <= N` would spill. Pushing keeps it inline as long
+        // as it fits, matching how the `serde` Deserialize impl above behaves.
+        let len = u32::deserialize_reader(reader)?;
+        let mut result = SmallVec::new();
+        result.try_reserve(len as usize).map_err(|_| {
+            borsh::io::Error::new(borsh::io::ErrorKind::InvalidData, "allocation failure")
+        })?;
+        for _ in 0..len {
+            result.push(T::deserialize_reader(reader)?);
+        }
+        Ok(result)
     }
 }
 
@@ -2961,7 +2973,10 @@ where
     T: BorshSchema,
 {
     fn add_definitions_recursively(
-        definitions: &mut alloc::collections::BTreeMap<borsh::schema::Declaration, borsh::schema::Definition>,
+        definitions: &mut alloc::collections::BTreeMap<
+            borsh::schema::Declaration,
+            borsh::schema::Definition,
+        >,
     ) {
         <alloc::vec::Vec<T> as BorshSchema>::add_definitions_recursively(definitions);
     }

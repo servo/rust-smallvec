@@ -831,10 +831,20 @@ fn test_borsh() {
     let bytes = to_vec(&small_vec).unwrap();
     let decoded: SmallVec<i32, 2> = from_slice(&bytes).unwrap();
     assert_eq!(small_vec, decoded);
+    assert!(decoded.spilled()); // 4 elements > inline capacity of 2
 
     // Round-trip should also match a plain Vec's encoding.
     let vec_bytes = to_vec(&alloc::vec![1i32, 2, 3, 4]).unwrap();
     assert_eq!(bytes, vec_bytes);
+
+    // A result that fits inline should deserialize inline, not via a heap Vec
+    // conversion (regression test: an earlier version always spilled here).
+    let mut small: SmallVec<i32, 4> = SmallVec::new();
+    small.extend([1, 2]);
+    let small_bytes = to_vec(&small).unwrap();
+    let small_decoded: SmallVec<i32, 4> = from_slice(&small_bytes).unwrap();
+    assert_eq!(small, small_decoded);
+    assert!(!small_decoded.spilled());
 }
 
 #[test]
