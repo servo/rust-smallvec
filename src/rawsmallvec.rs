@@ -15,7 +15,7 @@ use {
 #[repr(C)]
 pub union RawSmallVec<T, const N: usize> {
     pub inline: ManuallyDrop<MaybeUninit<[T; N]>>,
-    pub heap: (NonNull<T>, usize)
+    pub heap: (NonNull<T>, usize),
 }
 
 impl<T, const N: usize> RawSmallVec<T, N> {

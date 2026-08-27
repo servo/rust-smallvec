@@ -78,12 +78,13 @@ mod taggedlen;
 #[cfg(test)]
 mod tests;
 
+pub use errors::CollectionAllocErr;
 #[cfg(feature = "internals")]
 pub use rawsmallvec::RawSmallVec;
 #[cfg(not(feature = "internals"))]
 use rawsmallvec::RawSmallVec;
 #[cfg(feature = "std")]
-use std::io;
+use std::io::{Result as WriteResult, Write};
 use {
     add_syntax::prepend,
     alloc::{alloc::Layout, boxed::Box, vec::Vec},
@@ -95,7 +96,6 @@ use {
         mem::{align_of, size_of, ManuallyDrop, MaybeUninit},
         ptr::{copy, copy_nonoverlapping, NonNull},
     },
-    errors::CollectionAllocErr,
     taggedlen::TaggedLen,
 };
 
@@ -2593,19 +2593,19 @@ impl<T: Debug, const N: usize> Debug for Drain<'_, T, N> {
 }
 
 #[cfg(feature = "std")]
-impl<const N: usize> io::Write for SmallVec<u8, N> {
+impl<const N: usize> Write for SmallVec<u8, N> {
     #[inline]
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> WriteResult<usize> {
         self.extend_from_slice(buf);
         Ok(buf.len())
     }
 
     #[inline]
-    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+    fn write_all(&mut self, buf: &[u8]) -> WriteResult<()> {
         self.extend_from_slice(buf);
         Ok(())
     }
 
     #[inline]
-    fn flush(&mut self) -> io::Result<()> { Ok(()) }
+    fn flush(&mut self) -> WriteResult<()> { Ok(()) }
 }
