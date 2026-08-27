@@ -83,6 +83,7 @@ use std::io::{
     Write
 };
 use {
+    add_syntax::prepend,
     alloc::{
         alloc::Layout,
         boxed::Box,
@@ -111,8 +112,7 @@ use {
             copy,
             copy_nonoverlapping
         }
-    },
-    add_syntax::prepend
+    }
 };
 
 /// Error type for APIs with fallible heap allocation
