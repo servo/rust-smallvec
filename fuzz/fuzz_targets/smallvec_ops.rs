@@ -58,7 +58,7 @@ fn do_test<const N: usize>(data: &[u8]) -> SmallVec<u8, N> {
             5 => {
                 v.pop();
             }
-            6 => v.grow(next_usize!(bytes) + v.len()),
+            6 => v.reserve_exact(next_usize!(bytes)),
             7 => {
                 if v.len() < CAP_GROWTH {
                     v.reserve(next_usize!(bytes))
