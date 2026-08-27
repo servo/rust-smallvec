@@ -1691,21 +1691,28 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn retain_mut<F: FnMut(&mut T) -> bool>(&mut self, mut f: F) {
-        let mut del = 0;
         let len = self.len();
+
+        if len == 0 {
+            // return early as hint to llvm, like what std does
+            return;
+        }
+
         let ptr = self.as_mut_ptr();
-        for i in 0..len {
+        let mut write_idx = 0;
+
+        for read_idx in 0..len {
             // SAFETY: all the pointers are in bounds
-            // `i - del` never overflows since `del <= i` is a maintained invariant
             unsafe {
-                if !f(&mut *ptr.add(i)) {
-                    del += 1;
-                } else if del > 0 {
-                    core::ptr::swap(ptr.add(i), ptr.add(i - del));
+                if f(&mut *ptr.add(read_idx)) {
+                    if write_idx < read_idx {
+                        core::ptr::swap(ptr.add(read_idx), ptr.add(write_idx));
+                    }
+                    write_idx += 1;
                 }
             }
         }
-        self.truncate(len - del);
+        self.truncate(write_idx);
     }
 
     #[inline]
