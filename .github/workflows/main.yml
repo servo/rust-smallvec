@@ -57,6 +57,10 @@ jobs:
         if: matrix.toolchain == 'nightly'
         run: cargo test --verbose --all-features
 
+      - name: Cargo doc all features
+        if: matrix.toolchain == 'nightly'
+        run: cargo doc --all-features
+
       - name: Cargo bench
         if: matrix.toolchain == 'nightly'
         run: cargo bench --verbose bench
