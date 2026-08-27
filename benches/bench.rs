@@ -3,8 +3,10 @@
 
 extern crate test;
 
-use smallvec::{smallvec, SmallVec};
-use test::Bencher;
+use {
+    smallvec::{smallvec, SmallVec},
+    test::Bencher,
+};
 
 const VEC_SIZE: usize = 16;
 const SPILLED_SIZE: usize = 100;
@@ -21,71 +23,39 @@ trait Vector<T>: for<'a> From<&'a [T]> + Extend<T> {
 }
 
 impl<T: Copy> Vector<T> for Vec<T> {
-    fn new() -> Self {
-        Self::with_capacity(VEC_SIZE)
-    }
+    fn new() -> Self { Self::with_capacity(VEC_SIZE) }
 
-    fn push(&mut self, val: T) {
-        self.push(val)
-    }
+    fn push(&mut self, val: T) { self.push(val) }
 
-    fn pop(&mut self) -> Option<T> {
-        self.pop()
-    }
+    fn pop(&mut self) -> Option<T> { self.pop() }
 
-    fn remove(&mut self, p: usize) -> T {
-        self.remove(p)
-    }
+    fn remove(&mut self, p: usize) -> T { self.remove(p) }
 
-    fn insert(&mut self, n: usize, val: T) {
-        self.insert(n, val)
-    }
+    fn insert(&mut self, n: usize, val: T) { self.insert(n, val) }
 
-    fn from_elem(val: T, n: usize) -> Self {
-        vec![val; n]
-    }
+    fn from_elem(val: T, n: usize) -> Self { vec![val; n] }
 
-    fn from_elems(val: &[T]) -> Self {
-        val.to_owned()
-    }
+    fn from_elems(val: &[T]) -> Self { val.to_owned() }
 
-    fn extend_from_slice(&mut self, other: &[T]) {
-        Vec::extend_from_slice(self, other)
-    }
+    fn extend_from_slice(&mut self, other: &[T]) { Vec::extend_from_slice(self, other) }
 }
 
 impl<T: Copy> Vector<T> for SmallVec<T, VEC_SIZE> {
-    fn new() -> Self {
-        Self::new()
-    }
+    fn new() -> Self { Self::new() }
 
-    fn push(&mut self, val: T) {
-        self.push(val)
-    }
+    fn push(&mut self, val: T) { self.push(val) }
 
-    fn pop(&mut self) -> Option<T> {
-        self.pop()
-    }
+    fn pop(&mut self) -> Option<T> { self.pop() }
 
-    fn remove(&mut self, p: usize) -> T {
-        self.remove(p)
-    }
+    fn remove(&mut self, p: usize) -> T { self.remove(p) }
 
-    fn insert(&mut self, n: usize, val: T) {
-        self.insert(n, val)
-    }
+    fn insert(&mut self, n: usize, val: T) { self.insert(n, val) }
 
-    fn from_elem(val: T, n: usize) -> Self {
-        smallvec![val; n]
-    }
+    fn from_elem(val: T, n: usize) -> Self { smallvec![val; n] }
 
-    fn from_elems(val: &[T]) -> Self {
-        SmallVec::from(val)
-    }
+    fn from_elems(val: &[T]) -> Self { SmallVec::from(val) }
 
-    fn extend_from_slice(&mut self, other: &[T]) {
-        SmallVec::extend_from_slice(self, other)
-    }
+    fn extend_from_slice(&mut self, other: &[T]) { SmallVec::extend_from_slice(self, other) }
 }
 
 macro_rules! make_benches {
@@ -153,9 +123,7 @@ make_benches! {
 
 fn gen_push<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     #[inline(never)]
-    fn push_noinline<V: Vector<u64>>(vec: &mut V, x: u64) {
-        vec.push(x);
-    }
+    fn push_noinline<V: Vector<u64>>(vec: &mut V, x: u64) { vec.push(x); }
 
     b.iter(|| {
         let mut vec = V::new();
@@ -168,9 +136,7 @@ fn gen_push<V: Vector<u64>>(n: u64, b: &mut Bencher) {
 
 fn gen_insert_push<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     #[inline(never)]
-    fn insert_push_noinline<V: Vector<u64>>(vec: &mut V, x: u64) {
-        vec.insert(x as usize, x);
-    }
+    fn insert_push_noinline<V: Vector<u64>>(vec: &mut V, x: u64) { vec.insert(x as usize, x); }
 
     b.iter(|| {
         let mut vec = V::new();
@@ -183,9 +149,7 @@ fn gen_insert_push<V: Vector<u64>>(n: u64, b: &mut Bencher) {
 
 fn gen_insert<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     #[inline(never)]
-    fn insert_noinline<V: Vector<u64>>(vec: &mut V, p: usize, x: u64) {
-        vec.insert(p, x)
-    }
+    fn insert_noinline<V: Vector<u64>>(vec: &mut V, p: usize, x: u64) { vec.insert(p, x) }
 
     b.iter(|| {
         let mut vec = V::new();
@@ -201,9 +165,7 @@ fn gen_insert<V: Vector<u64>>(n: u64, b: &mut Bencher) {
 
 fn gen_remove<V: Vector<u64>>(n: usize, b: &mut Bencher) {
     #[inline(never)]
-    fn remove_noinline<V: Vector<u64>>(vec: &mut V, p: usize) -> u64 {
-        vec.remove(p)
-    }
+    fn remove_noinline<V: Vector<u64>>(vec: &mut V, p: usize) -> u64 { vec.remove(p) }
 
     b.iter(|| {
         let mut vec = V::from_elem(0, n as _);

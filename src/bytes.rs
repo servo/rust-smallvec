@@ -4,13 +4,10 @@ use {
 };
 
 unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
-    #[inline]
     fn remaining_mut(&self) -> usize {
         // A vector can never have more than isize::MAX bytes
         isize::MAX as usize - self.len()
     }
-
-    #[inline]
     unsafe fn advance_mut(&mut self, cnt: usize) {
         let len = self.len();
         let remaining = self.capacity() - len;
@@ -22,8 +19,6 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
         // Addition will not overflow since the sum is at most the capacity.
         self.set_len(len + cnt);
     }
-
-    #[inline]
     fn chunk_mut(&mut self) -> &mut UninitSlice {
         if self.capacity() == self.len() {
             self.reserve(64); // Grow the smallvec
@@ -41,7 +36,6 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
 
     // Specialize these methods so they can skip checking `remaining_mut`
     // and `advance_mut`.
-    #[inline]
     fn put<T: bytes::Buf>(&mut self, mut src: T)
     where
         Self: Sized,
@@ -56,11 +50,7 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
             src.advance(l);
         }
     }
-
-    #[inline]
     fn put_slice(&mut self, src: &[u8]) { self.extend_from_slice(src); }
-
-    #[inline]
     fn put_bytes(&mut self, val: u8, cnt: usize) {
         // If the addition overflows, then the `resize` will fail.
         let new_len = self.len().saturating_add(cnt);

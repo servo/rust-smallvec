@@ -3,6 +3,12 @@
 version = 4
 
 [[package]]
+name = "add-syntax"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ff6415d4d71daf492fee3ffe63ab90322db5ebf7122d7bd46d09dbcd336fae34"
+
+[[package]]
 name = "bytes"
 version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -74,6 +80,7 @@ dependencies = [
 name = "smallvec"
 version = "2.0.0-alpha.12"
 dependencies = [
+ "add-syntax",
  "bytes",
  "malloc_size_of",
  "serde_core",

@@ -1,4 +1,9 @@
 wrap_comments = true
-imports_granularity = "Preserve"
+imports_granularity = "One"
 group_imports = "One"
 format_code_in_doc_comments = true
+error_on_line_overflow = true
+error_on_unformatted = true
+blank_lines_lower_bound = 0
+blank_lines_upper_bound = 1
+fn_single_line = true
