@@ -2285,7 +2285,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     }
 }
 
-impl<T: Clone, const N: usize, A: Allocator + Clone> SmallVec<T, N, A> {
+impl<T: Clone, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// Creates a [`SmallVec`] value from the slice `slice` with the specified
     /// allocator.
     pub fn from_slice_in(slice: &[T], alloc: A) -> Self {
