@@ -7,7 +7,7 @@ rust-smallvec
 > change between versions.
 >
 > The status of v2 can be tracked in:
-> - [its tracking issue](https://github.com/servo/rust-smallvec/issues/425)
+> - [the milestones](https://github.com/servo/rust-smallvec/milestones)
 > - [the wiki spec](https://github.com/servo/rust-smallvec/wiki)
 >
 > The source code for the latest smallvec 1.x.y release can be found on the
