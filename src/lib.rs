@@ -1304,7 +1304,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     }
 
     #[inline]
-    pub fn into_raw_parts_with_alloc(self) -> (*mut T, usize, usize, A) {
+    pub fn into_raw_parts_with_allocator(self) -> (*mut T, usize, usize, A) {
         let mut me = ManuallyDrop::new(self);
         let alloc = unsafe { core::ptr::read(me.allocator()) };
         (me.as_mut_ptr(), me.len(), me.capacity(), alloc)
@@ -1386,7 +1386,8 @@ macro_rules! make_heap_methods {
         $into_vec:ident,
         $into_boxed_slice:ident,
         $vec:path,
-        $box:path $(,)?
+        $box:path,
+        $into_raw_parts:ident $(,)?
     ) => {
         impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             #[inline]
@@ -1401,7 +1402,7 @@ macro_rules! make_heap_methods {
                     unsafe { vec.set_len(0) };
                     vec.shrink_to_fit();
 
-                    let (_ptr, _len, _cap, alloc) = vec.into_raw_parts_with_alloc();
+                    let (_ptr, _len, _cap, alloc) = vec.$into_raw_parts();
 
                     Self {
                         len: TaggedLen::new(len, false),
@@ -1409,8 +1410,8 @@ macro_rules! make_heap_methods {
                         _marker: PhantomData,
                     }
                 } else {
-                    // FIXME: Use `into_parts_with_alloc` once it is stable.
-                    let (ptr, len, cap, alloc) = vec.into_raw_parts_with_alloc();
+                    // FIXME: Use `into_parts_with_allocator` once it is stable/available.
+                    let (ptr, len, cap, alloc) = vec.$into_raw_parts();
                     // SAFETY: The pointer of a `Vec` is never null.
                     let ptr = unsafe { NonNull::new_unchecked(ptr) };
 
@@ -1471,6 +1472,7 @@ make_heap_methods! {
     into_boxed_slice,
     Vec<T, A>,
     Box<[T], A>,
+    into_raw_parts_with_allocator,
 }
 
 #[cfg(feature = "allocator-api2")]
@@ -1480,6 +1482,7 @@ make_heap_methods! {
     into_boxed_slice2,
     allocator_api2::vec::Vec<T, A>,
     allocator_api2::boxed::Box<[T], A>,
+    into_raw_parts_with_alloc,
 }
 
 /// Functions for interacting with `std` types whenever
