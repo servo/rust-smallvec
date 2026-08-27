@@ -391,14 +391,6 @@ fn test_append() {
 
 #[test]
 #[should_panic]
-fn test_invalid_grow() {
-    let mut v: SmallVec<u8, 8> = SmallVec::new();
-    v.extend(0..8);
-    v.grow(5);
-}
-
-#[test]
-#[should_panic]
 fn drain_overflow() {
     let mut v: SmallVec<u8, 8> = smallvec![0];
     v.drain(..=usize::MAX);
@@ -861,7 +853,7 @@ fn grow_to_shrink() {
     assert!(v.spilled());
     v.clear();
     // Shrink to inline.
-    v.grow(2);
+    v.shrink_to(2);
     assert!(!v.spilled());
     assert_eq!(v.capacity(), 2);
     assert_eq!(v.len(), 0);
@@ -886,20 +878,6 @@ fn resumable_extend() {
 fn uninhabited() {
     enum Void {}
     let _sv = SmallVec::<Void, 8>::new();
-}
-
-#[test]
-fn grow_spilled_same_size() {
-    let mut v: SmallVec<u8, 2> = SmallVec::new();
-    v.push(0);
-    v.push(1);
-    v.push(2);
-    assert!(v.spilled());
-    assert_eq!(v.capacity(), 4);
-    // grow with the same capacity
-    v.grow(4);
-    assert_eq!(v.capacity(), 4);
-    assert_eq!(v[..], [0, 1, 2]);
 }
 
 #[test]
