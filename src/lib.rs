@@ -1504,9 +1504,12 @@ impl<T, const N: usize> SmallVec<T, N> {
             }
         } else {
             // FIXME: Use `into_parts` once it is stable.
-            let (ptr, len, cap) = vec.into_raw_parts();
+            // `into_raw_parts` cannot be use here because of the crates MSRV.
+            let mut vec = ManuallyDrop::new(vec);
+            let len = vec.len();
+            let cap = vec.capacity();
             // SAFETY: The pointer of a `Vec` is never null.
-            let ptr = unsafe { NonNull::new_unchecked(ptr) };
+            let ptr = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
 
             Self {
                 len: TaggedLen::new(len, true),
