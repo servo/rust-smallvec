@@ -28,6 +28,12 @@ add-syntax = "0.1.0"
 
 [dev-dependencies]
 serde_test = "1.0"
+criterion = "0.4.0"
+
+[[bench]]
+name = "bench"
+path = "benches/bench.rs"
+harness = false
 
 [package.metadata.docs.rs]
 all-features = true

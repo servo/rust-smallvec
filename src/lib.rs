@@ -1054,18 +1054,17 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn pop(&mut self) -> Option<T> {
-        if self.is_empty() {
-            None
-        } else {
-            let len = self.len() - 1;
-            // SAFETY: len < old_len since this can't overflow, because the old length is
-            // non zero
-            unsafe { self.set_len(len) };
-            // SAFETY: this element was initialized and we just gave up ownership of it, so
-            // we can give it away
-            let value = unsafe { self.as_mut_ptr().add(len).read() };
-            Some(value)
+        let len = self.len();
+        if len == 0 {
+            return None;
         }
+        let new_len = len - 1;
+        // SAFETY: new_len < len since len is non-zero
+        unsafe { self.set_len(new_len) };
+        // SAFETY: this element was initialized and we just gave up ownership of it, so
+        // we can give it away
+        let value = unsafe { self.as_mut_ptr().add(new_len).read() };
+        Some(value)
     }
 
     #[inline]
@@ -1461,21 +1460,28 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn retain_mut<F: FnMut(&mut T) -> bool>(&mut self, mut f: F) {
-        let mut del = 0;
         let len = self.len();
+
+        if len == 0 {
+            // return early as hint to llvm, like what std does
+            return;
+        }
+
         let ptr = self.as_mut_ptr();
-        for i in 0..len {
+        let mut write_idx = 0;
+
+        for read_idx in 0..len {
             // SAFETY: all the pointers are in bounds
-            // `i - del` never overflows since `del <= i` is a maintained invariant
             unsafe {
-                if !f(&mut *ptr.add(i)) {
-                    del += 1;
-                } else if del > 0 {
-                    core::ptr::swap(ptr.add(i), ptr.add(i - del));
+                if f(&mut *ptr.add(read_idx)) {
+                    if write_idx < read_idx {
+                        core::ptr::swap(ptr.add(read_idx), ptr.add(write_idx));
+                    }
+                    write_idx += 1;
                 }
             }
         }
-        self.truncate(len - del);
+        self.truncate(write_idx);
     }
 
     #[inline]
