@@ -1,10 +1,10 @@
-use crate::{smallvec, SmallVec};
-use alloc::borrow::ToOwned;
-use alloc::boxed::Box;
-use alloc::rc::Rc;
-use alloc::{vec, vec::Vec};
 use core::hash::Hasher;
 use core::iter::FromIterator;
+use smallvec::{smallvec, SmallVec};
+use std::borrow::ToOwned;
+use std::boxed::Box;
+use std::rc::Rc;
+use std::{vec, vec::Vec};
 
 #[test]
 pub fn test_zero() {
@@ -926,10 +926,10 @@ const fn const_new_inner() -> SmallVec<i32, 4> {
     SmallVec::<i32, 4>::new()
 }
 const fn const_new_inline_sized() -> SmallVec<i32, 4> {
-    crate::smallvec_inline![1; 4]
+    smallvec::smallvec_inline![1; 4]
 }
 const fn const_new_inline_args() -> SmallVec<i32, 2> {
-    crate::smallvec_inline![1, 4]
+    smallvec::smallvec_inline![1, 4]
 }
 
 #[test]
@@ -1075,7 +1075,7 @@ fn test_spare_capacity_mut() {
 mod buf_mut {
     use bytes::BufMut as _;
 
-    type SmallVec = crate::SmallVec<u8, 8>;
+    type SmallVec = smallvec::SmallVec<u8, 8>;
 
     #[test]
     fn test_smallvec_as_mut_buf() {
