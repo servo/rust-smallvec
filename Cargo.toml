@@ -11,7 +11,7 @@ keywords = ["small", "vec", "vector", "stack", "no_std"]
 categories = ["data-structures"]
 readme = "README.md"
 documentation = "https://docs.rs/smallvec/"
-exclude = [".gitignore", "tests/", "scripts/", "fuzz/", "benches/", ".github/"]
+exclude = [".gitignore", "tests/", "fuzz/", "benches/", ".github/"]
 
 [features]
 std = []

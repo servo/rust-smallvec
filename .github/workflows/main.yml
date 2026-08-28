@@ -34,7 +34,7 @@ jobs:
         
       - name: Style check
         if: matrix.toolchain == 'nightly'
-        run: cargo fmt --all --check
+        run: rustup component add rustfmt && cargo fmt --all --check
 
       - name: Cargo build
         run: cargo build --verbose
@@ -48,7 +48,7 @@ jobs:
 
       - name: Cargo doc all features
         if: matrix.toolchain == 'nightly'
-        run: rustup component add rustfmt && cargo doc --all-features --verbose
+        run: cargo doc --all-features --verbose
 
       - name: Cargo bench all features
         if: matrix.toolchain == 'nightly'
