@@ -31,7 +31,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
-          components: rustfmt, miri
         
       - name: Style check
         if: matrix.toolchain == 'nightly'
@@ -49,7 +48,7 @@ jobs:
 
       - name: Cargo doc all features
         if: matrix.toolchain == 'nightly'
-        run: cargo doc --all-features --verbose
+        run: rustup component add rustfmt && cargo doc --all-features --verbose
 
       - name: Cargo bench all features
         if: matrix.toolchain == 'nightly'
@@ -57,7 +56,7 @@ jobs:
 
       - name: miri
         if: matrix.toolchain == 'nightly'
-        run: cargo miri test --verbose --all-features
+        run: rustup component add miri && cargo miri test --verbose --all-features
 
       - name: fuzz
         if: matrix.fuzz == 1
