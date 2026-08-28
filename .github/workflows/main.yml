@@ -31,27 +31,16 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
-          components: rustfmt
         
       - name: Style check
         if: matrix.toolchain == 'nightly'
-        run: cargo fmt --all --check
+        run: rustup component add rustfmt && cargo fmt --all --check
 
       - name: Cargo build
         run: cargo build --verbose
 
-      - name: Cargo test
+      - name: Cargo test no features
         run: cargo test --verbose
-
-      - name: Cargo test w/ serde
-        run: cargo test --verbose --features serde
-
-      - name: Cargo test w/ malloc_size_of
-        run: cargo test --verbose --features malloc_size_of
-
-      - name: Cargo check w/o default features
-        if: matrix.toolchain == 'nightly'
-        run: cargo check --verbose --no-default-features
 
       - name: Cargo test all features
         if: matrix.toolchain == 'nightly'
@@ -59,15 +48,15 @@ jobs:
 
       - name: Cargo doc all features
         if: matrix.toolchain == 'nightly'
-        run: cargo doc --all-features
+        run: cargo doc --all-features --verbose
 
-      - name: Cargo bench
+      - name: Cargo bench all features
         if: matrix.toolchain == 'nightly'
-        run: cargo bench --verbose bench
+        run: cargo bench --verbose --all-features
 
       - name: miri
         if: matrix.toolchain == 'nightly'
-        run: bash ./scripts/run_miri.sh
+        run: rustup component add miri && cargo miri test --verbose --all-features
 
       - name: fuzz
         if: matrix.fuzz == 1
