@@ -1821,6 +1821,67 @@ impl<T, const N: usize> SmallVec<T, N> {
             _marker: PhantomData
         }
     }
+
+    /// Decomposes a `SmallVec<T, N>` into its raw components: `(pointer,
+    /// length, capacity)`.
+    ///
+    /// Returns the raw pointer to the underlying data, the length of
+    /// the vector (in elements), and the allocated capacity of the
+    /// data (in elements). These are the same arguments in the same
+    /// order as the arguments to [`from_raw_parts`].
+    ///
+    /// After calling this function, the caller is responsible for the
+    /// memory previously managed by the `SmallVec`. Most often, one does
+    /// this by converting the raw pointer, length, and capacity back
+    /// into a `SmallVec` with the [`from_raw_parts`] function; more generally,
+    /// if `T` is non-zero-sized and the capacity is nonzero, one may use
+    /// any method that calls [`dealloc`] with a layout of
+    /// `Layout::array::<T>(capacity)`; if `T` is zero-sized or the
+    /// capacity is zero, nothing needs to be done.
+    ///
+    /// [`from_raw_parts`]: SmallVec::from_raw_parts
+    /// [`dealloc`]: alloc::alloc::GlobalAlloc::dealloc
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the contents are not spilled on the heap.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use smallvec::SmallVec;
+    ///
+    /// let v: SmallVec<i32, 1> = SmallVec::from([-1, 0, 1]);
+    ///
+    /// let (ptr, len, cap) = v.into_raw_parts();
+    ///
+    /// let rebuilt = unsafe {
+    ///     // We can now make changes to the components, such as
+    ///     // transmuting the raw pointer to a compatible type.
+    ///     let ptr = ptr as *mut u32;
+    ///
+    ///     SmallVec::<u32, 5>::from_raw_parts(ptr, len, cap)
+    /// };
+    /// assert_eq!(rebuilt, [4294967295, 0, 1]);
+    /// ```
+    #[inline]
+    pub fn into_raw_parts(self) -> (*mut T, usize, usize) {
+        #[cold]
+        #[inline(never)]
+        #[track_caller]
+        fn assert_failed() -> ! {
+            panic!(
+                "SmallVec::into_raw_parts() called on inline (stack) SmallVec, \
+                 which cannot be safely leaked"
+            );
+        }
+        if !self.spilled() {
+            assert_failed();
+        }
+
+        let mut me = ManuallyDrop::new(self);
+        (me.as_mut_ptr(), me.len(), me.capacity())
+    }
 }
 
 impl<T: Clone, const N: usize> SmallVec<T, N> {
