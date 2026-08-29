@@ -126,6 +126,19 @@ fn test_with_capacity() {
 }
 
 #[test]
+fn test_try_with_capacity() {
+    let v: SmallVec<u8, 3> = SmallVec::try_with_capacity(1).unwrap();
+    assert!(v.is_empty());
+    assert!(!v.spilled());
+    assert_eq!(v.capacity(), 3);
+
+    let v: SmallVec<u8, 3> = SmallVec::try_with_capacity(10).unwrap();
+    assert!(v.is_empty());
+    assert!(v.spilled());
+    assert_eq!(v.capacity(), 10);
+}
+
+#[test]
 fn drain() {
     let mut v: SmallVec<u8, 2> = SmallVec::new();
     v.push(3);

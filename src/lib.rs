@@ -849,6 +849,19 @@ impl<T, const N: usize> SmallVec<T, N> {
         this
     }
 
+    /// Constructs a new, empty `SmallVec` with at least the specified capacity,
+    /// returning an error if the allocation fails.
+    ///
+    /// This is the fallible version of [`with_capacity`](Self::with_capacity).
+    #[inline]
+    pub fn try_with_capacity(capacity: usize) -> Result<Self, CollectionAllocErr> {
+        let mut this = Self::new();
+        if capacity > Self::inline_size() {
+            this.try_grow(capacity)?;
+        }
+        Ok(this)
+    }
+
     #[inline]
     pub const fn from_buf<const S: usize>(elements: [T; S]) -> Self {
         const {
