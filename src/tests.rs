@@ -1,4 +1,4 @@
-use crate::{smallvec, SmallVec};
+use crate::SmallVec;
 use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
 use alloc::rc::Rc;
@@ -167,7 +167,7 @@ fn drain_rev() {
 
 #[test]
 fn drain_forget() {
-    let mut v: SmallVec<u8, 1> = smallvec![0, 1, 2, 3, 4, 5, 6, 7];
+    let mut v: SmallVec<u8, 1> = SmallVec::from([0, 1, 2, 3, 4, 5, 6, 7]);
     std::mem::forget(v.drain(2..5));
     assert_eq!(v.len(), 2);
 }
@@ -175,21 +175,21 @@ fn drain_forget() {
 #[test]
 fn splice() {
     // The range starts right before the end.
-    let mut v: SmallVec<u8, 1> = smallvec![0, 1, 2, 3, 4, 5, 6];
+    let mut v: SmallVec<u8, 1> = SmallVec::from([0, 1, 2, 3, 4, 5, 6]);
     let new = [7, 8, 9, 10];
     let u: SmallVec<u8, 1> = v.splice(6.., new).collect();
     assert_eq!(v, [0, 1, 2, 3, 4, 5, 7, 8, 9, 10]);
     assert_eq!(u, [6]);
 
     // The range is empty.
-    let mut v: SmallVec<u8, 1> = smallvec![0, 1, 2, 3, 4, 5, 6];
+    let mut v: SmallVec<u8, 1> = SmallVec::from([0, 1, 2, 3, 4, 5, 6]);
     let new = [7, 8, 9, 10];
     let u: SmallVec<u8, 1> = v.splice(1..1, new).collect();
     assert_eq!(v, [0, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6]);
     assert_eq!(u, [0u8; 0]);
 
     // The range is at the beginning and nonempty.
-    let mut v: SmallVec<u8, 1> = smallvec![0, 1, 2, 3, 4, 5, 6];
+    let mut v: SmallVec<u8, 1> = SmallVec::from([0, 1, 2, 3, 4, 5, 6]);
     let new = [7, 8, 9, 10];
     let u: SmallVec<u8, 1> = v.splice(..3, new).collect();
     assert_eq!(v, [7, 8, 9, 10, 3, 4, 5, 6]);
@@ -338,7 +338,7 @@ fn test_truncate_references() {
 
 #[test]
 fn test_split_off() {
-    let mut vec: SmallVec<u32, 4> = smallvec![1, 2, 3, 4, 5, 6];
+    let mut vec: SmallVec<u32, 4> = SmallVec::from([1, 2, 3, 4, 5, 6]);
     let orig_ptr = vec.as_ptr();
     let orig_capacity = vec.capacity();
 
@@ -400,7 +400,7 @@ fn test_invalid_grow() {
 #[test]
 #[should_panic]
 fn drain_overflow() {
-    let mut v: SmallVec<u8, 8> = smallvec![0];
+    let mut v: SmallVec<u8, 8> = SmallVec::from([0]);
     v.drain(..=usize::MAX);
 }
 
@@ -420,7 +420,7 @@ fn test_extend_from_slice() {
 
 #[test]
 fn test_extend_from_within() {
-    let mut v: SmallVec<u8, 8> = smallvec![0, 1, 2, 3];
+    let mut v: SmallVec<u8, 8> = SmallVec::from([0, 1, 2, 3]);
     v.extend_from_within(1..3);
     assert_eq!(
         &v.iter().map(|v| *v).collect::<Vec<_>>(),
@@ -703,15 +703,16 @@ fn test_into_vec() {
 #[test]
 fn test_into_inner() {
     let vec = SmallVec::<u8, 2>::from_iter(0..2);
-    assert_eq!(vec.into_inner(), Ok([0, 1]));
+    assert_eq!(vec.try_into(), Ok([0, 1]));
 
     let vec = SmallVec::<u8, 2>::from_iter(0..1);
-    assert_eq!(vec.clone().into_inner(), Err(vec));
+    assert_eq!(vec.clone().try_into(), Err::<[u8; 7], SmallVec<u8, 2>>(vec));
 
     let vec = SmallVec::<u8, 2>::from_iter(0..3);
-    assert_eq!(vec.clone().into_inner(), Err(vec));
+    assert_eq!(vec.clone().try_into(), Err::<[u8; 1], SmallVec<u8, 2>>(vec));
 }
 
+#[test]
 fn test_try_into_array() {
     // Inline < capacity
     let vec = SmallVec::<u8, 2>::from_iter(0..1);
@@ -946,15 +947,10 @@ const fn const_new_inner() -> SmallVec<i32, 4> {
     SmallVec::<i32, 4>::new()
 }
 const fn const_new_inline_sized() -> SmallVec<i32, 4> {
-    crate::smallvec_inline![1; 4]
+    SmallVec::from_buf([1; 4])
 }
 const fn const_new_inline_args() -> SmallVec<i32, 2> {
-    crate::smallvec_inline![1, 4]
-}
-
-#[test]
-fn empty_macro() {
-    let _v: SmallVec<u8, 1> = smallvec![];
+    SmallVec::from_buf([1, 4])
 }
 
 #[test]
@@ -986,7 +982,7 @@ fn test_clone_from() {
 
 #[test]
 fn test_extract_if() {
-    let mut a: SmallVec<u8, 2> = smallvec![0, 1u8, 2, 3, 4, 5, 6, 7, 8, 0];
+    let mut a: SmallVec<u8, 2> = SmallVec::from([0, 1u8, 2, 3, 4, 5, 6, 7, 8, 0]);
 
     let b: SmallVec<u8, 2> = a.extract_if(1..9, |x| *x % 3 == 0).collect();
 
@@ -1003,7 +999,7 @@ fn test_extract_if() {
 /// wrong" args.
 #[test]
 fn max_dont_panic() {
-    let mut sv: SmallVec<i32, 2> = smallvec![0];
+    let mut sv: SmallVec<i32, 2> = SmallVec::from([0]);
     let _ = sv.get(usize::MAX);
     sv.truncate(usize::MAX);
 }
@@ -1011,21 +1007,21 @@ fn max_dont_panic() {
 #[test]
 #[should_panic]
 fn max_remove() {
-    let mut sv: SmallVec<i32, 2> = smallvec![0];
+    let mut sv: SmallVec<i32, 2> = SmallVec::from([0]);
     sv.remove(usize::MAX);
 }
 
 #[test]
 #[should_panic]
 fn max_swap_remove() {
-    let mut sv: SmallVec<i32, 2> = smallvec![0];
+    let mut sv: SmallVec<i32, 2> = SmallVec::from([0]);
     sv.swap_remove(usize::MAX);
 }
 
 #[test]
 #[should_panic]
 fn max_insert() {
-    let mut sv: SmallVec<i32, 2> = smallvec![0];
+    let mut sv: SmallVec<i32, 2> = SmallVec::from([0]);
     sv.insert(usize::MAX, 0);
 }
 
