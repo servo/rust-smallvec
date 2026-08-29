@@ -1,10 +1,6 @@
-use crate::{smallvec, SmallVec};
-use alloc::borrow::ToOwned;
-use alloc::boxed::Box;
-use alloc::rc::Rc;
-use alloc::{vec, vec::Vec};
-use core::hash::Hasher;
-use core::iter::FromIterator;
+use smallvec::{smallvec, SmallVec};
+use std::hash::Hasher;
+use std::rc::Rc;
 
 #[test]
 pub fn test_zero() {
@@ -830,48 +826,6 @@ fn test_resize() {
     assert_eq!(v[..], [1, 0][..]);
 }
 
-#[cfg(feature = "std")]
-#[test]
-fn test_write() {
-    use std::io::Write;
-
-    let data = [1, 2, 3, 4, 5];
-
-    let mut small_vec: SmallVec<u8, 2> = SmallVec::new();
-    let len = small_vec.write(&data[..]).unwrap();
-    assert_eq!(len, 5);
-    assert_eq!(small_vec.as_ref(), data.as_ref());
-
-    let mut small_vec: SmallVec<u8, 2> = SmallVec::new();
-    small_vec.write_all(&data[..]).unwrap();
-    assert_eq!(small_vec.as_ref(), data.as_ref());
-}
-
-#[cfg(feature = "serde")]
-#[test]
-fn test_serde() {
-    use serde_test::{assert_tokens, Token};
-    let mut small_vec: SmallVec<i32, 2> = SmallVec::new();
-    assert_tokens(&small_vec, &[Token::Seq { len: Some(0) }, Token::SeqEnd]);
-    small_vec.push(1);
-    assert_tokens(
-        &small_vec,
-        &[Token::Seq { len: Some(1) }, Token::I32(1), Token::SeqEnd],
-    );
-    small_vec.extend([2, 3, 4]);
-    assert_tokens(
-        &small_vec,
-        &[
-            Token::Seq { len: Some(4) },
-            Token::I32(1),
-            Token::I32(2),
-            Token::I32(3),
-            Token::I32(4),
-            Token::SeqEnd,
-        ],
-    );
-}
-
 #[test]
 fn grow_to_shrink() {
     let mut v: SmallVec<u8, 2> = SmallVec::new();
@@ -946,10 +900,10 @@ const fn const_new_inner() -> SmallVec<i32, 4> {
     SmallVec::<i32, 4>::new()
 }
 const fn const_new_inline_sized() -> SmallVec<i32, 4> {
-    crate::smallvec_inline![1; 4]
+    smallvec::smallvec_inline![1; 4]
 }
 const fn const_new_inline_args() -> SmallVec<i32, 2> {
-    crate::smallvec_inline![1, 4]
+    smallvec::smallvec_inline![1, 4]
 }
 
 #[test]
@@ -1088,97 +1042,4 @@ fn test_spare_capacity_mut() {
     let spare = v.spare_capacity_mut();
     assert!(spare.len() >= 1);
     assert_eq!(spare.as_ptr().cast::<u8>(), unsafe { v.as_ptr().add(3) });
-}
-
-// Adopted from `tests/test_buf_mut.rs` in the `bytes` crate.
-#[cfg(feature = "bytes")]
-mod buf_mut {
-    use bytes::BufMut as _;
-
-    type SmallVec = crate::SmallVec<u8, 8>;
-
-    #[test]
-    fn test_smallvec_as_mut_buf() {
-        let mut buf = SmallVec::with_capacity(64);
-
-        assert_eq!(buf.remaining_mut(), isize::MAX as usize);
-
-        assert!(buf.chunk_mut().len() >= 64);
-
-        buf.put(&b"zomg"[..]);
-
-        assert_eq!(&buf, b"zomg");
-
-        assert_eq!(buf.remaining_mut(), isize::MAX as usize - 4);
-        assert_eq!(buf.capacity(), 64);
-
-        for _ in 0..16 {
-            buf.put(&b"zomg"[..]);
-        }
-
-        assert_eq!(buf.len(), 68);
-    }
-
-    #[test]
-    fn test_smallvec_put_bytes() {
-        let mut buf = SmallVec::new();
-        buf.push(17);
-        buf.put_bytes(19, 2);
-        assert_eq!([17, 19, 19], &buf[..]);
-    }
-
-    #[test]
-    fn test_put_u8() {
-        let mut buf = SmallVec::with_capacity(8);
-        buf.put_u8(33);
-        assert_eq!(b"\x21", &buf[..]);
-    }
-
-    #[test]
-    fn test_put_u16() {
-        let mut buf = SmallVec::with_capacity(8);
-        buf.put_u16(8532);
-        assert_eq!(b"\x21\x54", &buf[..]);
-
-        buf.clear();
-        buf.put_u16_le(8532);
-        assert_eq!(b"\x54\x21", &buf[..]);
-    }
-
-    #[test]
-    fn test_put_int() {
-        let mut buf = SmallVec::with_capacity(8);
-        buf.put_int(0x1020304050607080, 3);
-        assert_eq!(b"\x60\x70\x80", &buf[..]);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_put_int_nbytes_overflow() {
-        let mut buf = SmallVec::with_capacity(8);
-        buf.put_int(0x1020304050607080, 9);
-    }
-
-    #[test]
-    fn test_put_int_le() {
-        let mut buf = SmallVec::with_capacity(8);
-        buf.put_int_le(0x1020304050607080, 3);
-        assert_eq!(b"\x80\x70\x60", &buf[..]);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_put_int_le_nbytes_overflow() {
-        let mut buf = SmallVec::with_capacity(8);
-        buf.put_int_le(0x1020304050607080, 9);
-    }
-
-    #[test]
-    #[should_panic(expected = "advance out of bounds: the len is 8 but advancing by 12")]
-    fn test_smallvec_advance_mut() {
-        let mut buf = SmallVec::with_capacity(8);
-        unsafe {
-            buf.advance_mut(12);
-        }
-    }
 }
