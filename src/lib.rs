@@ -1668,6 +1668,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
+    #[deprecated(since = "2.0.0-alpha.13", note = "use `TryInto::<[T; N]>::into` instead")]
     pub fn into_inner(self) -> Result<[T; N], Self> {
         if self.len() != N {
             Err(self)
@@ -2685,6 +2686,25 @@ impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N> {
                 this.set_len(M);
             }
             this
+        }
+    }
+}
+
+impl<T, const N: usize, const M: usize> TryFrom<SmallVec<T, N>> for [T; M] {
+    type Error = SmallVec<T, N>;
+
+    #[inline]
+    fn try_from(mut this: SmallVec<T, N>) -> Result<[T; M], SmallVec<T, N>> {
+        if this.len() != M {
+            Err(this)
+        } else {
+            // SAFETY: we release ownership of the elements we hold
+            unsafe {
+                this.set_len(0);
+            }
+            let ptr = this.as_ptr() as *const [T; M];
+            // SAFETY: these elements are initialized since the length was `M`
+            unsafe { Ok(ptr.read()) }
         }
     }
 }

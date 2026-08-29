@@ -712,6 +712,26 @@ fn test_into_inner() {
     assert_eq!(vec.clone().into_inner(), Err(vec));
 }
 
+fn test_try_into_array() {
+    // Inline < capacity
+    let vec = SmallVec::<u8, 2>::from_iter(0..1);
+    assert_eq!(<[u8; 0]>::try_from(vec.clone()), Err(vec.clone()));
+    assert_eq!(<[u8; 1]>::try_from(vec.clone()), Ok([0]));
+    assert_eq!(<[u8; 2]>::try_from(vec.clone()), Err(vec));
+
+    // Inline == capacity
+    let vec = SmallVec::<u8, 2>::from_iter(0..2);
+    assert_eq!(<[u8; 1]>::try_from(vec.clone()), Err(vec.clone()));
+    assert_eq!(<[u8; 2]>::try_from(vec.clone()), Ok([0, 1]));
+    assert_eq!(<[u8; 3]>::try_from(vec.clone()), Err(vec));
+
+    // Heap
+    let vec = SmallVec::<u8, 2>::from_iter(0..3);
+    assert_eq!(<[u8; 2]>::try_from(vec.clone()), Err(vec.clone()));
+    assert_eq!(<[u8; 3]>::try_from(vec.clone()), Ok([0, 1, 2]));
+    assert_eq!(<[u8; 4]>::try_from(vec.clone()), Err(vec));
+}
+
 #[test]
 fn test_from_vec() {
     let vec = vec![];
