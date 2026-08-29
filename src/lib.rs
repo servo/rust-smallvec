@@ -81,7 +81,6 @@ mod tests;
 #[cfg(feature = "std")]
 use std::io::{Result as IoResult, Write};
 use {
-    add_syntax::prepend,
     alloc::{alloc::Layout, boxed::Box, vec::Vec},
     core::{
         fmt::Debug,
@@ -92,7 +91,9 @@ use {
         ptr::{copy, copy_nonoverlapping, NonNull},
     },
 };
-#[cfg_attr(feature = "internals", prepend(pub))]
+#[cfg(feature = "internals")]
+pub use {rawsmallvec::RawSmallVec, taggedlen::TaggedLen};
+#[cfg(not(feature = "internals"))]
 use {rawsmallvec::RawSmallVec, taggedlen::TaggedLen};
 
 /// Error type for APIs with fallible heap allocation
