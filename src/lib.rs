@@ -65,6 +65,8 @@ pub extern crate alloc;
 #[cfg(any(test, feature = "std"))]
 extern crate std;
 
+#[cfg(feature = "defmt")]
+mod defmt;
 mod rawsmallvec;
 #[cfg(test)]
 mod tests;
