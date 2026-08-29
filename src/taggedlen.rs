@@ -15,9 +15,13 @@ pub struct TaggedLen<T>(usize, PhantomData<T>);
 // Clone and Copy must be manually implemented because the generic interferes
 // with the derive attribute implementations.
 impl<T> Clone for TaggedLen<T> {
-    fn clone(&self) -> Self { Self(self.0, PhantomData) }
+    fn clone(&self) -> Self {
+        Self(self.0, PhantomData)
+    }
 
-    fn clone_from(&mut self, source: &Self) { self.0 = source.0; }
+    fn clone_from(&mut self, source: &Self) {
+        self.0 = source.0;
+    }
 }
 
 impl<T> Copy for TaggedLen<T> {}
@@ -34,7 +38,9 @@ impl<T> TaggedLen<T> {
     }
 
     #[must_use]
-    pub const fn on_heap(self) -> bool { return (size_of::<T>() != 0) && ((self.0 & 1usize) == 1); }
+    pub const fn on_heap(self) -> bool {
+        return (size_of::<T>() != 0) && ((self.0 & 1usize) == 1);
+    }
 
     pub const fn value(self) -> usize {
         return if size_of::<T>() == 0 {

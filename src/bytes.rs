@@ -1,9 +1,6 @@
 use {
     super::SmallVec,
-    bytes::{
-        BufMut,
-        buf::UninitSlice
-    }
+    bytes::{buf::UninitSlice, BufMut},
 };
 
 unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
@@ -42,7 +39,9 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
     // Specialize these methods so they can skip checking `remaining_mut`
     // and `advance_mut`.
     fn put<T: bytes::Buf>(&mut self, mut src: T)
-    where Self: Sized {
+    where
+        Self: Sized,
+    {
         // In case the src isn't contiguous, reserve upfront.
         self.reserve(src.remaining());
 
@@ -54,7 +53,9 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
         }
     }
 
-    fn put_slice(&mut self, src: &[u8]) { self.extend_from_slice(src); }
+    fn put_slice(&mut self, src: &[u8]) {
+        self.extend_from_slice(src);
+    }
 
     fn put_bytes(&mut self, val: u8, cnt: usize) {
         // If the addition overflows, then the `resize` will fail.

@@ -1,15 +1,7 @@
 use {
     crate::SmallVec,
-    alloc::{
-        borrow::ToOwned,
-        boxed::Box,
-        rc::Rc,
-        vec::Vec
-    },
-    core::{
-        hash::Hasher,
-        iter::FromIterator
-    }
+    alloc::{borrow::ToOwned, boxed::Box, rc::Rc, vec::Vec},
+    core::{hash::Hasher, iter::FromIterator},
 };
 
 #[test]
@@ -112,7 +104,9 @@ pub fn test_double_spill() {
 
 // https://github.com/servo/rust-smallvec/issues/4
 #[test]
-fn issue_4() { SmallVec::<Box<u32>, 2>::new(); }
+fn issue_4() {
+    SmallVec::<Box<u32>, 2>::new();
+}
 
 // https://github.com/servo/rust-smallvec/issues/5
 #[test]
@@ -235,7 +229,9 @@ fn into_iter_drop() {
     struct DropCounter<'a>(&'a Cell<i32>);
 
     impl<'a> Drop for DropCounter<'a> {
-        fn drop(&mut self) { self.0.set(self.0.get() + 1); }
+        fn drop(&mut self) {
+            self.0.set(self.0.get() + 1);
+        }
     }
 
     {
@@ -488,10 +484,7 @@ fn test_ord() {
 
 #[test]
 fn test_hash() {
-    use std::{
-        collections::hash_map::DefaultHasher,
-        hash::Hash
-    };
+    use std::{collections::hash_map::DefaultHasher, hash::Hash};
 
     fn hash(value: impl Hash) -> u64 {
         let mut hasher = DefaultHasher::new();
@@ -834,44 +827,25 @@ fn test_write() {
 #[cfg(feature = "serde")]
 #[test]
 fn test_serde() {
-    use serde_test::{
-        Token,
-        assert_tokens
-    };
+    use serde_test::{assert_tokens, Token};
     let mut small_vec: SmallVec<i32, 2> = SmallVec::new();
-    assert_tokens(
-        &small_vec,
-        &[
-            Token::Seq {
-                len: Some(0)
-            },
-            Token::SeqEnd
-        ]
-    );
+    assert_tokens(&small_vec, &[Token::Seq { len: Some(0) }, Token::SeqEnd]);
     small_vec.push(1);
     assert_tokens(
         &small_vec,
-        &[
-            Token::Seq {
-                len: Some(1)
-            },
-            Token::I32(1),
-            Token::SeqEnd
-        ]
+        &[Token::Seq { len: Some(1) }, Token::I32(1), Token::SeqEnd],
     );
     small_vec.extend([2, 3, 4]);
     assert_tokens(
         &small_vec,
         &[
-            Token::Seq {
-                len: Some(4)
-            },
+            Token::Seq { len: Some(4) },
             Token::I32(1),
             Token::I32(2),
             Token::I32(3),
             Token::I32(4),
-            Token::SeqEnd
-        ]
+            Token::SeqEnd,
+        ],
     );
 }
 
@@ -926,7 +900,9 @@ fn grow_spilled_same_size() {
 }
 
 #[test]
-fn const_generics() { let _v = SmallVec::<i32, 987>::default(); }
+fn const_generics() {
+    let _v = SmallVec::<i32, 987>::default();
+}
 
 #[test]
 fn const_new() {
@@ -943,15 +919,25 @@ fn const_new() {
     assert_eq!(v[0], 1);
     assert_eq!(v[1], 4);
 }
-const fn const_new_inner() -> SmallVec<i32, 4> { SmallVec::<i32, 4>::new() }
-const fn const_new_inline_sized() -> SmallVec<i32, 4> { SmallVec::from_buf([1; 4]) }
-const fn const_new_inline_args() -> SmallVec<i32, 2> { SmallVec::from_buf([1, 4]) }
+const fn const_new_inner() -> SmallVec<i32, 4> {
+    SmallVec::<i32, 4>::new()
+}
+const fn const_new_inline_sized() -> SmallVec<i32, 4> {
+    SmallVec::from_buf([1; 4])
+}
+const fn const_new_inline_args() -> SmallVec<i32, 2> {
+    SmallVec::from_buf([1, 4])
+}
 
 #[test]
-fn empty_macro() { let _v: SmallVec<u8, 1> = SmallVec::new(); }
+fn empty_macro() {
+    let _v: SmallVec<u8, 1> = SmallVec::new();
+}
 
 #[test]
-fn zero_size_items() { SmallVec::<(), 0>::new().push(()); }
+fn zero_size_items() {
+    SmallVec::<(), 0>::new().push(());
+}
 
 #[test]
 fn test_clone_from() {
@@ -1028,7 +1014,9 @@ fn collect_from_iter() {
     impl<I: Iterator> Iterator for IterNoHint<I> {
         type Item = I::Item;
 
-        fn next(&mut self) -> Option<Self::Item> { self.0.next() }
+        fn next(&mut self) -> Option<Self::Item> {
+            self.0.next()
+        }
 
         // no implementation of size_hint means it returns (0, None) - which forces
         // from_iter to grow the allocated space iteratively.

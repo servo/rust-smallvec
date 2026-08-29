@@ -1,10 +1,6 @@
 use {
     super::SmallVec,
-    malloc_size_of::{
-        MallocShallowSizeOf,
-        MallocSizeOf,
-        MallocSizeOfOps
-    }
+    malloc_size_of::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps},
 };
 
 impl<T, const N: usize> MallocShallowSizeOf for SmallVec<T, N> {

@@ -2,20 +2,15 @@ use {
     super::SmallVec,
     core::marker::PhantomData,
     serde_core::{
-        Deserialize,
-        Deserializer,
-        Serialize,
-        Serializer,
-        de::{
-            SeqAccess,
-            Visitor
-        },
-        ser::SerializeSeq
-    }
+        de::{SeqAccess, Visitor},
+        ser::SerializeSeq,
+        Deserialize, Deserializer, Serialize, Serializer,
+    },
 };
 
 impl<T, const N: usize> Serialize for SmallVec<T, N>
-where T: Serialize
+where
+    T: Serialize,
 {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut state = serializer.serialize_seq(Some(self.len()))?;
@@ -27,21 +22,23 @@ where T: Serialize
 }
 
 impl<'de, T, const N: usize> Deserialize<'de> for SmallVec<T, N>
-where T: Deserialize<'de>
+where
+    T: Deserialize<'de>,
 {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_seq(SmallVecVisitor {
-            phantom: PhantomData
+            phantom: PhantomData,
         })
     }
 }
 
 struct SmallVecVisitor<T, const N: usize> {
-    phantom: PhantomData<T>
+    phantom: PhantomData<T>,
 }
 
 impl<'de, T, const N: usize> Visitor<'de> for SmallVecVisitor<T, N>
-where T: Deserialize<'de>
+where
+    T: Deserialize<'de>,
 {
     type Value = SmallVec<T, N>;
 
@@ -50,7 +47,9 @@ where T: Deserialize<'de>
     }
 
     fn visit_seq<B>(self, mut seq: B) -> Result<Self::Value, B::Error>
-    where B: SeqAccess<'de> {
+    where
+        B: SeqAccess<'de>,
+    {
         use serde_core::de::Error;
         let len = seq.size_hint().unwrap_or(0);
         let mut values = SmallVec::new();

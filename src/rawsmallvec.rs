@@ -1,19 +1,10 @@
 use {
-    super::{
-        CollectionAllocErr,
-        TaggedLen
-    },
+    super::{CollectionAllocErr, TaggedLen},
     core::{
         alloc::Layout,
-        mem::{
-            ManuallyDrop,
-            MaybeUninit
-        },
-        ptr::{
-            NonNull,
-            copy_nonoverlapping
-        }
-    }
+        mem::{ManuallyDrop, MaybeUninit},
+        ptr::{copy_nonoverlapping, NonNull},
+    },
 };
 
 /// Either a stack array with `length <= N` or a heap array
@@ -24,23 +15,25 @@ use {
 #[repr(C)]
 pub union RawSmallVec<T, const N: usize> {
     pub inline: ManuallyDrop<MaybeUninit<[T; N]>>,
-    pub heap: (NonNull<T>, usize)
+    pub heap: (NonNull<T>, usize),
 }
 
 impl<T, const N: usize> RawSmallVec<T, N> {
     const IS_ZST: bool = size_of::<T>() == 0;
 
-    pub const fn new() -> Self { Self::new_inline(MaybeUninit::uninit()) }
+    pub const fn new() -> Self {
+        Self::new_inline(MaybeUninit::uninit())
+    }
 
     pub const fn new_inline(inline: MaybeUninit<[T; N]>) -> Self {
         Self {
-            inline: ManuallyDrop::new(inline)
+            inline: ManuallyDrop::new(inline),
         }
     }
 
     pub const fn new_heap(ptr: NonNull<T>, capacity: usize) -> Self {
         Self {
-            heap: (ptr, capacity)
+            heap: (ptr, capacity),
         }
     }
 
@@ -61,12 +54,16 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     /// # Safety
     ///
     /// The vector must be on the heap
-    pub const unsafe fn as_ptr_heap(&self) -> *const T { self.heap.0.as_ptr() }
+    pub const unsafe fn as_ptr_heap(&self) -> *const T {
+        self.heap.0.as_ptr()
+    }
 
     /// # Safety
     ///
     /// The vector must be on the heap
-    pub const unsafe fn as_mut_ptr_heap(&mut self) -> *mut T { self.heap.0.as_ptr() }
+    pub const unsafe fn as_mut_ptr_heap(&mut self) -> *mut T {
+        self.heap.0.as_ptr()
+    }
 
     /// # Safety
     ///
@@ -75,12 +72,9 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     pub unsafe fn try_grow_raw(
         &mut self,
         len: TaggedLen<T>,
-        new_capacity: usize
+        new_capacity: usize,
     ) -> Result<(), CollectionAllocErr> {
-        use alloc::alloc::{
-            alloc,
-            realloc
-        };
+        use alloc::alloc::{alloc, realloc};
         debug_assert!(!Self::IS_ZST);
         debug_assert!(new_capacity > 0);
         debug_assert!(new_capacity >= len.value());
@@ -102,9 +96,8 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         let new_ptr = if !was_on_heap {
             // get a fresh allocation
             let new_ptr = alloc(new_layout) as *mut T; // `new_layout` has nonzero size.
-            let new_ptr = NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr {
-                layout: new_layout
-            })?;
+            let new_ptr =
+                NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr { layout: new_layout })?;
             copy_nonoverlapping(ptr, new_ptr.as_ptr(), len);
             new_ptr
         } else {
@@ -121,9 +114,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             // does not overflow when rounded up to alignment. since it was constructed
             // with Layout::array
             let new_ptr = realloc(ptr as *mut u8, old_layout, new_layout.size()) as *mut T;
-            NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr {
-                layout: new_layout
-            })?
+            NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr { layout: new_layout })?
         };
         *self = Self::new_heap(new_ptr, new_capacity);
         Ok(())
