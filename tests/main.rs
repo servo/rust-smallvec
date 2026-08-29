@@ -1,6 +1,19 @@
-use smallvec::{smallvec, SmallVec};
-use std::hash::Hasher;
-use std::rc::Rc;
+use {
+    crate::{
+        SmallVec,
+        smallvec
+    },
+    alloc::{
+        borrow::ToOwned,
+        boxed::Box,
+        rc::Rc,
+        vec::Vec
+    },
+    core::{
+        hash::Hasher,
+        iter::FromIterator
+    }
+};
 
 #[test]
 pub fn test_zero() {
@@ -102,9 +115,7 @@ pub fn test_double_spill() {
 
 // https://github.com/servo/rust-smallvec/issues/4
 #[test]
-fn issue_4() {
-    SmallVec::<Box<u32>, 2>::new();
-}
+fn issue_4() { SmallVec::<Box<u32>, 2>::new(); }
 
 // https://github.com/servo/rust-smallvec/issues/5
 #[test]
@@ -227,9 +238,7 @@ fn into_iter_drop() {
     struct DropCounter<'a>(&'a Cell<i32>);
 
     impl<'a> Drop for DropCounter<'a> {
-        fn drop(&mut self) {
-            self.0.set(self.0.get() + 1);
-        }
+        fn drop(&mut self) { self.0.set(self.0.get() + 1); }
     }
 
     {
@@ -879,9 +888,7 @@ fn grow_spilled_same_size() {
 }
 
 #[test]
-fn const_generics() {
-    let _v = SmallVec::<i32, 987>::default();
-}
+fn const_generics() { let _v = SmallVec::<i32, 987>::default(); }
 
 #[test]
 fn const_new() {
@@ -909,14 +916,10 @@ const fn const_new_inline_args() -> SmallVec<i32, 2> {
 }
 
 #[test]
-fn empty_macro() {
-    let _v: SmallVec<u8, 1> = smallvec![];
-}
+fn empty_macro() { let _v: SmallVec<u8, 1> = smallvec![]; }
 
 #[test]
-fn zero_size_items() {
-    SmallVec::<(), 0>::new().push(());
-}
+fn zero_size_items() { SmallVec::<(), 0>::new().push(()); }
 
 #[test]
 fn test_clone_from() {
@@ -993,9 +996,7 @@ fn collect_from_iter() {
     impl<I: Iterator> Iterator for IterNoHint<I> {
         type Item = I::Item;
 
-        fn next(&mut self) -> Option<Self::Item> {
-            self.0.next()
-        }
+        fn next(&mut self) -> Option<Self::Item> { self.0.next() }
 
         // no implementation of size_hint means it returns (0, None) - which forces
         // from_iter to grow the allocated space iteratively.
