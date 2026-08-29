@@ -15,17 +15,18 @@ jobs:
           COMMENT: ${{ github.event.comment.body }}
           USER: ${{ github.event.comment.user.login }}
           ISSUE: ${{ github.event.issue.number }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           COMMAND="${COMMENT#smallbot! }"
           if [ "$COMMAND" = "assign" ]; then
-            COUNT=$(gh issue view "$ISSUE" --json assignees --jq '.assignees | length')
+            COUNT=$(gh issue view "$ISSUE" --repo "$REPOSITORY" --json assignees --jq '.assignees | length')
             if [ "$COUNT" -eq 0 ]; then
-              gh issue edit "$ISSUE" --add-assignee "$USER"
+              gh issue edit "$ISSUE" --repo "$REPOSITORY" --add-assignee "$USER"
             fi
           fi
           if [ "$COMMAND" = "unassign" ]; then
-            ASSIGNED=$(gh issue view "$ISSUE" --json assignees --jq "[.assignees[].login] | index(\"$USER\")")
+            ASSIGNED=$(gh issue view "$ISSUE" --repo "$REPOSITORY" --json assignees --jq "[.assignees[].login] | index(\"$USER\")")
             if [ "$ASSIGNED" != "null" ]; then
-              gh issue edit "$ISSUE" --remove-assignee "$USER"
+              gh issue edit "$ISSUE" --repo "$REPOSITORY" --remove-assignee "$USER"
             fi
           fi
