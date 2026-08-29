@@ -2992,6 +2992,25 @@ impl<T: Debug, const N: usize> Debug for Drain<'_, T, N> {
     }
 }
 
+#[cfg(feature = "arbitrary")]
+#[cfg_attr(docsrs, doc(cfg(feature = "arbitrary")))]
+impl<'a, T, const N: usize> arbitrary::Arbitrary<'a> for SmallVec<T, N>
+where
+    T: arbitrary::Arbitrary<'a>,
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        u.arbitrary_iter()?.collect()
+    }
+
+    fn arbitrary_take_rest(u: arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        u.arbitrary_take_rest_iter()?.collect()
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        arbitrary::size_hint::and(<usize as arbitrary::Arbitrary>::size_hint(depth), (0, None))
+    }
+}
+
 #[cfg(feature = "serde")]
 #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 impl<T, const N: usize> Serialize for SmallVec<T, N>
