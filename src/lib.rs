@@ -1668,7 +1668,10 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    #[deprecated(since = "2.0.0-alpha.13", note = "use `TryInto::<[T; N]>::into` instead")]
+    #[deprecated(
+        since = "2.0.0-alpha.13",
+        note = "use `TryInto::<[T; N]>::into` instead"
+    )]
     pub fn into_inner(self) -> Result<[T; N], Self> {
         if self.len() != N {
             Err(self)
