@@ -1,6 +1,6 @@
 # Contributing to rust-smallvec
 
-This branch containst the code for SmallVec v2, which is on pre-release.
+This branch contains the code for SmallVec v2, which is on pre-release.
 
 Visit [the wiki](https://github.com/servo/rust-smallvec/wiki) for more information about the status and management of v2. Visit it before making any contribution.
 
