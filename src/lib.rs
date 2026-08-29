@@ -66,8 +66,6 @@ pub extern crate alloc;
 extern crate std;
 
 mod rawsmallvec;
-#[cfg(test)]
-mod tests;
 
 #[cfg(feature = "bytes")]
 use bytes::{

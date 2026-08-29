@@ -29,6 +29,18 @@ malloc_size_of = { version = "0.1.1", optional = true, default-features = false 
 serde_test = "1.0"
 criterion = "0.4.0"
 
+[[test]]
+name = "bytes"
+required-features = ["bytes"]
+
+[[test]]
+name = "serde"
+required-features = ["serde"]
+
+[[test]]
+name = "std"
+required-features = ["std"]
+
 [[bench]]
 name = "bench"
 path = "benches/bench.rs"
