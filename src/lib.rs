@@ -65,8 +65,6 @@ pub extern crate alloc;
 #[cfg(any(test, feature = "std"))]
 extern crate std;
 
-#[cfg(feature = "defmt")]
-mod defmt;
 mod rawsmallvec;
 #[cfg(test)]
 mod tests;
@@ -102,6 +100,12 @@ use serde_core::{
 };
 #[cfg(feature = "std")]
 use std::io;
+#[cfg(feature = "defmt")]
+use defmt::{
+    Format,
+    write,
+    Formatter
+};
 
 /// Error type for APIs with fallible heap allocation
 #[derive(Debug)]
@@ -3128,5 +3132,19 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
         // If the addition overflows, then the `resize` will fail.
         let new_len = self.len().saturating_add(cnt);
         self.resize(new_len, val);
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<T: Format, const N: usize> Format for SmallVec<T, N> {
+    fn format(&self, fmt: Formatter) {
+        write!(fmt, "[");
+        for (index, element) in self.iter().enumerate() {
+            if index != 0 {
+                write!(fmt, ", ")
+            }
+            write!(fmt, "{:?}", element);
+        }
+        write!(fmt, "]");
     }
 }
