@@ -87,6 +87,8 @@ use core::mem::MaybeUninit;
 use core::ptr::copy;
 use core::ptr::copy_nonoverlapping;
 use core::ptr::NonNull;
+#[cfg(feature = "defmt")]
+use defmt::{write, Format, Formatter};
 #[cfg(feature = "malloc_size_of")]
 use malloc_size_of::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps};
 #[cfg(feature = "internals")]
@@ -100,12 +102,6 @@ use serde_core::{
 };
 #[cfg(feature = "std")]
 use std::io;
-#[cfg(feature = "defmt")]
-use defmt::{
-    Format,
-    write,
-    Formatter
-};
 
 /// Error type for APIs with fallible heap allocation
 #[derive(Debug)]
