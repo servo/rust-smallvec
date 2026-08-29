@@ -1,0 +1,31 @@
+name: SmallBot
+on:
+  issue_comment: 
+    types: [created]
+jobs:
+  bot:
+    if: startsWith(github.event.comment.body, 'smallbot! ')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Match command
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENT: ${{ github.event.comment.body }}
+          USER: ${{ github.event.comment.user.login }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          COMMAND="${COMMENT#smallbot! }"
+          if [ "$COMMAND" = "assign" ]; then
+            COUNT=$(gh issue view "$ISSUE" --json assignees --jq '.assignees | length')
+            if [ "$COUNT" -eq 0 ]; then
+              gh issue edit "$ISSUE" --add-assignee "$USER"
+            fi
+          fi
+          if [ "$COMMAND" = "unassign" ]; then
+            ASSIGNED=$(gh issue view "$ISSUE" --json assignees --jq "[.assignees[].login] | index(\"$USER\")")
+            if [ "$ASSIGNED" != "null" ]; then
+              gh issue edit "$ISSUE" --remove-assignee "$USER"
+            fi
+          fi
