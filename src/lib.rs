@@ -88,7 +88,7 @@ use core::ptr::copy;
 use core::ptr::copy_nonoverlapping;
 use core::ptr::NonNull;
 #[cfg(feature = "defmt")]
-use defmt::{write, Format, Formatter};
+use defmt::{write as dewrite, Format, Formatter as DeFormatter};
 #[cfg(feature = "malloc_size_of")]
 use malloc_size_of::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps};
 #[cfg(feature = "internals")]
@@ -3133,14 +3133,14 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
 
 #[cfg(feature = "defmt")]
 impl<T: Format, const N: usize> Format for SmallVec<T, N> {
-    fn format(&self, fmt: Formatter) {
-        write!(fmt, "[");
+    fn format(&self, fmt: DeFormatter) {
+        dewrite!(fmt, "[");
         for (index, element) in self.iter().enumerate() {
             if index != 0 {
-                write!(fmt, ", ")
+                dewrite!(fmt, ", ")
             }
-            write!(fmt, "{:?}", element);
+            dewrite!(fmt, "{:?}", element);
         }
-        write!(fmt, "]");
+        dewrite!(fmt, "]");
     }
 }
