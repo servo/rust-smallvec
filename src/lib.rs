@@ -116,6 +116,7 @@ use {
             Hash,
             Hasher
         },
+        iter::repeat_n,
         marker::PhantomData,
         mem::{
             ManuallyDrop,
@@ -127,8 +128,7 @@ use {
             NonNull,
             copy,
             copy_nonoverlapping
-        },
-        iter::repeat_n
+        }
     }
 };
 
@@ -1108,7 +1108,6 @@ impl<T, const N: usize> SmallVec<T, N> {
                 // Since self is a &mut, passing it to a function would invalidate the slice
                 // iterator.
                 vec: core::ptr::NonNull::new_unchecked(self as *mut _)
-                // vec: core::ptr::NonNull::from(self),
             }
         }
     }
