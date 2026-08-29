@@ -3134,13 +3134,6 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
 #[cfg(feature = "defmt")]
 impl<T: Format, const N: usize> Format for SmallVec<T, N> {
     fn format(&self, fmt: DeFormatter) {
-        dewrite!(fmt, "[");
-        for (index, element) in self.iter().enumerate() {
-            if index != 0 {
-                dewrite!(fmt, ", ")
-            }
-            dewrite!(fmt, "{:?}", element);
-        }
-        dewrite!(fmt, "]");
+        dewrite!(fmt, "{=[?]}", self.as_ref());
     }
 }
