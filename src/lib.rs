@@ -65,6 +65,8 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+#[cfg(feature = "borsh")]
+mod borsh;
 mod rawsmallvec;
 
 #[cfg(feature = "bytes")]
