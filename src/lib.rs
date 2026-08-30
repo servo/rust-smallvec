@@ -234,9 +234,9 @@ impl<T, const N: usize> RawSmallVec<T, N> {
 
     #[inline]
     const fn as_ptr_inline(&self) -> *const T {
-        // SAFETY: it is safe because we aren't reading the value, just getting a
-        // reference to it. reading it would be UB potentially, but for that downstream
-        // unsafe is required
+        // SAFETY: it is safe because we aren't reading the value, just getting
+        // a reference to it. reading it would be UB potentially, but
+        // for that downstream unsafe is required
         #[allow(unused_unsafe, reason = "Unsafe in MSRV")]
         (unsafe { &raw const self.inline }).cast()
     }

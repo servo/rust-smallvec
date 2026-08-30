@@ -3,10 +3,7 @@ use {
         hash::Hasher,
         iter::FromIterator
     },
-    smallvec::{
-        SmallVec,
-        smallvec
-    },
+    smallvec::SmallVec,
     std::{
         borrow::ToOwned,
         boxed::Box,

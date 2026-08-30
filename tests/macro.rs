@@ -1,7 +1,5 @@
-/// This file tests `smallvec!` without actually having the macro in scope.
-/// This forces any recursion to use a `$crate` prefix to reliably find itself.
-
 #[test]
+#[allow(deprecated)]
 fn smallvec() {
     let mut vec: smallvec::SmallVec<i32, 2>;
 
