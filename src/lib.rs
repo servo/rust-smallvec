@@ -72,19 +72,19 @@ use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 #[cfg(feature = "bytes")]
-use bytes::{buf::UninitSlice, BufMut};
+use bytes::{BufMut, buf::UninitSlice};
 use core::borrow::Borrow;
 use core::borrow::BorrowMut;
 use core::fmt::Debug;
 use core::hash::{Hash, Hasher};
 use core::marker::PhantomData;
-use core::mem::align_of;
-use core::mem::size_of;
 use core::mem::ManuallyDrop;
 use core::mem::MaybeUninit;
+use core::mem::align_of;
+use core::mem::size_of;
+use core::ptr::NonNull;
 use core::ptr::copy;
 use core::ptr::copy_nonoverlapping;
-use core::ptr::NonNull;
 #[cfg(feature = "malloc_size_of")]
 use malloc_size_of::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps};
 #[cfg(feature = "internals")]
@@ -327,11 +327,7 @@ impl<T> TaggedLen<T> {
 
     #[inline]
     pub const fn value(self) -> usize {
-        if Self::IS_ZST {
-            self.0
-        } else {
-            self.0 >> 1
-        }
+        if Self::IS_ZST { self.0 } else { self.0 >> 1 }
     }
 }
 
@@ -1014,11 +1010,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub const fn inline_size() -> usize {
-        if Self::IS_ZST {
-            usize::MAX
-        } else {
-            N
-        }
+        if Self::IS_ZST { usize::MAX } else { N }
     }
 
     #[inline]
@@ -1291,11 +1283,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub fn pop_if(&mut self, predicate: impl FnOnce(&mut T) -> bool) -> Option<T> {
         let last = self.last_mut()?;
-        if predicate(last) {
-            self.pop()
-        } else {
-            None
-        }
+        if predicate(last) { self.pop() } else { None }
     }
 
     #[inline]
@@ -1841,7 +1829,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// # Examples
     ///
     /// ```
-    /// use smallvec::{smallvec, SmallVec};
+    /// use smallvec::{SmallVec, smallvec};
     ///
     /// let mut v: SmallVec<_, 1> = smallvec![1, 2, 3];
     ///

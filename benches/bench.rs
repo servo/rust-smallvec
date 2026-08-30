@@ -1,7 +1,7 @@
 #![allow(deprecated)]
 
-use criterion::{criterion_group, criterion_main, Bencher, Criterion};
-use smallvec::{smallvec, SmallVec};
+use criterion::{Bencher, Criterion, criterion_group, criterion_main};
+use smallvec::{SmallVec, smallvec};
 use std::hint::black_box;
 use std::time::Duration;
 
