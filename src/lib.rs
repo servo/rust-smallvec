@@ -60,9 +60,9 @@
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 
 #[doc(hidden)]
-pub extern crate alloc;
+extern crate alloc;
 
-#[cfg(any(test, feature = "std"))]
+#[cfg(feature = "std")]
 extern crate std;
 
 mod rawsmallvec;
@@ -71,6 +71,12 @@ mod rawsmallvec;
 use bytes::{
     BufMut,
     buf::UninitSlice
+};
+#[cfg(feature = "defmt")]
+use defmt::{
+    Format,
+    Formatter as DeFormatter,
+    write as dewrite
 };
 #[cfg(feature = "malloc_size_of")]
 use malloc_size_of::{
