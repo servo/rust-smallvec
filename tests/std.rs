@@ -1,7 +1,7 @@
 use smallvec::SmallVec;
 
 #[test]
-fn test_write() {
+fn write() {
     use std::io::Write;
 
     let data = [1, 2, 3, 4, 5];
