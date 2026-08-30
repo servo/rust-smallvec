@@ -16,7 +16,6 @@ use {
     }
 };
 
-#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 impl<T, const N: usize> Serialize for SmallVec<T, N>
 where T: Serialize
 {
