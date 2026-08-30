@@ -60,9 +60,9 @@
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 
 #[doc(hidden)]
-pub extern crate alloc;
+extern crate alloc;
 
-#[cfg(any(test, feature = "std"))]
+#[cfg(feature = "std")]
 extern crate std;
 
 #[cfg(feature = "borsh")]
@@ -73,6 +73,12 @@ mod rawsmallvec;
 use bytes::{
     BufMut,
     buf::UninitSlice
+};
+#[cfg(feature = "defmt")]
+use defmt::{
+    Format,
+    Formatter as DeFormatter,
+    write as dewrite
 };
 #[cfg(feature = "malloc_size_of")]
 use malloc_size_of::{
@@ -3201,5 +3207,12 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
         // If the addition overflows, then the `resize` will fail.
         let new_len = self.len().saturating_add(cnt);
         self.resize(new_len, val);
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<T: Format, const N: usize> Format for SmallVec<T, N> {
+    fn format(&self, fmt: DeFormatter) {
+        dewrite!(fmt, "{=[?]}", self.as_ref());
     }
 }
