@@ -164,7 +164,9 @@ fn infallible<T>(result: Result<T, CollectionAllocErr>) -> T {
 
 /// Helper function to check if a type is a ZST.
 #[inline]
-const fn is_zst<T>() -> bool { const { size_of::<T>() == 0 } }
+const fn is_zst<T>() -> bool {
+    const { size_of::<T>() == 0 }
+}
 
 #[inline]
 /// A local copy of [`core::slice::range`]. The latter function is unstable
@@ -206,7 +208,9 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     const IS_ZST: bool = is_zst::<T>();
 
     #[inline]
-    const fn new() -> Self { Self::new_inline(MaybeUninit::uninit()) }
+    const fn new() -> Self {
+        Self::new_inline(MaybeUninit::uninit())
+    }
 
     #[inline]
     const fn new_inline(inline: MaybeUninit<[T; N]>) -> Self {
@@ -240,13 +244,17 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     ///
     /// The vector must be on the heap
     #[inline]
-    const unsafe fn as_ptr_heap(&self) -> *const T { self.heap.0.as_ptr() }
+    const unsafe fn as_ptr_heap(&self) -> *const T {
+        self.heap.0.as_ptr()
+    }
 
     /// # Safety
     ///
     /// The vector must be on the heap
     #[inline]
-    const unsafe fn as_mut_ptr_heap(&mut self) -> *mut T { self.heap.0.as_ptr() }
+    const unsafe fn as_mut_ptr_heap(&mut self) -> *mut T {
+        self.heap.0.as_ptr()
+    }
 
     /// # Safety
     ///
@@ -326,10 +334,14 @@ struct TaggedLen<T>(usize, PhantomData<T>);
 // with the derive attribute implementations.
 impl<T> Clone for TaggedLen<T> {
     #[inline]
-    fn clone(&self) -> Self { Self(self.0, PhantomData) }
+    fn clone(&self) -> Self {
+        Self(self.0, PhantomData)
+    }
 
     #[inline]
-    fn clone_from(&mut self, source: &Self) { self.0 = source.0; }
+    fn clone_from(&mut self, source: &Self) {
+        self.0 = source.0;
+    }
 }
 
 impl<T> Copy for TaggedLen<T> {}
@@ -359,7 +371,9 @@ impl<T> TaggedLen<T> {
     }
 
     #[inline]
-    pub const fn value(self) -> usize { if Self::IS_ZST { self.0 } else { self.0 >> 1 } }
+    pub const fn value(self) -> usize {
+        if Self::IS_ZST { self.0 } else { self.0 >> 1 }
+    }
 }
 
 #[repr(C)]
@@ -374,7 +388,9 @@ unsafe impl<T: Sync, const N: usize> Sync for SmallVec<T, N> {}
 
 impl<T, const N: usize> Default for SmallVec<T, N> {
     #[inline]
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// An iterator that removes the items from a `SmallVec` and yields them by
@@ -410,7 +426,9 @@ impl<'a, T: 'a, const N: usize> Iterator for Drain<'a, T, N> {
     }
 
     #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
 }
 
 impl<'a, T: 'a, const N: usize> DoubleEndedIterator for Drain<'a, T, N> {
@@ -425,7 +443,9 @@ impl<'a, T: 'a, const N: usize> DoubleEndedIterator for Drain<'a, T, N> {
 
 impl<T, const N: usize> ExactSizeIterator for Drain<'_, T, N> {
     #[inline]
-    fn len(&self) -> usize { self.iter.len() }
+    fn len(&self) -> usize {
+        self.iter.len()
+    }
 }
 
 impl<T, const N: usize> core::iter::FusedIterator for Drain<'_, T, N> {}
@@ -506,7 +526,9 @@ impl<'a, T: 'a, const N: usize> Drop for Drain<'a, T, N> {
 
 impl<T, const N: usize> Drain<'_, T, N> {
     #[must_use]
-    pub fn as_slice(&self) -> &[T] { self.iter.as_slice() }
+    pub fn as_slice(&self) -> &[T] {
+        self.iter.as_slice()
+    }
 
     /// The range from `self.vec.len` to `self.tail_start` contains elements
     /// that have been moved out.
@@ -621,7 +643,9 @@ where F: FnMut(&mut T) -> bool
         }
     }
 
-    fn size_hint(&self) -> (usize, Option<usize>) { (0, Some(self.end - self.idx)) }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.end - self.idx))
+    }
 }
 
 impl<T, F, const N: usize> Drop for ExtractIf<'_, T, N, F>
@@ -665,13 +689,19 @@ where
 impl<I: Iterator, const N: usize> Iterator for Splice<'_, I, N> {
     type Item = I::Item;
 
-    fn next(&mut self) -> Option<Self::Item> { self.drain.next() }
+    fn next(&mut self) -> Option<Self::Item> {
+        self.drain.next()
+    }
 
-    fn size_hint(&self) -> (usize, Option<usize>) { self.drain.size_hint() }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.drain.size_hint()
+    }
 }
 
 impl<I: Iterator, const N: usize> DoubleEndedIterator for Splice<'_, I, N> {
-    fn next_back(&mut self) -> Option<Self::Item> { self.drain.next_back() }
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.drain.next_back()
+    }
 }
 
 impl<I: Iterator, const N: usize> ExactSizeIterator for Splice<'_, I, N> {}
@@ -991,7 +1021,9 @@ impl<T, const N: usize> SmallVec<T, N> {
     ///
     /// The active union member must be the self.raw.heap
     #[inline]
-    unsafe fn set_on_heap(&mut self) { self.len = TaggedLen::new(self.len(), true); }
+    unsafe fn set_on_heap(&mut self) {
+        self.len = TaggedLen::new(self.len(), true);
+    }
 
     /// Sets the tag to be inline
     ///
@@ -999,7 +1031,9 @@ impl<T, const N: usize> SmallVec<T, N> {
     ///
     /// The active union member must be the self.raw.inline
     #[inline]
-    unsafe fn set_inline(&mut self) { self.len = TaggedLen::new(self.len(), false); }
+    unsafe fn set_inline(&mut self) {
+        self.len = TaggedLen::new(self.len(), false);
+    }
 
     /// Sets the length of a vector.
     ///
@@ -1019,14 +1053,20 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    pub const fn inline_size() -> usize { if Self::IS_ZST { usize::MAX } else { N } }
+    pub const fn inline_size() -> usize {
+        if Self::IS_ZST { usize::MAX } else { N }
+    }
 
     #[inline]
-    pub const fn len(&self) -> usize { self.len.value() }
+    pub const fn len(&self) -> usize {
+        self.len.value()
+    }
 
     #[must_use]
     #[inline]
-    pub const fn is_empty(&self) -> bool { self.len() == 0 }
+    pub const fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
     #[inline]
     pub const fn capacity(&self) -> usize {
@@ -1039,7 +1079,9 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    pub const fn spilled(&self) -> bool { self.len.on_heap() }
+    pub const fn spilled(&self) -> bool {
+        self.len.on_heap()
+    }
 
     /// Splits the collection into two at the given index.
     ///
@@ -1234,7 +1276,9 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    pub fn push(&mut self, value: T) { _ = self.push_mut(value); }
+    pub fn push(&mut self, value: T) {
+        _ = self.push_mut(value);
+    }
 
     #[inline]
     #[must_use]
@@ -1310,7 +1354,9 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    pub fn grow(&mut self, new_capacity: usize) { infallible(self.try_grow(new_capacity)); }
+    pub fn grow(&mut self, new_capacity: usize) {
+        infallible(self.try_grow(new_capacity));
+    }
 
     #[cold]
     pub fn try_grow(&mut self, new_capacity: usize) -> Result<(), CollectionAllocErr> {
@@ -1537,7 +1583,9 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    pub fn insert(&mut self, index: usize, value: T) { _ = self.insert_mut(index, value); }
+    pub fn insert(&mut self, index: usize, value: T) {
+        _ = self.insert_mut(index, value);
+    }
 
     #[inline]
     #[must_use]
@@ -1648,7 +1696,9 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    pub fn into_boxed_slice(self) -> Box<[T]> { self.into_vec().into_boxed_slice() }
+    pub fn into_boxed_slice(self) -> Box<[T]> {
+        self.into_vec().into_boxed_slice()
+    }
 
     #[inline]
     #[deprecated(
@@ -1672,7 +1722,9 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    pub fn retain<F: FnMut(&T) -> bool>(&mut self, mut f: F) { self.retain_mut(|elem| f(elem)) }
+    pub fn retain<F: FnMut(&T) -> bool>(&mut self, mut f: F) {
+        self.retain_mut(|elem| f(elem))
+    }
 
     #[inline]
     pub fn retain_mut<F: FnMut(&mut T) -> bool>(&mut self, mut f: F) {
@@ -1883,7 +1935,9 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
     }
 
     #[inline]
-    pub fn extend_from_slice(&mut self, other: &[T]) { self.extend(other.iter()) }
+    pub fn extend_from_slice(&mut self, other: &[T]) {
+        self.extend(other.iter())
+    }
 
     pub fn extend_from_within<R>(&mut self, src: R)
     where R: core::ops::RangeBounds<usize> {
@@ -2092,11 +2146,15 @@ impl<T, const N: usize> core::ops::Deref for SmallVec<T, N> {
     type Target = [T];
 
     #[inline]
-    fn deref(&self) -> &Self::Target { self.as_slice() }
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
 }
 impl<T, const N: usize> core::ops::DerefMut for SmallVec<T, N> {
     #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target { self.as_mut_slice() }
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut_slice()
+    }
 }
 
 /// This function is used in the [`smallvec`] macro.
@@ -2184,7 +2242,9 @@ mod spec_traits {
     where I: Iterator<Item = T>
     {
         #[inline]
-        default fn spec_extend(&mut self, iter: I) { self.extend_fallback(iter); }
+        default fn spec_extend(&mut self, iter: I) {
+            self.extend_fallback(iter);
+        }
     }
 
     impl<T, I, const N: usize> SpecExtend<T, I> for SmallVec<T, N>
@@ -2252,7 +2312,9 @@ mod spec_traits {
         T: Clone
     {
         #[inline]
-        default fn spec_extend(&mut self, iterator: I) { self.spec_extend(iterator.cloned()) }
+        default fn spec_extend(&mut self, iterator: I) {
+            self.spec_extend(iterator.cloned())
+        }
     }
 
     impl<'a, T: 'a, const N: usize> SpecExtend<&'a T, core::slice::Iter<'a, T>> for SmallVec<T, N>
@@ -2340,7 +2402,9 @@ mod spec_traits {
     where I: Iterator<Item = T>
     {
         #[inline]
-        default fn spec_from_iter(iter: I) -> Self { Self::from_iter_fallback(iter) }
+        default fn spec_from_iter(iter: I) -> Self {
+            Self::from_iter_fallback(iter)
+        }
     }
 
     impl<T, I, const N: usize> SpecFromIterator<T, I> for SmallVec<T, N>
@@ -2370,7 +2434,9 @@ mod spec_traits {
 
     impl<T: Clone, const N: usize> SpecCloneFrom<T> for SmallVec<T, N> {
         #[inline]
-        default fn spec_clone_from(&mut self, source: &[T]) { self.clone_from_fallback(source); }
+        default fn spec_clone_from(&mut self, source: &[T]) {
+            self.clone_from_fallback(source);
+        }
     }
 
     impl<T: Copy, const N: usize> SpecCloneFrom<T> for SmallVec<T, N> {
@@ -2606,17 +2672,23 @@ impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N> {
 
 impl<T: Clone, const N: usize> From<&mut [T]> for SmallVec<T, N> {
     #[inline]
-    fn from(slice: &mut [T]) -> Self { Self::from(slice as &[T]) }
+    fn from(slice: &mut [T]) -> Self {
+        Self::from(slice as &[T])
+    }
 }
 
 impl<T: Clone, const M: usize, const N: usize> From<&[T; M]> for SmallVec<T, N> {
     #[inline]
-    fn from(slice: &[T; M]) -> Self { Self::from(slice as &[T]) }
+    fn from(slice: &[T; M]) -> Self {
+        Self::from(slice as &[T])
+    }
 }
 
 impl<T: Clone, const M: usize, const N: usize> From<&mut [T; M]> for SmallVec<T, N> {
     #[inline]
-    fn from(slice: &mut [T; M]) -> Self { Self::from(slice as &[T]) }
+    fn from(slice: &mut [T; M]) -> Self {
+        Self::from(slice as &[T])
+    }
 }
 
 impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N> {
@@ -2660,12 +2732,16 @@ impl<T, const N: usize, const M: usize> TryFrom<SmallVec<T, N>> for [T; M] {
 }
 
 impl<T, const N: usize> From<Vec<T>> for SmallVec<T, N> {
-    fn from(array: Vec<T>) -> Self { Self::from_vec(array) }
+    fn from(array: Vec<T>) -> Self {
+        Self::from_vec(array)
+    }
 }
 
 impl<T: Clone, const N: usize> Clone for SmallVec<T, N> {
     #[inline]
-    fn clone(&self) -> SmallVec<T, N> { SmallVec::from(self.as_slice()) }
+    fn clone(&self) -> SmallVec<T, N> {
+        SmallVec::from(self.as_slice())
+    }
 
     #[inline]
     fn clone_from(&mut self, source: &Self) {
@@ -2683,7 +2759,9 @@ impl<T: Clone, const N: usize> Clone for SmallVec<T, N> {
 
 impl<T: Clone, const N: usize> Clone for IntoIter<T, N> {
     #[inline]
-    fn clone(&self) -> IntoIter<T, N> { SmallVec::from(self.as_slice()).into_iter() }
+    fn clone(&self) -> IntoIter<T, N> {
+        SmallVec::from(self.as_slice()).into_iter()
+    }
 }
 
 impl<T, const N: usize> Extend<T> for SmallVec<T, N> {
@@ -2777,21 +2855,27 @@ impl<'a, T, const N: usize> IntoIterator for &'a SmallVec<T, N> {
     type IntoIter = core::slice::Iter<'a, T>;
     type Item = &'a T;
 
-    fn into_iter(self) -> Self::IntoIter { self.iter() }
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl<'a, T, const N: usize> IntoIterator for &'a mut SmallVec<T, N> {
     type IntoIter = core::slice::IterMut<'a, T>;
     type Item = &'a mut T;
 
-    fn into_iter(self) -> Self::IntoIter { self.iter_mut() }
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
 }
 
 impl<T, U, const N: usize, const M: usize> PartialEq<SmallVec<U, M>> for SmallVec<T, N>
 where T: PartialEq<U>
 {
     #[inline]
-    fn eq(&self, other: &SmallVec<U, M>) -> bool { self.as_slice().eq(other.as_slice()) }
+    fn eq(&self, other: &SmallVec<U, M>) -> bool {
+        self.as_slice().eq(other.as_slice())
+    }
 }
 impl<T, const N: usize> Eq for SmallVec<T, N> where T: Eq {}
 
@@ -2799,35 +2883,45 @@ impl<T, U, const N: usize, const M: usize> PartialEq<[U; M]> for SmallVec<T, N>
 where T: PartialEq<U>
 {
     #[inline]
-    fn eq(&self, other: &[U; M]) -> bool { self[..] == other[..] }
+    fn eq(&self, other: &[U; M]) -> bool {
+        self[..] == other[..]
+    }
 }
 
 impl<T, U, const N: usize, const M: usize> PartialEq<&[U; M]> for SmallVec<T, N>
 where T: PartialEq<U>
 {
     #[inline]
-    fn eq(&self, other: &&[U; M]) -> bool { self[..] == other[..] }
+    fn eq(&self, other: &&[U; M]) -> bool {
+        self[..] == other[..]
+    }
 }
 
 impl<T, U, const N: usize> PartialEq<[U]> for SmallVec<T, N>
 where T: PartialEq<U>
 {
     #[inline]
-    fn eq(&self, other: &[U]) -> bool { self[..] == other[..] }
+    fn eq(&self, other: &[U]) -> bool {
+        self[..] == other[..]
+    }
 }
 
 impl<T, U, const N: usize> PartialEq<&[U]> for SmallVec<T, N>
 where T: PartialEq<U>
 {
     #[inline]
-    fn eq(&self, other: &&[U]) -> bool { self[..] == other[..] }
+    fn eq(&self, other: &&[U]) -> bool {
+        self[..] == other[..]
+    }
 }
 
 impl<T, U, const N: usize> PartialEq<&mut [U]> for SmallVec<T, N>
 where T: PartialEq<U>
 {
     #[inline]
-    fn eq(&self, other: &&mut [U]) -> bool { self[..] == other[..] }
+    fn eq(&self, other: &&mut [U]) -> bool {
+        self[..] == other[..]
+    }
 }
 
 impl<T, const N: usize> PartialOrd for SmallVec<T, N>
@@ -2849,27 +2943,37 @@ where T: Ord
 }
 
 impl<T: Hash, const N: usize> Hash for SmallVec<T, N> {
-    fn hash<H: Hasher>(&self, state: &mut H) { self.as_slice().hash(state) }
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_slice().hash(state)
+    }
 }
 
 impl<T, const N: usize> Borrow<[T]> for SmallVec<T, N> {
     #[inline]
-    fn borrow(&self) -> &[T] { self.as_slice() }
+    fn borrow(&self) -> &[T] {
+        self.as_slice()
+    }
 }
 
 impl<T, const N: usize> BorrowMut<[T]> for SmallVec<T, N> {
     #[inline]
-    fn borrow_mut(&mut self) -> &mut [T] { self.as_mut_slice() }
+    fn borrow_mut(&mut self) -> &mut [T] {
+        self.as_mut_slice()
+    }
 }
 
 impl<T, const N: usize> AsRef<[T]> for SmallVec<T, N> {
     #[inline]
-    fn as_ref(&self) -> &[T] { self.as_slice() }
+    fn as_ref(&self) -> &[T] {
+        self.as_slice()
+    }
 }
 
 impl<T, const N: usize> AsMut<[T]> for SmallVec<T, N> {
     #[inline]
-    fn as_mut(&mut self) -> &mut [T] { self.as_mut_slice() }
+    fn as_mut(&mut self) -> &mut [T] {
+        self.as_mut_slice()
+    }
 }
 
 impl<T: Debug, const N: usize> Debug for SmallVec<T, N> {
@@ -2984,7 +3088,9 @@ impl<const N: usize> io::Write for SmallVec<u8, N> {
     }
 
     #[inline]
-    fn flush(&mut self) -> io::Result<()> { Ok(()) }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 #[cfg(feature = "bytes")]
@@ -3041,7 +3147,9 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
     }
 
     #[inline]
-    fn put_slice(&mut self, src: &[u8]) { self.extend_from_slice(src); }
+    fn put_slice(&mut self, src: &[u8]) {
+        self.extend_from_slice(src);
+    }
 
     #[inline]
     fn put_bytes(&mut self, val: u8, cnt: usize) {

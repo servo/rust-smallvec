@@ -7,7 +7,6 @@ error_on_unformatted = true
 blank_lines_lower_bound = 0
 blank_lines_upper_bound = 1
 float_literal_trailing_zero = "IfNoPostfix"
-fn_single_line = true
 imports_layout = "Vertical"
 normalize_comments = true
 reorder_impl_items = true
