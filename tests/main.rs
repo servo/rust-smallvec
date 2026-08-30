@@ -1,10 +1,19 @@
-use crate::SmallVec;
-use alloc::borrow::ToOwned;
-use alloc::boxed::Box;
-use alloc::rc::Rc;
-use alloc::{vec, vec::Vec};
-use core::hash::Hasher;
-use core::iter::FromIterator;
+use {
+    core::{
+        hash::Hasher,
+        iter::FromIterator
+    },
+    smallvec::{
+        SmallVec,
+        smallvec
+    },
+    std::{
+        borrow::ToOwned,
+        boxed::Box,
+        rc::Rc,
+        vec::Vec
+    }
+};
 
 #[test]
 pub fn test_zero() {
@@ -317,7 +326,7 @@ fn test_truncate() {
 
 #[test]
 fn test_truncate_references() {
-    let mut v = vec![0, 1, 2, 3, 4, 5, 6, 7];
+    let mut v = Vec::from([0, 1, 2, 3, 4, 5, 6, 7]);
     let mut i = 8;
     let mut v: SmallVec<&mut u8, 8> = v.iter_mut().collect();
 
@@ -486,8 +495,10 @@ fn test_ord() {
 
 #[test]
 fn test_hash() {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::Hash;
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::Hash
+    };
 
     fn hash(value: impl Hash) -> u64 {
         let mut hasher = DefaultHasher::new();
@@ -567,17 +578,17 @@ fn test_from() {
     assert_eq!(&SmallVec::<u32, 2>::from(&[1][..])[..], [1]);
     assert_eq!(&SmallVec::<u32, 2>::from(&[1, 2, 3][..])[..], [1, 2, 3]);
 
-    let vec = vec![];
+    let vec = Vec::new();
     let small_vec: SmallVec<u8, 3> = SmallVec::from(vec);
     assert_eq!(&*small_vec, &[0u8; 0]);
     drop(small_vec);
 
-    let vec = vec![1, 2, 3, 4, 5];
+    let vec = Vec::from([1, 2, 3, 4, 5]);
     let small_vec: SmallVec<u8, 3> = SmallVec::from(vec);
     assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
     drop(small_vec);
 
-    let vec = vec![1, 2, 3, 4, 5];
+    let vec = Vec::from([1, 2, 3, 4, 5]);
     let small_vec: SmallVec<u8, 1> = SmallVec::from(vec);
     assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
     drop(small_vec);
@@ -589,7 +600,7 @@ fn test_from() {
 
     let array = [99; 128];
     let small_vec: SmallVec<u8, 128> = SmallVec::from(array);
-    assert_eq!(&*small_vec, vec![99u8; 128].as_slice());
+    assert_eq!(&*small_vec, Vec::from([99u8; 128]).as_slice());
     drop(small_vec);
 
     #[derive(PartialEq, Eq, Debug)]
@@ -599,14 +610,14 @@ fn test_from() {
     assert_eq!(&*small_vec, &[NoClone(42)]);
     drop(small_vec);
 
-    let vec = vec![NoClone(42)];
+    let vec = Vec::from([NoClone(42)]);
     let small_vec: SmallVec<NoClone, 1> = SmallVec::from(vec);
     assert_eq!(&*small_vec, &[NoClone(42)]);
     drop(small_vec);
 
     let array = [1; 128];
     let small_vec: SmallVec<u8, 1> = SmallVec::from(array);
-    assert_eq!(&*small_vec, vec![1; 128].as_slice());
+    assert_eq!(&*small_vec, Vec::from([1; 128]).as_slice());
     drop(small_vec);
 
     let array = [99];
@@ -645,8 +656,8 @@ fn test_into_iter_as_slice() {
 
 #[test]
 fn test_into_iter_clone() {
-    // Test that the cloned iterator yields identical elements and that it owns its
-    // own copy (i.e. no use after move errors).
+    // Test that the cloned iterator yields identical elements and that it owns
+    // its own copy (i.e. no use after move errors).
     let mut iter = SmallVec::<u8, 2>::from_iter(0..3).into_iter();
     let mut clone_iter = iter.clone();
     while let Some(x) = iter.next() {
@@ -686,7 +697,7 @@ fn shrink_to_fit_unspill() {
 
 #[test]
 fn shrink_after_from_empty_vec() {
-    let mut v = SmallVec::<u8, 2>::from_vec(vec![]);
+    let mut v = SmallVec::<u8, 2>::from_vec(Vec::new());
     v.shrink_to_fit();
     assert!(!v.spilled())
 }
@@ -694,10 +705,10 @@ fn shrink_after_from_empty_vec() {
 #[test]
 fn test_into_vec() {
     let vec = SmallVec::<u8, 2>::from_iter(0..2);
-    assert_eq!(vec.into_vec(), vec![0, 1]);
+    assert_eq!(vec.into_vec(), Vec::from([0, 1]));
 
     let vec = SmallVec::<u8, 2>::from_iter(0..3);
-    assert_eq!(vec.into_vec(), vec![0, 1, 2]);
+    assert_eq!(vec.into_vec(), Vec::from([0, 1, 2]));
 }
 
 #[test]
@@ -735,32 +746,32 @@ fn test_try_into_array() {
 
 #[test]
 fn test_from_vec() {
-    let vec = vec![];
+    let vec = Vec::new();
     let small_vec: SmallVec<u8, 3> = SmallVec::from_vec(vec);
     assert_eq!(&*small_vec, &[0u8; 0]);
     drop(small_vec);
 
-    let vec = vec![];
+    let vec = Vec::new();
     let small_vec: SmallVec<u8, 1> = SmallVec::from_vec(vec);
     assert_eq!(&*small_vec, &[0u8; 0]);
     drop(small_vec);
 
-    let vec = vec![1];
+    let vec = Vec::from([1]);
     let small_vec: SmallVec<u8, 3> = SmallVec::from_vec(vec);
     assert_eq!(&*small_vec, &[1]);
     drop(small_vec);
 
-    let vec = vec![1, 2, 3];
+    let vec = Vec::from([1, 2, 3]);
     let small_vec: SmallVec<u8, 3> = SmallVec::from_vec(vec);
     assert_eq!(&*small_vec, &[1, 2, 3]);
     drop(small_vec);
 
-    let vec = vec![1, 2, 3, 4, 5];
+    let vec = Vec::from([1, 2, 3, 4, 5]);
     let small_vec: SmallVec<u8, 3> = SmallVec::from_vec(vec);
     assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
     drop(small_vec);
 
-    let vec = vec![1, 2, 3, 4, 5];
+    let vec = Vec::from([1, 2, 3, 4, 5]);
     let small_vec: SmallVec<u8, 1> = SmallVec::from_vec(vec);
     assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
     drop(small_vec);
@@ -990,12 +1001,13 @@ fn collect_from_iter() {
 
     impl<I: Iterator> Iterator for IterNoHint<I> {
         type Item = I::Item;
+
         fn next(&mut self) -> Option<Self::Item> {
             self.0.next()
         }
 
-        // no implementation of size_hint means it returns (0, None) - which forces
-        // from_iter to grow the allocated space iteratively.
+        // no implementation of size_hint means it returns (0, None) - which
+        // forces from_iter to grow the allocated space iteratively.
     }
 
     // A length of 3 is fine to trigger this bug under valgrind, but making the
