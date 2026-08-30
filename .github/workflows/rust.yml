@@ -1,4 +1,4 @@
-name: CI
+name: Rust
 
 on:
   push:
@@ -8,80 +8,80 @@ on:
     types: [checks_requested]
   workflow_dispatch:
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  linux-ci:
-    name: Linux
+  build:
+    name: Build and test (${{ matrix.name }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        toolchain: ["stable", "beta", "nightly", "1.83.0"]
         include:
-          - toolchain: stable
-            fuzz: 1
-          - toolchain: beta
-            fuzz: 1
+          - name: stable
+            toolchain: stable
+            fuzz: true
+          - name: beta
+            toolchain: beta
+            fuzz: true
+          - name: nightly
+            toolchain: nightly
+            nightly: true
+          - name: MSRV
+            toolchain: "1.83.0"
+          - name: no_std
+            toolchain: stable
+            target: thumbv7m-none-eabi
+            no_std: true
     steps:
       - uses: actions/checkout@v4
 
       - name: Install packages for fuzzing
-        if: runner.os == 'Linux' && matrix.fuzz == 1
+        if: matrix.fuzz
         run: sudo apt-get update -y && sudo apt-get install -y binutils-dev libunwind8-dev libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc libiberty-dev
 
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
-        
+          target: ${{ matrix.target }}
+
       - name: Style check
-        if: matrix.toolchain == 'nightly'
+        if: matrix.nightly
         run: rustup component add rustfmt && cargo fmt --all --check
 
-      - name: Cargo build
+      - name: Build
         run: cargo build --verbose
 
-      - name: Cargo test no features
+      - name: Run tests
+        if: ${{ !matrix.no_std }}
         run: cargo test --verbose
 
       - name: Cargo test all features
-        if: matrix.toolchain == 'nightly'
+        if: matrix.nightly
         run: cargo test --verbose --all-features
 
       - name: Cargo doc all features
-        if: matrix.toolchain == 'nightly'
+        if: matrix.nightly
         run: cargo doc --all-features --verbose
 
       - name: Cargo bench all features
-        if: matrix.toolchain == 'nightly'
+        if: matrix.nightly
         run: cargo bench --verbose --all-features
 
       - name: miri
-        if: matrix.toolchain == 'nightly'
+        if: matrix.nightly
         run: rustup component add miri && cargo miri test --verbose --all-features
 
       - name: fuzz
-        if: matrix.fuzz == 1
+        if: matrix.fuzz
         working-directory: fuzz
         run: ./travis-fuzz.sh
-
-  no-std:
-    name: no_std
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-          target: thumbv7m-none-eabi
-      - name: Cargo build
-        run: cargo build --verbose
 
   build_result:
     name: homu build finished
     runs-on: ubuntu-latest
-    needs:
-      - "linux-ci"
-      - "no-std"
+    needs: build
 
     steps:
       - name: Mark the job as successful
@@ -90,4 +90,3 @@ jobs:
       - name: Mark the job as unsuccessful
         run: exit 1
         if: "!success()"
-
