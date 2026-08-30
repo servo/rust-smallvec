@@ -641,8 +641,8 @@ fn test_into_iter_as_slice() {
 
 #[test]
 fn test_into_iter_clone() {
-    // Test that the cloned iterator yields identical elements and that it owns its
-    // own copy (i.e. no use after move errors).
+    // Test that the cloned iterator yields identical elements and that it owns
+    // its own copy (i.e. no use after move errors).
     let mut iter = SmallVec::<u8, 2>::from_iter(0..3).into_iter();
     let mut clone_iter = iter.clone();
     while let Some(x) = iter.next() {
@@ -994,8 +994,8 @@ fn collect_from_iter() {
             self.0.next()
         }
 
-        // no implementation of size_hint means it returns (0, None) - which forces
-        // from_iter to grow the allocated space iteratively.
+        // no implementation of size_hint means it returns (0, None) - which
+        // forces from_iter to grow the allocated space iteratively.
     }
 
     // A length of 3 is fine to trigger this bug under valgrind, but making the
