@@ -1,5 +1,10 @@
-use core::mem::{ManuallyDrop, MaybeUninit};
-use core::ptr::NonNull;
+use core::{
+    mem::{
+        ManuallyDrop,
+        MaybeUninit
+    },
+    ptr::NonNull
+};
 
 /// Either a stack array with `length <= N` or a heap array
 /// whose pointer and capacity are stored here.
@@ -9,5 +14,5 @@ use core::ptr::NonNull;
 #[repr(C)]
 pub union RawSmallVec<T, const N: usize> {
     pub inline: ManuallyDrop<MaybeUninit<[T; N]>>,
-    pub heap: (NonNull<T>, usize),
+    pub heap: (NonNull<T>, usize)
 }
