@@ -20,7 +20,7 @@ use {
 
 impl<Type: BorshSerialize, const INLINE: usize> BorshSerialize for SmallVec<Type, INLINE> {
     fn serialize<Writer: Write>(&self, writer: &mut Writer) -> Serial<()> {
-        self.len.0.serialize(writer)?;
+        self.len.value().serialize(writer)?;
         for element in self {
             element.serialize(writer)?;
         }
@@ -30,7 +30,7 @@ impl<Type: BorshSerialize, const INLINE: usize> BorshSerialize for SmallVec<Type
 
 impl<Type: BorshSchema, const INLINE: usize> BorshSchema for SmallVec<Type, INLINE> {
     fn declaration() -> Declaration {
-        return format!("SmallVec<{}, {INLINE}>", Type::declaration());
+        return format!("Vec<{}>", Type::declaration());
     }
 
     fn add_definitions_recursively(definitions: &mut Map<Declaration, Definition>) -> () {
@@ -43,7 +43,7 @@ impl<Type: BorshSchema, const INLINE: usize> BorshSchema for SmallVec<Type, INLI
             declaration,
             Definition::Sequence {
                 length_width: usize::BITS as u8 / 8,
-                length_range: 0..=(isize::MAX as u64),
+                length_range: 0..=(usize::MAX as u64),
                 elements: Type::declaration()
             }
         );
