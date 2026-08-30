@@ -2790,7 +2790,7 @@ impl<T, const N: usize> core::iter::FromIterator<T> for SmallVec<T, N> {
     }
 }
 
-#[deprecated]
+#[deprecated(since = "2.0.0-alpha.13", note = "use `SmallVec::from` instead")]
 #[macro_export]
 macro_rules! smallvec {
     ($elem:expr; $n:expr) => ({
@@ -2801,7 +2801,7 @@ macro_rules! smallvec {
     });
 }
 
-#[deprecated]
+#[deprecated(since = "2.0.0-alpha.13", note = "use `SmallVec::from_buf` instead")]
 #[macro_export]
 macro_rules! smallvec_inline {
     ($elem:expr; $n:expr) => ({
