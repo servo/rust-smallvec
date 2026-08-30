@@ -12,8 +12,6 @@ use core::marker::PhantomData;
 #[repr(transparent)]
 pub struct TaggedLen<T>(usize, PhantomData<T>);
 
-// Clone and Copy must be manually implemented because the generic interferes
-// with the derive attribute implementations.
 impl<T> Clone for TaggedLen<T> {
     #[inline]
     fn clone(&self) -> Self {
@@ -55,11 +53,5 @@ impl<T> TaggedLen<T> {
     #[inline]
     pub const fn value(self) -> usize {
         if Self::IS_ZST { self.0 } else { self.0 >> 1 }
-    }
-}
-
-impl<T> From<TaggedLen<T>> for usize {
-    fn from(value: TaggedLen<T>) -> Self {
-        return value.0;
     }
 }
