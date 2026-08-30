@@ -1,7 +1,12 @@
-use super::SmallVec;
-use borsh::{
-    io::{Result as Serial, Write},
-    BorshSerialize,
+use {
+    super::SmallVec,
+    borsh::{
+        BorshSerialize,
+        io::{
+            Result as Serial,
+            Write
+        }
+    }
 };
 
 impl<Type: BorshSerialize, const INLINE: usize> BorshSerialize for SmallVec<Type, INLINE> {
