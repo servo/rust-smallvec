@@ -31,9 +31,7 @@ fn test_serde() {
     assert_tokens(
         &small_vec,
         &[
-            Token::Seq {
-                len: Some(4)
-            },
+            Token::Seq { len: Some(4) },
             Token::I32(1),
             Token::I32(2),
             Token::I32(3),

@@ -1005,7 +1005,6 @@ fn collect_from_iter() {
 
     impl<I: Iterator> Iterator for IterNoHint<I> {
         type Item = I::Item;
-
         fn next(&mut self) -> Option<Self::Item> {
             self.0.next()
         }
