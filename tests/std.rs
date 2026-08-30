@@ -1,9 +1,10 @@
-use smallvec::SmallVec;
+use {
+    smallvec::SmallVec,
+    std::io::Write
+};
 
 #[test]
 fn test_write() {
-    use std::io::Write;
-
     let data = [1, 2, 3, 4, 5];
 
     let mut small_vec: SmallVec<u8, 2> = SmallVec::new();

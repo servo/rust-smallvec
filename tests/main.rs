@@ -1,12 +1,21 @@
 use {
     core::{
-        hash::Hasher,
+        borrow::{
+            Borrow,
+            BorrowMut
+        },
+        cell::Cell,
+        hash::{
+            Hash,
+            Hasher
+        },
         iter::FromIterator
     },
     smallvec::SmallVec,
     std::{
         borrow::ToOwned,
         boxed::Box,
+        hash::DefaultHasher,
         rc::Rc,
         vec::Vec
     }
@@ -232,8 +241,6 @@ fn into_iter_rev() {
 
 #[test]
 fn into_iter_drop() {
-    use std::cell::Cell;
-
     struct DropCounter<'a>(&'a Cell<i32>);
 
     impl<'a> Drop for DropCounter<'a> {
@@ -492,11 +499,6 @@ fn test_ord() {
 
 #[test]
 fn test_hash() {
-    use std::{
-        collections::hash_map::DefaultHasher,
-        hash::Hash
-    };
-
     fn hash(value: impl Hash) -> u64 {
         let mut hasher = DefaultHasher::new();
         value.hash(&mut hasher);
@@ -544,8 +546,6 @@ fn test_as_mut() {
 
 #[test]
 fn test_borrow() {
-    use std::borrow::Borrow;
-
     let mut a: SmallVec<u32, 2> = SmallVec::new();
     a.push(1);
     assert_eq!(a.borrow(), [1]);
@@ -557,8 +557,6 @@ fn test_borrow() {
 
 #[test]
 fn test_borrow_mut() {
-    use std::borrow::BorrowMut;
-
     let mut a: SmallVec<u32, 2> = SmallVec::new();
     a.push(1);
     assert_eq!(a.borrow_mut(), [1]);

@@ -1,11 +1,13 @@
-use smallvec::SmallVec;
+use {
+    serde_test::{
+        Token,
+        assert_tokens
+    },
+    smallvec::SmallVec
+};
 
 #[test]
 fn test_serde() {
-    use serde_test::{
-        Token,
-        assert_tokens
-    };
     let mut small_vec: SmallVec<i32, 2> = SmallVec::new();
     assert_tokens(
         &small_vec,
