@@ -1,5 +1,10 @@
-use arbitrary::{Arbitrary, Unstructured};
-use smallvec::SmallVec;
+use {
+    arbitrary::{
+        Arbitrary,
+        Unstructured
+    },
+    smallvec::SmallVec
+};
 
 #[test]
 fn test_arbitrary() {

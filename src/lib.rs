@@ -114,6 +114,7 @@ use {
             Hash,
             Hasher
         },
+        iter::repeat_n,
         marker::PhantomData,
         mem::{
             ManuallyDrop,
@@ -125,8 +126,7 @@ use {
             NonNull,
             copy,
             copy_nonoverlapping
-        },
-        iter::repeat_n
+        }
     }
 };
 
@@ -2995,8 +2995,7 @@ impl<T: Debug, const N: usize> Debug for Drain<'_, T, N> {
 #[cfg(feature = "arbitrary")]
 #[cfg_attr(docsrs, doc(cfg(feature = "arbitrary")))]
 impl<'a, T, const N: usize> arbitrary::Arbitrary<'a> for SmallVec<T, N>
-where
-    T: arbitrary::Arbitrary<'a>,
+where T: arbitrary::Arbitrary<'a>
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         u.arbitrary_iter()?.collect()

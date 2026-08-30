@@ -1,9 +1,9 @@
 use {
-    crate::{
+    smallvec::{
         SmallVec,
         smallvec
     },
-    alloc::{
+    std::{
         borrow::ToOwned,
         boxed::Box,
         rc::Rc,
