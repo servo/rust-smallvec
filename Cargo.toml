@@ -21,6 +21,7 @@ serde = ["dep:serde_core"]
 internals = []
 
 [dependencies]
+arbitrary = { version = "1", optional = true, default-features = false }
 borsh = { version = "1.8", optional = true, default-features = false }
 bytes = { version = "1", optional = true, default-features = false }
 serde_core = { version = "1.0.221", optional = true, default-features = false }
@@ -29,6 +30,22 @@ malloc_size_of = { version = "0.1.1", optional = true, default-features = false 
 [dev-dependencies]
 serde_test = "1.0"
 criterion = "0.4.0"
+
+[[test]]
+name = "arbitrary"
+required-features = ["arbitrary"]
+
+[[test]]
+name = "bytes"
+required-features = ["bytes"]
+
+[[test]]
+name = "serde"
+required-features = ["serde"]
+
+[[test]]
+name = "std"
+required-features = ["std"]
 
 [[bench]]
 name = "bench"

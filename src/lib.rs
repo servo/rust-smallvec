@@ -68,8 +68,6 @@ extern crate std;
 #[cfg(feature = "borsh")]
 mod borsh;
 mod rawsmallvec;
-#[cfg(test)]
-mod tests;
 
 use alloc::alloc::Layout;
 use alloc::boxed::Box;
@@ -2792,7 +2790,7 @@ impl<T, const N: usize> core::iter::FromIterator<T> for SmallVec<T, N> {
     }
 }
 
-#[deprecated]
+#[deprecated(since = "2.0.0-alpha.13", note = "use `SmallVec::from` instead")]
 #[macro_export]
 macro_rules! smallvec {
     ($elem:expr; $n:expr) => ({
@@ -2803,7 +2801,7 @@ macro_rules! smallvec {
     });
 }
 
-#[deprecated]
+#[deprecated(since = "2.0.0-alpha.13", note = "use `SmallVec::from_buf` instead")]
 #[macro_export]
 macro_rules! smallvec_inline {
     ($elem:expr; $n:expr) => ({
@@ -2979,6 +2977,25 @@ impl<T: Debug, const N: usize> Debug for IntoIter<T, N> {
 impl<T: Debug, const N: usize> Debug for Drain<'_, T, N> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("Drain").field(&self.iter.as_slice()).finish()
+    }
+}
+
+#[cfg(feature = "arbitrary")]
+#[cfg_attr(docsrs, doc(cfg(feature = "arbitrary")))]
+impl<'a, T, const N: usize> arbitrary::Arbitrary<'a> for SmallVec<T, N>
+where
+    T: arbitrary::Arbitrary<'a>,
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        u.arbitrary_iter()?.collect()
+    }
+
+    fn arbitrary_take_rest(u: arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        u.arbitrary_take_rest_iter()?.collect()
+    }
+
+    fn size_hint(depth: usize) -> (usize, Option<usize>) {
+        arbitrary::size_hint::and(<usize as arbitrary::Arbitrary>::size_hint(depth), (0, None))
     }
 }
 
