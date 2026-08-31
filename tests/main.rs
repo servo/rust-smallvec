@@ -386,7 +386,7 @@ fn test_append() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "new_capacity >= len")]
 fn test_invalid_grow() {
     let mut v: SmallVec<u8, 8> = SmallVec::new();
     v.extend(0..8);
@@ -394,7 +394,7 @@ fn test_invalid_grow() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "attempted to index slice up to maximum usize")]
 fn drain_overflow() {
     let mut v: SmallVec<u8, 8> = smallvec![0];
     v.drain(..=usize::MAX);
@@ -425,7 +425,7 @@ fn test_extend_from_within() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "drop")]
 fn test_drop_panic_smallvec() {
     // This test should only panic once, and not double panic,
     // which would mean a double drop
@@ -963,21 +963,21 @@ fn max_dont_panic() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "removal index")]
 fn max_remove() {
     let mut sv: SmallVec<i32, 2> = smallvec![0];
     sv.remove(usize::MAX);
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "swap_remove index")]
 fn max_swap_remove() {
     let mut sv: SmallVec<i32, 2> = smallvec![0];
     sv.swap_remove(usize::MAX);
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "insertion index")]
 fn max_insert() {
     let mut sv: SmallVec<i32, 2> = smallvec![0];
     sv.insert(usize::MAX, 0);

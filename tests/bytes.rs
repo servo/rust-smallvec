@@ -60,7 +60,7 @@ fn test_put_int() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "cannot write")]
 fn test_put_int_nbytes_overflow() {
     let mut buf = SmallVec::with_capacity(8);
     buf.put_int(0x1020304050607080, 9);
@@ -74,14 +74,14 @@ fn test_put_int_le() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "cannot write")]
 fn test_put_int_le_nbytes_overflow() {
     let mut buf = SmallVec::with_capacity(8);
     buf.put_int_le(0x1020304050607080, 9);
 }
 
 #[test]
-#[should_panic(expected = "advance out of bounds: the len is 8 but advancing by 12")]
+#[should_panic(expected = "advance out of bounds")]
 fn test_smallvec_advance_mut() {
     let mut buf = SmallVec::with_capacity(8);
     unsafe {
