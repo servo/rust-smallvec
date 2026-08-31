@@ -1,16 +1,14 @@
 [package]
 name = "smallvec"
 version = "2.0.0-alpha.12"
-edition = "2021"
-rust-version = "1.83"
+edition = "2024"
+rust-version = "1.86"
 authors = ["The Servo Project Developers"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/servo/rust-smallvec"
 description = "'Small vector' optimization: store up to a small number of items on the stack"
 keywords = ["small", "vec", "vector", "stack", "no_std"]
 categories = ["data-structures"]
-readme = "README.md"
-documentation = "https://docs.rs/smallvec/"
 exclude = [".gitignore", "tests/", "fuzz/", "benches/", ".github/"]
 
 [features]
@@ -19,16 +17,19 @@ specialization = []
 may_dangle = []
 serde = ["dep:serde_core"]
 internals = []
+borsh = ["dep:borsh"]
 
 [dependencies]
-arbitrary = { version = "1", optional = true, default-features = false }
-bytes = { version = "1", optional = true, default-features = false }
-serde_core = { version = "1.0.221", optional = true, default-features = false }
-malloc_size_of = { version = "0.1.1", optional = true, default-features = false }
+arbitrary = { version = "1.4", optional = true, default-features = false }
+borsh = { version = "1.8", optional = true, features = ["derive", "unstable__schema"], default-features = false }
+bytes = { version = "1.12", optional = true, default-features = false }
+defmt = { version = "1.1", optional = true, default-features = false}
+serde_core = { version = "1.0", optional = true, default-features = false }
+malloc_size_of = { version = "0.1", optional = true, default-features = false }
 
 [dev-dependencies]
 serde_test = "1.0"
-criterion = "0.4.0"
+criterion = "0.8"
 
 [[test]]
 name = "arbitrary"
