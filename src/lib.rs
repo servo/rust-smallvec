@@ -67,6 +67,7 @@ extern crate std;
 
 #[cfg(feature = "borsh")]
 mod borsh;
+mod macros;
 mod rawsmallvec;
 
 #[cfg(feature = "bytes")]
@@ -253,7 +254,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     /// The vector must be on the heap
     #[inline]
     const unsafe fn as_ptr_heap(&self) -> *const T {
-        self.heap.0.as_ptr()
+        return unsafe { self.heap.0.as_ptr() };
     }
 
     /// # Safety
@@ -261,7 +262,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     /// The vector must be on the heap
     #[inline]
     const unsafe fn as_mut_ptr_heap(&mut self) -> *mut T {
-        self.heap.0.as_ptr()
+        return unsafe { self.heap.0.as_ptr() };
     }
 
     /// # Safety
@@ -283,7 +284,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
 
         let was_on_heap = len.on_heap();
         let ptr = if was_on_heap {
-            self.as_mut_ptr_heap()
+            unsafe { self.as_mut_ptr_heap() }
         } else {
             self.as_mut_ptr_inline()
         };
@@ -297,19 +298,20 @@ impl<T, const N: usize> RawSmallVec<T, N> {
 
         let new_ptr = if !was_on_heap {
             // get a fresh allocation
-            let new_ptr = alloc(new_layout) as *mut T; // `new_layout` has nonzero size.
+            let new_ptr = unsafe { alloc(new_layout) } as *mut T; // `new_layout` has nonzero size.
             let new_ptr = NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr {
                 layout: new_layout
             })?;
-            copy_nonoverlapping(ptr, new_ptr.as_ptr(), len);
+            unsafe { copy_nonoverlapping(ptr, new_ptr.as_ptr(), len) };
             new_ptr
         } else {
             // use realloc
 
             // this can't overflow since we already constructed an equivalent
             // layout during the previous allocation
-            let old_layout =
-                Layout::from_size_align_unchecked(self.heap.1 * size_of::<T>(), align_of::<T>());
+            let old_layout = unsafe {
+                Layout::from_size_align_unchecked(self.heap.1 * size_of::<T>(), align_of::<T>())
+            };
 
             // SAFETY: ptr was allocated with this allocator
             // old_layout is the same as the layout used to allocate the
@@ -317,7 +319,8 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             // than zero does not overflow when rounded up to
             // alignment. since it was constructed
             // with Layout::array
-            let new_ptr = realloc(ptr as *mut u8, old_layout, new_layout.size()) as *mut T;
+            let new_ptr =
+                unsafe { realloc(ptr as *mut u8, old_layout, new_layout.size()) } as *mut T;
             NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr {
                 layout: new_layout
             })?
@@ -561,8 +564,10 @@ impl<T, const N: usize> Drain<'_, T, N> {
 
         for place in range_slice {
             if let Some(new_item) = replace_with.next() {
-                unsafe { core::ptr::write(place, new_item) };
-                vec.set_len(vec.len() + 1);
+                unsafe {
+                    core::ptr::write(place, new_item);
+                    vec.set_len(vec.len() + 1);
+                }
             } else {
                 return false;
             }
@@ -578,9 +583,9 @@ impl<T, const N: usize> Drain<'_, T, N> {
 
         // Test
         let old_len = vec.len();
-        vec.set_len(len);
+        unsafe { vec.set_len(len) }
         vec.reserve(additional);
-        vec.set_len(old_len);
+        unsafe { vec.set_len(old_len) };
 
         let new_tail_start = self.tail_start + additional;
         unsafe {
@@ -2841,28 +2846,6 @@ impl<T, const N: usize> core::iter::FromIterator<T> for SmallVec<T, N> {
     }
 }
 
-#[deprecated(since = "2.0.0-alpha.13", note = "use `SmallVec::from` instead")]
-#[macro_export]
-macro_rules! smallvec {
-    ($elem:expr; $n:expr) => ({
-        $crate::from_elem($elem, $n)
-    });
-    ($($($x:expr),+$(,)?)?) => ({
-        $crate::SmallVec::from([$($($x),+)?])
-    });
-}
-
-#[deprecated(since = "2.0.0-alpha.13", note = "use `SmallVec::from_buf` instead")]
-#[macro_export]
-macro_rules! smallvec_inline {
-    ($elem:expr; $n:expr) => ({
-        $crate::SmallVec::<_, $n>::from_buf([$elem; $n])
-    });
-    ($($($x:expr),+$(,)?)?) => ({
-        $crate::SmallVec::from_buf([$($($x),+)?])
-    });
-}
-
 impl<T, const N: usize> IntoIterator for SmallVec<T, N> {
     type IntoIter = IntoIter<T, N>;
     type Item = T;
@@ -3162,7 +3145,7 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
         }
 
         // Addition will not overflow since the sum is at most the capacity.
-        self.set_len(len + cnt);
+        unsafe { self.set_len(len + cnt) };
     }
 
     #[inline]

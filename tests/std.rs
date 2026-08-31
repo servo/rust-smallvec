@@ -4,7 +4,7 @@ use {
 };
 
 #[test]
-fn test_write() {
+fn write() {
     let data = [1, 2, 3, 4, 5];
 
     let mut small_vec: SmallVec<u8, 2> = SmallVec::new();

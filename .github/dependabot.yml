@@ -1,0 +1,6 @@
+version: 2
+updates:
+  - package-ecosystem: "Cargo"
+    directory: "/"
+    schedule:
+      interval: "daily"

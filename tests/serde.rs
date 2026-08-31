@@ -7,7 +7,7 @@ use {
 };
 
 #[test]
-fn test_serde() {
+fn serde() {
     let mut small_vec: SmallVec<i32, 2> = SmallVec::new();
     assert_tokens(
         &small_vec,
