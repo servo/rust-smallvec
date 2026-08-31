@@ -1,23 +1,23 @@
 use {
     super::super::{
+        DropDealloc,
         SmallVec,
         rawsmallvec::RawSmallVec,
-        taggedlen::TaggedLen,
-        DropDealloc
+        taggedlen::TaggedLen
     },
     core::{
-        marker::PhantomData,
-        ptr::{
-            NonNull,
-            slice_from_raw_parts_mut
-        },
         fmt::{
             Debug,
             Formatter,
             Result as Format
         },
         iter::FusedIterator,
-        mem::ManuallyDrop
+        marker::PhantomData,
+        mem::ManuallyDrop,
+        ptr::{
+            NonNull,
+            slice_from_raw_parts_mut
+        }
     }
 };
 

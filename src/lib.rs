@@ -88,6 +88,10 @@ use defmt::{
     Formatter as DeFormatter,
     write as dewrite
 };
+pub use iterators::{
+    extractif::ExtractIf,
+    intoiter::IntoIter
+};
 #[cfg(feature = "std")]
 use std::io;
 use {
@@ -116,10 +120,6 @@ use {
             copy_nonoverlapping
         }
     }
-};
-pub use iterators::{
-    intoiter::IntoIter,
-    extractif::ExtractIf
 };
 #[cfg(feature = "internals")]
 pub use {
@@ -872,8 +872,8 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// );
     /// assert_eq!(ones.len(), 3);
     /// ```
-    //pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> ExtractIf<'_, T, N, F>
-    //where
+    // pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> ExtractIf<'_,
+    // T, N, F> where
     //    F: FnMut(&mut T) -> bool,
     //    R: core::ops::RangeBounds<usize>
     //{
@@ -1887,9 +1887,9 @@ mod spec_traits {
         }
     }
 
-    //impl<T, const N: usize, const M: usize> SpecExtend<T, IntoIter<T, M>> for SmallVec<T, N> {
-    //    fn spec_extend(&mut self, mut iter: IntoIter<T, M>) {
-    //        let slice = iter.as_slice();
+    // impl<T, const N: usize, const M: usize> SpecExtend<T, IntoIter<T, M>> for
+    // SmallVec<T, N> {    fn spec_extend(&mut self, mut iter: IntoIter<T,
+    // M>) {        let slice = iter.as_slice();
     //        let len = slice.len();
     //        let old_len = self.len();
     //
