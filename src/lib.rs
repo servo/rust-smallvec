@@ -67,6 +67,7 @@ extern crate std;
 
 #[cfg(feature = "borsh")]
 mod borsh;
+mod macros;
 mod rawsmallvec;
 mod taggedlen;
 
@@ -393,8 +394,10 @@ impl<T, const N: usize> Drain<'_, T, N> {
 
         for place in range_slice {
             if let Some(new_item) = replace_with.next() {
-                unsafe { core::ptr::write(place, new_item) };
-                vec.set_len(vec.len() + 1);
+                unsafe {
+                    core::ptr::write(place, new_item);
+                    vec.set_len(vec.len() + 1);
+                }
             } else {
                 return false;
             }
@@ -410,9 +413,9 @@ impl<T, const N: usize> Drain<'_, T, N> {
 
         // Test
         let old_len = vec.len();
-        vec.set_len(len);
+        unsafe { vec.set_len(len) }
         vec.reserve(additional);
-        vec.set_len(old_len);
+        unsafe { vec.set_len(old_len) };
 
         let new_tail_start = self.tail_start + additional;
         unsafe {
@@ -2673,28 +2676,6 @@ impl<T, const N: usize> core::iter::FromIterator<T> for SmallVec<T, N> {
     }
 }
 
-#[deprecated(since = "2.0.0-alpha.13", note = "use `SmallVec::from` instead")]
-#[macro_export]
-macro_rules! smallvec {
-    ($elem:expr; $n:expr) => ({
-        $crate::from_elem($elem, $n)
-    });
-    ($($($x:expr),+$(,)?)?) => ({
-        $crate::SmallVec::from([$($($x),+)?])
-    });
-}
-
-#[deprecated(since = "2.0.0-alpha.13", note = "use `SmallVec::from_buf` instead")]
-#[macro_export]
-macro_rules! smallvec_inline {
-    ($elem:expr; $n:expr) => ({
-        $crate::SmallVec::<_, $n>::from_buf([$elem; $n])
-    });
-    ($($($x:expr),+$(,)?)?) => ({
-        $crate::SmallVec::from_buf([$($($x),+)?])
-    });
-}
-
 impl<T, const N: usize> IntoIterator for SmallVec<T, N> {
     type IntoIter = IntoIter<T, N>;
     type Item = T;
@@ -2994,7 +2975,7 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
         }
 
         // Addition will not overflow since the sum is at most the capacity.
-        self.set_len(len + cnt);
+        unsafe { self.set_len(len + cnt) };
     }
 
     #[inline]
