@@ -1,7 +1,7 @@
 use smallvec::SmallVec;
 
 #[test]
-fn test_serde() {
+fn serde() {
     use serde_test::{
         Token,
         assert_tokens

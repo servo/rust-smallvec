@@ -1,8 +1,8 @@
 [package]
 name = "smallvec"
 version = "2.0.0-alpha.12"
-edition = "2021"
-rust-version = "1.83"
+edition = "2024"
+rust-version = "1.86"
 authors = ["The Servo Project Developers"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/servo/rust-smallvec"
@@ -29,7 +29,7 @@ malloc_size_of = { version = "0.1", optional = true, default-features = false }
 
 [dev-dependencies]
 serde_test = "1.0"
-criterion = "0.4"
+criterion = "0.8"
 
 [[test]]
 name = "arbitrary"
