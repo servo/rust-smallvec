@@ -2,10 +2,7 @@ pub mod extractif;
 pub mod intoiter;
 
 use {
-    super::{
-        SmallVec,
-        spec_traits::SpecFromIterator
-    },
+    super::SmallVec,
     core::{
         iter::FromIterator,
         slice::{
@@ -20,7 +17,7 @@ impl<T, const N: usize> FromIterator<T> for SmallVec<T, N> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         #[cfg(feature = "specialization")]
         {
-            SpecFromIterator::<T, _>::spec_from_iter(iter.into_iter())
+            super::spec_traits::SpecFromIterator::<T, _>::spec_from_iter(iter.into_iter())
         }
 
         #[cfg(not(feature = "specialization"))]
