@@ -67,12 +67,14 @@ extern crate std;
 
 #[cfg(feature = "borsh")]
 mod borsh;
+mod macros;
 #[cfg(feature = "malloc_size_of")]
 mod mallocsizeof;
 mod rawsmallvec;
 mod references;
 #[cfg(feature = "serde")]
 mod serde;
+mod taggedlen;
 
 #[cfg(feature = "bytes")]
 use bytes::{
@@ -85,10 +87,6 @@ use defmt::{
     Formatter as DeFormatter,
     write as dewrite
 };
-#[cfg(feature = "internals")]
-pub use rawsmallvec::RawSmallVec;
-#[cfg(not(feature = "internals"))]
-use rawsmallvec::RawSmallVec;
 #[cfg(feature = "std")]
 use std::io;
 use {
@@ -117,6 +115,16 @@ use {
             copy_nonoverlapping
         }
     }
+};
+#[cfg(feature = "internals")]
+pub use {
+    rawsmallvec::RawSmallVec,
+    taggedlen::TaggedLen
+};
+#[cfg(not(feature = "internals"))]
+use {
+    rawsmallvec::RawSmallVec,
+    taggedlen::TaggedLen
 };
 
 /// Error type for APIs with fallible heap allocation
@@ -188,181 +196,6 @@ where R: core::ops::RangeBounds<usize> {
     core::ops::Range {
         start,
         end
-    }
-}
-
-impl<T, const N: usize> RawSmallVec<T, N> {
-    const IS_ZST: bool = is_zst::<T>();
-
-    #[inline]
-    const fn new() -> Self {
-        Self::new_inline(MaybeUninit::uninit())
-    }
-
-    #[inline]
-    const fn new_inline(inline: MaybeUninit<[T; N]>) -> Self {
-        Self {
-            inline: ManuallyDrop::new(inline)
-        }
-    }
-
-    #[inline]
-    const fn new_heap(ptr: NonNull<T>, capacity: usize) -> Self {
-        Self {
-            heap: (ptr, capacity)
-        }
-    }
-
-    #[inline]
-    const fn as_ptr_inline(&self) -> *const T {
-        // SAFETY: it is safe because we aren't reading the value, just getting
-        // a reference to it. reading it would be UB potentially, but
-        // for that downstream unsafe is required
-        #[allow(unused_unsafe, reason = "Unsafe in MSRV")]
-        (unsafe { &raw const self.inline }).cast()
-    }
-
-    #[inline]
-    const fn as_mut_ptr_inline(&mut self) -> *mut T {
-        // SAFETY: same as above
-        #[allow(unused_unsafe, reason = "Unsafe in MSRV")]
-        (unsafe { &raw mut self.inline }).cast()
-    }
-
-    /// # Safety
-    ///
-    /// The vector must be on the heap
-    #[inline]
-    const unsafe fn as_ptr_heap(&self) -> *const T {
-        self.heap.0.as_ptr()
-    }
-
-    /// # Safety
-    ///
-    /// The vector must be on the heap
-    #[inline]
-    const unsafe fn as_mut_ptr_heap(&mut self) -> *mut T {
-        self.heap.0.as_ptr()
-    }
-
-    /// # Safety
-    ///
-    /// `new_capacity` must be non zero, and greater or equal to the length.
-    /// T must not be a ZST.
-    unsafe fn try_grow_raw(
-        &mut self,
-        len: TaggedLen<T>,
-        new_capacity: usize
-    ) -> Result<(), CollectionAllocErr> {
-        use alloc::alloc::{
-            alloc,
-            realloc
-        };
-        debug_assert!(!Self::IS_ZST);
-        debug_assert!(new_capacity > 0);
-        debug_assert!(new_capacity >= len.value());
-
-        let was_on_heap = len.on_heap();
-        let ptr = if was_on_heap {
-            self.as_mut_ptr_heap()
-        } else {
-            self.as_mut_ptr_inline()
-        };
-        let len = len.value();
-
-        let new_layout =
-            Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
-        if new_layout.size() > isize::MAX as usize {
-            return Err(CollectionAllocErr::CapacityOverflow);
-        }
-
-        let new_ptr = if !was_on_heap {
-            // get a fresh allocation
-            let new_ptr = alloc(new_layout) as *mut T; // `new_layout` has nonzero size.
-            let new_ptr = NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr {
-                layout: new_layout
-            })?;
-            copy_nonoverlapping(ptr, new_ptr.as_ptr(), len);
-            new_ptr
-        } else {
-            // use realloc
-
-            // this can't overflow since we already constructed an equivalent
-            // layout during the previous allocation
-            let old_layout =
-                Layout::from_size_align_unchecked(self.heap.1 * size_of::<T>(), align_of::<T>());
-
-            // SAFETY: ptr was allocated with this allocator
-            // old_layout is the same as the layout used to allocate the
-            // previous memory block new_layout.size() is greater
-            // than zero does not overflow when rounded up to
-            // alignment. since it was constructed
-            // with Layout::array
-            let new_ptr = realloc(ptr as *mut u8, old_layout, new_layout.size()) as *mut T;
-            NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr {
-                layout: new_layout
-            })?
-        };
-        *self = Self::new_heap(new_ptr, new_capacity);
-        Ok(())
-    }
-}
-
-/// Vec guarantees that its length is always less than [`isize::MAX`] in
-/// *bytes*.
-///
-/// For a non ZST, this means that the length is less than `isize::MAX` objects,
-/// which implies we have at least one free bit we can use. We use the least
-/// significant bit for the tag. And store the length in the `usize::BITS - 1`
-/// most significant bits.
-///
-/// For a ZST, we never use the heap, so we just store the length directly.
-#[repr(transparent)]
-struct TaggedLen<T>(usize, PhantomData<T>);
-
-// Clone and Copy must be manually implemented because the generic interferes
-// with the derive attribute implementations.
-impl<T> Clone for TaggedLen<T> {
-    #[inline]
-    fn clone(&self) -> Self {
-        Self(self.0, PhantomData)
-    }
-
-    #[inline]
-    fn clone_from(&mut self, source: &Self) {
-        self.0 = source.0;
-    }
-}
-
-impl<T> Copy for TaggedLen<T> {}
-
-impl<T> TaggedLen<T> {
-    const IS_ZST: bool = is_zst::<T>();
-
-    #[inline]
-    pub const fn new(len: usize, on_heap: bool) -> Self {
-        if Self::IS_ZST {
-            debug_assert!(!on_heap);
-            Self(len, PhantomData)
-        } else {
-            debug_assert!(len < isize::MAX as usize);
-            Self((len << 1) | on_heap as usize, PhantomData)
-        }
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn on_heap(self) -> bool {
-        if Self::IS_ZST {
-            false
-        } else {
-            (self.0 & 1_usize) == 1
-        }
-    }
-
-    #[inline]
-    pub const fn value(self) -> usize {
-        if Self::IS_ZST { self.0 } else { self.0 >> 1 }
     }
 }
 
@@ -542,8 +375,10 @@ impl<T, const N: usize> Drain<'_, T, N> {
 
         for place in range_slice {
             if let Some(new_item) = replace_with.next() {
-                unsafe { core::ptr::write(place, new_item) };
-                vec.set_len(vec.len() + 1);
+                unsafe {
+                    core::ptr::write(place, new_item);
+                    vec.set_len(vec.len() + 1);
+                }
             } else {
                 return false;
             }
@@ -559,9 +394,9 @@ impl<T, const N: usize> Drain<'_, T, N> {
 
         // Test
         let old_len = vec.len();
-        vec.set_len(len);
+        unsafe { vec.set_len(len) }
         vec.reserve(additional);
-        vec.set_len(old_len);
+        unsafe { vec.set_len(old_len) };
 
         let new_tail_start = self.tail_start + additional;
         unsafe {
@@ -2807,28 +2642,6 @@ impl<T, const N: usize> core::iter::FromIterator<T> for SmallVec<T, N> {
     }
 }
 
-#[deprecated(since = "2.0.0-alpha.13", note = "use `SmallVec::from` instead")]
-#[macro_export]
-macro_rules! smallvec {
-    ($elem:expr; $n:expr) => ({
-        $crate::from_elem($elem, $n)
-    });
-    ($($($x:expr),+$(,)?)?) => ({
-        $crate::SmallVec::from([$($($x),+)?])
-    });
-}
-
-#[deprecated(since = "2.0.0-alpha.13", note = "use `SmallVec::from_buf` instead")]
-#[macro_export]
-macro_rules! smallvec_inline {
-    ($elem:expr; $n:expr) => ({
-        $crate::SmallVec::<_, $n>::from_buf([$elem; $n])
-    });
-    ($($($x:expr),+$(,)?)?) => ({
-        $crate::SmallVec::from_buf([$($($x),+)?])
-    });
-}
-
 impl<T, const N: usize> IntoIterator for SmallVec<T, N> {
     type IntoIter = IntoIter<T, N>;
     type Item = T;
@@ -3022,7 +2835,7 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
         }
 
         // Addition will not overflow since the sum is at most the capacity.
-        self.set_len(len + cnt);
+        unsafe { self.set_len(len + cnt) };
     }
 
     #[inline]
