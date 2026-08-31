@@ -60,7 +60,7 @@ fn test_put_int() {
 }
 
 #[test]
-#[should_panic(expected = "cannot write")]
+#[should_panic(expected = "size too large")]
 fn test_put_int_nbytes_overflow() {
     let mut buf = SmallVec::with_capacity(8);
     buf.put_int(0x1020304050607080, 9);
@@ -74,7 +74,7 @@ fn test_put_int_le() {
 }
 
 #[test]
-#[should_panic(expected = "cannot write")]
+#[should_panic(expected = "size too large")]
 fn test_put_int_le_nbytes_overflow() {
     let mut buf = SmallVec::with_capacity(8);
     buf.put_int_le(0x1020304050607080, 9);
