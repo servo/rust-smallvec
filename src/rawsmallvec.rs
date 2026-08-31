@@ -70,7 +70,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     /// The vector must be on the heap
     #[inline]
     pub const unsafe fn as_ptr_heap(&self) -> *const T {
-        self.heap.0.as_ptr()
+        unsafe { self.heap.0.as_ptr() }
     }
 
     /// # Safety
@@ -78,7 +78,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     /// The vector must be on the heap
     #[inline]
     pub const unsafe fn as_mut_ptr_heap(&mut self) -> *mut T {
-        self.heap.0.as_ptr()
+        unsafe { self.heap.0.as_ptr() }
     }
 
     /// # Safety
@@ -100,7 +100,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
 
         let was_on_heap = len.on_heap();
         let ptr = if was_on_heap {
-            self.as_mut_ptr_heap()
+            unsafe { self.as_mut_ptr_heap() }
         } else {
             self.as_mut_ptr_inline()
         };
@@ -114,19 +114,20 @@ impl<T, const N: usize> RawSmallVec<T, N> {
 
         let new_ptr = if !was_on_heap {
             // get a fresh allocation
-            let new_ptr = alloc(new_layout) as *mut T; // `new_layout` has nonzero size.
+            let new_ptr = unsafe { alloc(new_layout) } as *mut T; // `new_layout` has nonzero size.
             let new_ptr = NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr {
                 layout: new_layout
             })?;
-            copy_nonoverlapping(ptr, new_ptr.as_ptr(), len);
+            unsafe { copy_nonoverlapping(ptr, new_ptr.as_ptr(), len) };
             new_ptr
         } else {
             // use realloc
 
             // this can't overflow since we already constructed an equivalent
             // layout during the previous allocation
-            let old_layout =
-                Layout::from_size_align_unchecked(self.heap.1 * size_of::<T>(), align_of::<T>());
+            let old_layout = unsafe {
+                Layout::from_size_align_unchecked(self.heap.1 * size_of::<T>(), align_of::<T>())
+            };
 
             // SAFETY: ptr was allocated with this allocator
             // old_layout is the same as the layout used to allocate the
@@ -134,7 +135,8 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             // than zero does not overflow when rounded up to
             // alignment. since it was constructed
             // with Layout::array
-            let new_ptr = realloc(ptr as *mut u8, old_layout, new_layout.size()) as *mut T;
+            let new_ptr =
+                unsafe { realloc(ptr as *mut u8, old_layout, new_layout.size()) } as *mut T;
             NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr {
                 layout: new_layout
             })?
