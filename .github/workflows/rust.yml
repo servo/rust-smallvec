@@ -28,7 +28,7 @@ jobs:
             toolchain: nightly
             nightly: true
           - name: MSRV
-            toolchain: "1.83.0"
+            toolchain: "1.86.0"
           - name: no_std
             toolchain: stable
             target: thumbv7m-none-eabi
