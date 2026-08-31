@@ -158,12 +158,6 @@ fn infallible<T>(result: Result<T, CollectionAllocErr>) -> T {
     }
 }
 
-/// Helper function to check if a type is a ZST.
-#[inline]
-const fn is_zst<T>() -> bool {
-    const { size_of::<T>() == 0 }
-}
-
 #[inline]
 /// A local copy of [`core::slice::range`]. The latter function is unstable
 /// and thus cannot be used yet.
@@ -810,7 +804,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 }
 
 impl<T, const N: usize> SmallVec<T, N> {
-    const IS_ZST: bool = is_zst::<T>();
+    const IS_ZST: bool = size_of::<T>() == 0;
 
     #[inline]
     pub fn from_vec(vec: Vec<T>) -> Self {
