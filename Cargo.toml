@@ -17,7 +17,6 @@ specialization = []
 may_dangle = []
 serde = ["dep:serde_core"]
 internals = []
-borsh = ["dep:borsh"]
 
 [dependencies]
 arbitrary = { version = "1.4", optional = true, default-features = false }
