@@ -36,6 +36,10 @@ name = "arbitrary"
 required-features = ["arbitrary"]
 
 [[test]]
+name = "borsh"
+required-features = ["borsh"]
+
+[[test]]
 name = "bytes"
 required-features = ["bytes"]
 
