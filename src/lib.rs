@@ -67,6 +67,8 @@ extern crate std;
 
 #[cfg(feature = "borsh")]
 mod borsh;
+mod comparisons;
+mod conversions;
 mod macros;
 #[cfg(feature = "malloc_size_of")]
 mod mallocsizeof;
@@ -2556,97 +2558,6 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 }
 
-impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N> {
-    #[inline]
-    fn from(slice: &[T]) -> Self {
-        if slice.len() > Self::inline_size() {
-            // Standard Rust vectors are already specialized.
-            Self::from_vec(Vec::from(slice))
-        } else {
-            // SAFETY: The precondition is checked in the initial comparison
-            // above.
-            unsafe {
-                #[cfg(feature = "specialization")]
-                {
-                    <Self as spec_traits::SpecFromSlice<T>>::spec_from(slice)
-                }
-
-                #[cfg(not(feature = "specialization"))]
-                {
-                    Self::from_slice_fallback(slice)
-                }
-            }
-        }
-    }
-}
-
-impl<T: Clone, const N: usize> From<&mut [T]> for SmallVec<T, N> {
-    #[inline]
-    fn from(slice: &mut [T]) -> Self {
-        Self::from(slice as &[T])
-    }
-}
-
-impl<T: Clone, const M: usize, const N: usize> From<&[T; M]> for SmallVec<T, N> {
-    #[inline]
-    fn from(slice: &[T; M]) -> Self {
-        Self::from(slice as &[T])
-    }
-}
-
-impl<T: Clone, const M: usize, const N: usize> From<&mut [T; M]> for SmallVec<T, N> {
-    #[inline]
-    fn from(slice: &mut [T; M]) -> Self {
-        Self::from(slice as &[T])
-    }
-}
-
-impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N> {
-    fn from(array: [T; M]) -> Self {
-        if M > N {
-            // If M > N, we'd have to heap allocate anyway,
-            // so delegate for Vec for the allocation.
-            Self::from(Vec::from(array))
-        } else {
-            // M <= N
-            let mut this = Self::new();
-            debug_assert!(M <= this.capacity());
-            let array = ManuallyDrop::new(array);
-            // SAFETY: M <= this.capacity()
-            unsafe {
-                copy_nonoverlapping(array.as_ptr(), this.as_mut_ptr(), M);
-                this.set_len(M);
-            }
-            this
-        }
-    }
-}
-
-impl<T, const N: usize, const M: usize> TryFrom<SmallVec<T, N>> for [T; M] {
-    type Error = SmallVec<T, N>;
-
-    #[inline]
-    fn try_from(mut this: SmallVec<T, N>) -> Result<[T; M], SmallVec<T, N>> {
-        if this.len() != M {
-            Err(this)
-        } else {
-            // SAFETY: we release ownership of the elements we hold
-            unsafe {
-                this.set_len(0);
-            }
-            let ptr = this.as_ptr() as *const [T; M];
-            // SAFETY: these elements are initialized since the length was `M`
-            unsafe { Ok(ptr.read()) }
-        }
-    }
-}
-
-impl<T, const N: usize> From<Vec<T>> for SmallVec<T, N> {
-    fn from(array: Vec<T>) -> Self {
-        Self::from_vec(array)
-    }
-}
-
 impl<T: Clone, const N: usize> Clone for SmallVec<T, N> {
     #[inline]
     fn clone(&self) -> SmallVec<T, N> {
@@ -2755,79 +2666,6 @@ impl<'a, T, const N: usize> IntoIterator for &'a mut SmallVec<T, N> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
-    }
-}
-
-impl<T, U, const N: usize, const M: usize> PartialEq<SmallVec<U, M>> for SmallVec<T, N>
-where T: PartialEq<U>
-{
-    #[inline]
-    fn eq(&self, other: &SmallVec<U, M>) -> bool {
-        self.as_slice().eq(other.as_slice())
-    }
-}
-impl<T, const N: usize> Eq for SmallVec<T, N> where T: Eq {}
-
-impl<T, U, const N: usize, const M: usize> PartialEq<[U; M]> for SmallVec<T, N>
-where T: PartialEq<U>
-{
-    #[inline]
-    fn eq(&self, other: &[U; M]) -> bool {
-        self[..] == other[..]
-    }
-}
-
-impl<T, U, const N: usize, const M: usize> PartialEq<&[U; M]> for SmallVec<T, N>
-where T: PartialEq<U>
-{
-    #[inline]
-    fn eq(&self, other: &&[U; M]) -> bool {
-        self[..] == other[..]
-    }
-}
-
-impl<T, U, const N: usize> PartialEq<[U]> for SmallVec<T, N>
-where T: PartialEq<U>
-{
-    #[inline]
-    fn eq(&self, other: &[U]) -> bool {
-        self[..] == other[..]
-    }
-}
-
-impl<T, U, const N: usize> PartialEq<&[U]> for SmallVec<T, N>
-where T: PartialEq<U>
-{
-    #[inline]
-    fn eq(&self, other: &&[U]) -> bool {
-        self[..] == other[..]
-    }
-}
-
-impl<T, U, const N: usize> PartialEq<&mut [U]> for SmallVec<T, N>
-where T: PartialEq<U>
-{
-    #[inline]
-    fn eq(&self, other: &&mut [U]) -> bool {
-        self[..] == other[..]
-    }
-}
-
-impl<T, const N: usize> PartialOrd for SmallVec<T, N>
-where T: PartialOrd
-{
-    #[inline]
-    fn partial_cmp(&self, other: &SmallVec<T, N>) -> Option<core::cmp::Ordering> {
-        self.as_slice().partial_cmp(other.as_slice())
-    }
-}
-
-impl<T, const N: usize> Ord for SmallVec<T, N>
-where T: Ord
-{
-    #[inline]
-    fn cmp(&self, other: &SmallVec<T, N>) -> core::cmp::Ordering {
-        self.as_slice().cmp(other.as_slice())
     }
 }
 
