@@ -657,8 +657,8 @@ fn test_into_iter_as_slice() {
 
 #[test]
 fn test_into_iter_clone() {
-    // Test that the cloned iterator yields identical elements and that it owns its
-    // own copy (i.e. no use after move errors).
+    // Test that the cloned iterator yields identical elements and that it owns
+    // its own copy (i.e. no use after move errors).
     let mut iter = SmallVec::<[u8; 2]>::from_iter(0..3).into_iter();
     let mut clone_iter = iter.clone();
     while let Some(x) = iter.next() {
