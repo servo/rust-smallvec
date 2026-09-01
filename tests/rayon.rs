@@ -1,13 +1,14 @@
-use {
-    rayon::{
-        iter::ParallelIterator,
-        prelude::ParallelSlice
-    },
-    smallvec::SmallVec
-};
-
+#[cfg(not(miri))]
 #[test]
 fn rayon() {
+    use {
+        rayon::{
+            iter::ParallelIterator,
+            prelude::ParallelSlice
+        },
+        smallvec::SmallVec
+    };
+
     assert_eq!(
         [0, 1, 2, 3]
             .par_chunks(2)
