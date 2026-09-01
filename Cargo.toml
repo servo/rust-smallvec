@@ -41,6 +41,10 @@ name = "bytes"
 required-features = ["bytes"]
 
 [[test]]
+name = "rayon"
+required-features = ["rayon"]
+
+[[test]]
 name = "serde"
 required-features = ["serde"]
 

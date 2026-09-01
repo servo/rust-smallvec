@@ -21,7 +21,7 @@ use {
     }
 };
 
-pub(crate) struct SliceDrain<'a, T>(slice::IterMut<'a, T>);
+struct SliceDrain<'a, T>(slice::IterMut<'a, T>);
 
 impl<T> Iterator for SliceDrain<'_, T> {
     type Item = T;
@@ -82,11 +82,13 @@ impl<T: Send, const N: usize> ParallelIterator for SmallVec<T, N> {
             len,
             DrainProducer(unsafe {
                 // SAFETY: set_len(0) is always valid
-                // All items will either be passed out or dropped by DrainProducer/SliceDrop, so
-                // there shouldn't be any possibility for leakage
+                // All items will either be passed out or dropped by
+                // DrainProducer/SliceDrop, so there shouldn't
+                // be any possibility for leakage
                 self.set_len(0);
 
-                // SAFETY: set_len didn't deallocate/drop the elements, so they are still valid.
+                // SAFETY: set_len didn't deallocate/drop the elements, so they
+                // are still valid.
                 slice::from_raw_parts_mut(self.as_mut_ptr(), len)
             }),
             consumer
