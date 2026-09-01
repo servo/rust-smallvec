@@ -18,9 +18,6 @@ opt-level = 3
 debug = false
 strip = true
 
-[profile.release]
-opt-level = 3
-
 [features]
 std = []
 specialization = []
