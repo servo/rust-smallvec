@@ -67,7 +67,7 @@ jobs:
 
       - name: Cargo bench all features
         if: matrix.nightly
-        run: cargo bench --verbose --all-features
+        run: cargo clean && cargo bench --verbose --all-features
 
       - name: miri
         if: matrix.nightly
