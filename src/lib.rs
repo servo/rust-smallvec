@@ -1111,7 +1111,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     pub fn push_mut(&mut self, value: T) -> &mut T {
         let len = self.len();
         if len == self.capacity() {
-            self.reserve(1);
+            self.reserve_cold(1);
         }
 
         // SAFETY: `len < capacity` after the reserve,
@@ -1231,14 +1231,20 @@ impl<T, const N: usize> SmallVec<T, N> {
     pub fn reserve(&mut self, additional: usize) {
         // can't overflow since len <= capacity
         if additional > self.capacity() - self.len() {
-            let new_capacity = infallible(
-                self.len()
-                    .checked_add(additional)
-                    .and_then(usize::checked_next_power_of_two)
-                    .ok_or(CollectionAllocErr::CapacityOverflow)
-            );
-            self.grow(new_capacity);
+            self.reserve_cold(additional);
         }
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn reserve_cold(&mut self, additional: usize) {
+        let new_capacity = infallible(
+            self.len()
+                .checked_add(additional)
+                .and_then(usize::checked_next_power_of_two)
+                .ok_or(CollectionAllocErr::CapacityOverflow)
+        );
+        self.grow(new_capacity);
     }
 
     #[inline]
@@ -1259,13 +1265,19 @@ impl<T, const N: usize> SmallVec<T, N> {
     pub fn reserve_exact(&mut self, additional: usize) {
         // can't overflow since len <= capacity
         if additional > self.capacity() - self.len() {
-            let new_capacity = infallible(
-                self.len()
-                    .checked_add(additional)
-                    .ok_or(CollectionAllocErr::CapacityOverflow)
-            );
-            self.grow(new_capacity);
+            self.reserve_exact_cold(additional);
         }
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn reserve_exact_cold(&mut self, additional: usize) {
+        let new_capacity = infallible(
+            self.len()
+                .checked_add(additional)
+                .ok_or(CollectionAllocErr::CapacityOverflow)
+        );
+        self.grow(new_capacity);
     }
 
     #[inline]
@@ -1441,8 +1453,11 @@ impl<T, const N: usize> SmallVec<T, N> {
         if index > len {
             assert_failed(index, len);
         }
-        self.reserve(1);
 
+        // reserve one if there is no capacity left
+        if len == self.capacity() {
+            self.reserve_cold(1);
+        }
         // SAFETY: `index <= len <= capacity`,
         //         so the offset stays in bounds of the allocation.
         let ptr = unsafe { self.as_mut_ptr().add(index) };
