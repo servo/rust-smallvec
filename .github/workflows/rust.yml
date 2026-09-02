@@ -34,7 +34,7 @@ jobs:
             target: thumbv7m-none-eabi
             no_std: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install packages for fuzzing
         if: matrix.fuzz
