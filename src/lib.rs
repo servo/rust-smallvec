@@ -67,6 +67,7 @@ extern crate std;
 
 #[cfg(feature = "borsh")]
 mod borsh;
+mod assertions;
 mod comparisons;
 mod conversions;
 mod macros;
@@ -168,22 +169,13 @@ const fn is_zst<T>() -> bool {
     const { size_of::<T>() == 0 }
 }
 
-#[inline]
 /// A local copy of [`core::slice::range`]. The latter function is unstable
 /// and thus cannot be used yet.
+#[inline]
 fn slice_range<R>(range: R, bounds: core::ops::RangeTo<usize>) -> core::ops::Range<usize>
-where R: core::ops::RangeBounds<usize> {
-    #[cold]
-    #[inline(never)]
-    #[track_caller]
-    fn assert_failed(start: usize, end: usize, len: usize) -> ! {
-        if start > end {
-            panic!("slice index starts at {start} but ends at {end}");
-        } else {
-            panic!("range end index {end} out of range for slice of length {len}");
-        }
-    }
-
+where
+    R: core::ops::RangeBounds<usize>,
+{
     let len = bounds.end;
 
     let start = match range.start_bound() {
@@ -203,7 +195,7 @@ where R: core::ops::RangeBounds<usize> {
     };
 
     if start > end || end > len {
-        assert_failed(start, end, len);
+        assertions::slice_range_failed(start, end, len);
     }
 
     core::ops::Range {
@@ -1380,16 +1372,9 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn swap_remove(&mut self, index: usize) -> T {
-        #[cold]
-        #[inline(never)]
-        #[track_caller]
-        fn assert_failed(index: usize, len: usize) -> ! {
-            panic!("swap_remove index (is {index}) should be < len (is {len})");
-        }
-
         let len = self.len();
         if index >= len {
-            assert_failed(index, len);
+            assertions::index_out_of_bounds("swap_remove", index, len);
         }
         // This can't overflow since `len > index >= 0`
         let new_len = len - 1;
@@ -1421,16 +1406,9 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     #[inline]
     pub fn remove(&mut self, index: usize) -> T {
-        #[cold]
-        #[inline(never)]
-        #[track_caller]
-        fn assert_failed(index: usize, len: usize) -> ! {
-            panic!("removal index (is {index}) should be < len (is {len})");
-        }
-
         let len = self.len();
         if index >= len {
-            assert_failed(index, len);
+            assertions::index_out_of_bounds("removal", index, len);
         }
         let new_len = len - 1;
         unsafe {
@@ -1453,16 +1431,9 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     #[must_use]
     pub fn insert_mut(&mut self, index: usize, value: T) -> &mut T {
-        #[cold]
-        #[inline(never)]
-        #[track_caller]
-        fn assert_failed(index: usize, len: usize) -> ! {
-            panic!("insertion index (is {index}) should be <= len (is {len})");
-        }
-
         let len = self.len();
         if index > len {
-            assert_failed(index, len);
+            assertions::index_out_of_bounds("insertion", index, len);
         }
         self.reserve(1);
 
