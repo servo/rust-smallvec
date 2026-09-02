@@ -1,4 +1,4 @@
-use crate::{SmallVec, spec_traits};
+use crate::SmallVec;
 use alloc::vec::Vec;
 use core::{mem::ManuallyDrop, ptr::copy_nonoverlapping};
 
@@ -14,7 +14,7 @@ impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N> {
             unsafe {
                 #[cfg(feature = "specialization")]
                 {
-                    <Self as spec_traits::SpecFromSlice<T>>::spec_from(slice)
+                    <Self as crate::spec_traits::SpecFromSlice<T>>::spec_from(slice)
                 }
 
                 #[cfg(not(feature = "specialization"))]
