@@ -1647,8 +1647,8 @@ impl<T, const N: usize> SmallVec<T, N> {
         // SAFETY: previous `read` is always less than original_len.
         unsafe { drop_in_place(g.v.as_mut_ptr().add(read)) }
 
+        let ptr = g.v.as_mut_ptr();
         while g.read < g.original_len {
-            let ptr = g.v.as_mut_ptr();
             // SAFETY: `read` is always less than original_len.
             let cur = unsafe { &mut *ptr.add(g.read) };
             if !f(cur) {
