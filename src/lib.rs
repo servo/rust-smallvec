@@ -69,6 +69,7 @@ extern crate std;
 mod borsh;
 mod comparisons;
 mod conversions;
+mod errors;
 mod macros;
 #[cfg(feature = "malloc_size_of")]
 mod mallocsizeof;
@@ -91,6 +92,7 @@ use defmt::{
     Formatter as DeFormatter,
     write as dewrite
 };
+pub use errors::CollectionAllocErr;
 #[cfg(feature = "std")]
 use std::io;
 use {
@@ -131,25 +133,6 @@ use {
     rawsmallvec::RawSmallVec,
     taggedlen::TaggedLen
 };
-
-/// Error type for APIs with fallible heap allocation
-#[derive(Debug)]
-pub enum CollectionAllocErr {
-    /// Overflow `usize::MAX` or other error during size computation
-    CapacityOverflow,
-    /// The allocator return an error
-    AllocErr {
-        /// The layout that was passed to the allocator
-        layout: Layout
-    }
-}
-impl core::fmt::Display for CollectionAllocErr {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Allocation error: {:?}", self)
-    }
-}
-
-impl core::error::Error for CollectionAllocErr {}
 
 #[inline]
 fn infallible<T>(result: Result<T, CollectionAllocErr>) -> T {

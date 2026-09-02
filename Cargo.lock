@@ -605,6 +605,7 @@ dependencies = [
  "criterion",
  "defmt",
  "malloc_size_of",
+ "rayon",
  "serde_core",
  "serde_test",
 ]
