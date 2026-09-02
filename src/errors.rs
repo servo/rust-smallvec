@@ -4,8 +4,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use alloc::alloc::Layout;
-
 /// Error type for APIs with fallible heap allocation
 #[derive(Debug)]
 pub enum CollectionAllocErr {
@@ -14,7 +12,7 @@ pub enum CollectionAllocErr {
     /// The allocator return an error
     AllocErr {
         /// The layout that was passed to the allocator
-        layout: Layout,
+        layout: alloc::alloc::Layout,
     },
 }
 
