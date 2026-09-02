@@ -2583,7 +2583,7 @@ impl<T: Clone, const N: usize> Clone for SmallVec<T, N> {
 
         #[cfg(not(feature = "specialization"))]
         {
-            self.clone_from_fallback(&*source);
+            self.clone_from_fallback(source);
         }
     }
 }
