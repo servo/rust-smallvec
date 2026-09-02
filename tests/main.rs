@@ -1,19 +1,28 @@
 use {
     core::{
-        hash::Hasher,
+        borrow::{
+            Borrow,
+            BorrowMut
+        },
+        cell::Cell,
+        hash::{
+            Hash,
+            Hasher
+        },
         iter::FromIterator
     },
     smallvec::SmallVec,
     std::{
         borrow::ToOwned,
         boxed::Box,
+        hash::DefaultHasher,
         rc::Rc,
         vec::Vec
     }
 };
 
 #[test]
-pub fn test_zero() {
+pub fn zero() {
     let mut v = SmallVec::<_, 0>::new();
     assert!(!v.spilled());
     v.push(0usize);
@@ -25,7 +34,7 @@ pub fn test_zero() {
 // valgrind.
 
 #[test]
-pub fn test_push_mut() {
+pub fn push_mut() {
     let mut v = SmallVec::<_, 16>::new();
 
     let first_elem = v.push_mut("hello".to_owned());
@@ -39,7 +48,7 @@ pub fn test_push_mut() {
 }
 
 #[test]
-pub fn test_insert_mut() {
+pub fn insert_mut() {
     let mut v = SmallVec::<_, 16>::new();
     v.push("hello".to_owned());
     v.push("there".to_owned());
@@ -57,7 +66,7 @@ pub fn test_insert_mut() {
 }
 
 #[test]
-pub fn test_inline() {
+pub fn inline() {
     let mut v = SmallVec::<_, 16>::new();
     v.push("hello".to_owned());
     v.push("there".to_owned());
@@ -65,7 +74,7 @@ pub fn test_inline() {
 }
 
 #[test]
-pub fn test_spill() {
+pub fn spill() {
     let mut v = SmallVec::<_, 2>::new();
     v.push("hello".to_owned());
     assert_eq!(v[0], "hello");
@@ -85,7 +94,7 @@ pub fn test_spill() {
 }
 
 #[test]
-pub fn test_double_spill() {
+pub fn double_spill() {
     let mut v = SmallVec::<_, 2>::new();
     v.push("hello".to_owned());
     v.push("there".to_owned());
@@ -123,7 +132,7 @@ fn issue_5() {
 }
 
 #[test]
-fn test_with_capacity() {
+fn with_capacity() {
     let v: SmallVec<u8, 3> = SmallVec::with_capacity(1);
     assert!(v.is_empty());
     assert!(!v.spilled());
@@ -232,8 +241,6 @@ fn into_iter_rev() {
 
 #[test]
 fn into_iter_drop() {
-    use std::cell::Cell;
-
     struct DropCounter<'a>(&'a Cell<i32>);
 
     impl<'a> Drop for DropCounter<'a> {
@@ -284,7 +291,7 @@ fn into_iter_drop() {
 }
 
 #[test]
-fn test_capacity() {
+fn capacity() {
     let mut v: SmallVec<u8, 2> = SmallVec::new();
     v.reserve(1);
     assert_eq!(v.capacity(), 2);
@@ -303,7 +310,7 @@ fn test_capacity() {
 }
 
 #[test]
-fn test_truncate() {
+fn truncate() {
     let mut v: SmallVec<Box<u8>, 8> = SmallVec::new();
 
     for x in 0..8 {
@@ -322,7 +329,7 @@ fn test_truncate() {
 }
 
 #[test]
-fn test_truncate_references() {
+fn truncate_references() {
     let mut v = Vec::from([0, 1, 2, 3, 4, 5, 6, 7]);
     let mut i = 8;
     let mut v: SmallVec<&mut u8, 8> = v.iter_mut().collect();
@@ -343,7 +350,7 @@ fn test_truncate_references() {
 }
 
 #[test]
-fn test_split_off() {
+fn split_off() {
     let mut vec: SmallVec<u32, 4> = SmallVec::from([1, 2, 3, 4, 5, 6]);
     let orig_ptr = vec.as_ptr();
     let orig_capacity = vec.capacity();
@@ -356,7 +363,7 @@ fn test_split_off() {
 }
 
 #[test]
-fn test_split_off_take_all() {
+fn split_off_take_all() {
     // Allocate enough capacity that we can tell whether the split-off vector's
     // capacity is based on its size, or (incorrectly) on the original capacity.
     let mut vec = SmallVec::<u32, 4>::with_capacity(1000);
@@ -377,7 +384,7 @@ fn test_split_off_take_all() {
 }
 
 #[test]
-fn test_append() {
+fn append() {
     let mut v: SmallVec<u8, 8> = SmallVec::new();
     for x in 0..4 {
         v.push(x);
@@ -396,22 +403,22 @@ fn test_append() {
 }
 
 #[test]
-#[should_panic]
-fn test_invalid_grow() {
+#[should_panic(expected = "new_capacity >= len")]
+fn invalid_grow() {
     let mut v: SmallVec<u8, 8> = SmallVec::new();
     v.extend(0..8);
     v.grow(5);
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "attempted to index slice up to maximum usize")]
 fn drain_overflow() {
     let mut v: SmallVec<u8, 8> = SmallVec::from([0]);
     v.drain(..=usize::MAX);
 }
 
 #[test]
-fn test_extend_from_slice() {
+fn extend_from_slice() {
     let mut v: SmallVec<u8, 8> = SmallVec::new();
     for x in 0..4 {
         v.push(x);
@@ -425,7 +432,7 @@ fn test_extend_from_slice() {
 }
 
 #[test]
-fn test_extend_from_within() {
+fn extend_from_within() {
     let mut v: SmallVec<u8, 8> = SmallVec::from([0, 1, 2, 3]);
     v.extend_from_within(1..3);
     assert_eq!(
@@ -435,8 +442,8 @@ fn test_extend_from_within() {
 }
 
 #[test]
-#[should_panic]
-fn test_drop_panic_smallvec() {
+#[should_panic(expected = "drop")]
+fn drop_panic_smallvec() {
     // This test should only panic once, and not double panic,
     // which would mean a double drop
     struct DropPanic;
@@ -452,7 +459,7 @@ fn test_drop_panic_smallvec() {
 }
 
 #[test]
-fn test_eq() {
+fn eq() {
     let mut a: SmallVec<u32, 2> = SmallVec::new();
     let mut b: SmallVec<u32, 2> = SmallVec::new();
     let mut c: SmallVec<u32, 2> = SmallVec::new();
@@ -471,7 +478,7 @@ fn test_eq() {
 }
 
 #[test]
-fn test_ord() {
+fn ord() {
     let mut a: SmallVec<u32, 2> = SmallVec::new();
     let mut b: SmallVec<u32, 2> = SmallVec::new();
     let mut c: SmallVec<u32, 2> = SmallVec::new();
@@ -491,12 +498,7 @@ fn test_ord() {
 }
 
 #[test]
-fn test_hash() {
-    use std::{
-        collections::hash_map::DefaultHasher,
-        hash::Hash
-    };
-
+fn hash() {
     fn hash(value: impl Hash) -> u64 {
         let mut hasher = DefaultHasher::new();
         value.hash(&mut hasher);
@@ -519,7 +521,7 @@ fn test_hash() {
 }
 
 #[test]
-fn test_as_ref() {
+fn as_ref() {
     let mut a: SmallVec<u32, 2> = SmallVec::new();
     a.push(1);
     assert_eq!(a.as_ref(), [1]);
@@ -530,7 +532,7 @@ fn test_as_ref() {
 }
 
 #[test]
-fn test_as_mut() {
+fn as_mut() {
     let mut a: SmallVec<u32, 2> = SmallVec::new();
     a.push(1);
     assert_eq!(a.as_mut(), [1]);
@@ -543,9 +545,7 @@ fn test_as_mut() {
 }
 
 #[test]
-fn test_borrow() {
-    use std::borrow::Borrow;
-
+fn borrow() {
     let mut a: SmallVec<u32, 2> = SmallVec::new();
     a.push(1);
     assert_eq!(a.borrow(), [1]);
@@ -556,9 +556,7 @@ fn test_borrow() {
 }
 
 #[test]
-fn test_borrow_mut() {
-    use std::borrow::BorrowMut;
-
+fn borrow_mut() {
     let mut a: SmallVec<u32, 2> = SmallVec::new();
     a.push(1);
     assert_eq!(a.borrow_mut(), [1]);
@@ -571,7 +569,7 @@ fn test_borrow_mut() {
 }
 
 #[test]
-fn test_from() {
+fn from() {
     assert_eq!(&SmallVec::<u32, 2>::from(&[1][..])[..], [1]);
     assert_eq!(&SmallVec::<u32, 2>::from(&[1, 2, 3][..])[..], [1, 2, 3]);
 
@@ -624,13 +622,13 @@ fn test_from() {
 }
 
 #[test]
-fn test_from_slice() {
+fn from_slice() {
     assert_eq!(&SmallVec::<u32, 2>::from(&[1][..])[..], [1]);
     assert_eq!(&SmallVec::<u32, 2>::from(&[1, 2, 3][..])[..], [1, 2, 3]);
 }
 
 #[test]
-fn test_exact_size_iterator() {
+fn exact_size_iterator() {
     let mut vec = SmallVec::<u32, 2>::from(&[1, 2, 3][..]);
     assert_eq!(vec.clone().into_iter().len(), 3);
     assert_eq!(vec.drain(..2).len(), 2);
@@ -638,7 +636,7 @@ fn test_exact_size_iterator() {
 }
 
 #[test]
-fn test_into_iter_as_slice() {
+fn into_iter_as_slice() {
     let vec = SmallVec::<u32, 2>::from(&[1, 2, 3][..]);
     let mut iter = vec.clone().into_iter();
     assert_eq!(iter.as_slice(), &[1, 2, 3]);
@@ -652,7 +650,7 @@ fn test_into_iter_as_slice() {
 }
 
 #[test]
-fn test_into_iter_clone() {
+fn into_iter_clone() {
     // Test that the cloned iterator yields identical elements and that it owns
     // its own copy (i.e. no use after move errors).
     let mut iter = SmallVec::<u8, 2>::from_iter(0..3).into_iter();
@@ -664,7 +662,7 @@ fn test_into_iter_clone() {
 }
 
 #[test]
-fn test_into_iter_clone_partially_consumed_iterator() {
+fn into_iter_clone_partially_consumed_iterator() {
     // Test that the cloned iterator only contains the remaining elements of the
     // original iterator.
     let mut iter = SmallVec::<u8, 2>::from_iter(0..3).into_iter().skip(1);
@@ -676,7 +674,7 @@ fn test_into_iter_clone_partially_consumed_iterator() {
 }
 
 #[test]
-fn test_into_iter_clone_empty_smallvec() {
+fn into_iter_clone_empty_smallvec() {
     let mut iter = SmallVec::<u8, 2>::new().into_iter();
     let mut clone_iter = iter.clone();
     assert_eq!(iter.next(), None);
@@ -700,7 +698,7 @@ fn shrink_after_from_empty_vec() {
 }
 
 #[test]
-fn test_into_vec() {
+fn into_vec() {
     let vec = SmallVec::<u8, 2>::from_iter(0..2);
     assert_eq!(vec.into_vec(), Vec::from([0, 1]));
 
@@ -709,7 +707,7 @@ fn test_into_vec() {
 }
 
 #[test]
-fn test_into_inner() {
+fn into_inner() {
     let vec = SmallVec::<u8, 2>::from_iter(0..2);
     assert_eq!(vec.try_into(), Ok([0, 1]));
 
@@ -721,7 +719,7 @@ fn test_into_inner() {
 }
 
 #[test]
-fn test_try_into_array() {
+fn try_into_array() {
     // Inline < capacity
     let vec = SmallVec::<u8, 2>::from_iter(0..1);
     assert_eq!(<[u8; 0]>::try_from(vec.clone()), Err(vec.clone()));
@@ -742,7 +740,7 @@ fn test_try_into_array() {
 }
 
 #[test]
-fn test_from_vec() {
+fn from_vec() {
     let vec = Vec::new();
     let small_vec: SmallVec<u8, 3> = SmallVec::from_vec(vec);
     assert_eq!(&*small_vec, &[0u8; 0]);
@@ -775,7 +773,7 @@ fn test_from_vec() {
 }
 
 #[test]
-fn test_retain() {
+fn retain() {
     // Test inline data storage
     let mut sv: SmallVec<i32, 5> = SmallVec::from(&[1, 2, 3, 3, 4]);
     sv.retain(|&i| i != 3);
@@ -810,7 +808,7 @@ fn test_retain() {
 }
 
 #[test]
-fn test_dedup() {
+fn dedup() {
     let mut dupes: SmallVec<i32, 5> = SmallVec::from(&[1, 1, 2, 3, 3]);
     dupes.dedup();
     assert_eq!(&*dupes, &[1, 2, 3]);
@@ -829,7 +827,7 @@ fn test_dedup() {
 }
 
 #[test]
-fn test_resize() {
+fn resize() {
     let mut v: SmallVec<i32, 8> = SmallVec::new();
     v.push(1);
     v.resize(5, 0);
@@ -925,7 +923,7 @@ fn zero_size_items() {
 }
 
 #[test]
-fn test_clone_from() {
+fn clone_from() {
     let mut a: SmallVec<u8, 2> = SmallVec::new();
     a.push(1);
     a.push(2);
@@ -947,7 +945,7 @@ fn test_clone_from() {
 }
 
 #[test]
-fn test_extract_if() {
+fn extract_if() {
     let mut a: SmallVec<u8, 2> = SmallVec::from([0, 1u8, 2, 3, 4, 5, 6, 7, 8, 0]);
 
     let b: SmallVec<u8, 2> = a.extract_if(1..9, |x| *x % 3 == 0).collect();
@@ -971,21 +969,21 @@ fn max_dont_panic() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "removal index")]
 fn max_remove() {
     let mut sv: SmallVec<i32, 2> = SmallVec::from([0]);
     sv.remove(usize::MAX);
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "swap_remove index")]
 fn max_swap_remove() {
     let mut sv: SmallVec<i32, 2> = SmallVec::from([0]);
     sv.swap_remove(usize::MAX);
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "insertion index")]
 fn max_insert() {
     let mut sv: SmallVec<i32, 2> = SmallVec::from([0]);
     sv.insert(usize::MAX, 0);
@@ -1020,14 +1018,14 @@ fn collect_from_iter() {
 }
 
 #[test]
-fn test_collect_with_spill() {
+fn collect_with_spill() {
     let input = "0123456";
     let collected: SmallVec<char, 4> = input.chars().collect();
     assert_eq!(collected, &['0', '1', '2', '3', '4', '5', '6']);
 }
 
 #[test]
-fn test_spare_capacity_mut() {
+fn spare_capacity_mut() {
     let mut v: SmallVec<u8, 2> = SmallVec::new();
     assert!(!v.spilled());
     let spare = v.spare_capacity_mut();

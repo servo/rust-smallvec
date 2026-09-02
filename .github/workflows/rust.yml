@@ -28,13 +28,13 @@ jobs:
             toolchain: nightly
             nightly: true
           - name: MSRV
-            toolchain: "1.83.0"
+            toolchain: "1.86.0"
           - name: no_std
             toolchain: stable
             target: thumbv7m-none-eabi
             no_std: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install packages for fuzzing
         if: matrix.fuzz
@@ -67,7 +67,7 @@ jobs:
 
       - name: Cargo bench all features
         if: matrix.nightly
-        run: cargo bench --verbose --all-features
+        run: cargo clean && cargo bench --verbose --all-features
 
       - name: miri
         if: matrix.nightly
