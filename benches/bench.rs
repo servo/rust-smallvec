@@ -385,8 +385,8 @@ fn bench_macro_from_list_vec(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     config = Criterion::default()
-        .warm_up_time(Duration::from_millis(200))
-        .measurement_time(Duration::from_millis(700));
+        .warm_up_time(Duration::from_millis(400))
+        .measurement_time(Duration::from_millis(1100));
     targets =
     bench_push,
     bench_push_small,

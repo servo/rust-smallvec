@@ -11,6 +11,13 @@ keywords = ["small", "vec", "vector", "stack", "no_std"]
 categories = ["data-structures"]
 exclude = [".gitignore", "tests/", "fuzz/", "benches/", ".github/"]
 
+[profile.bench]
+lto = "fat"
+codegen-units = 1
+opt-level = 3
+debug = false
+strip = true
+
 [features]
 std = []
 specialization = []
