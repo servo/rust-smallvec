@@ -1187,15 +1187,28 @@ impl<A: Array> SmallVec<A> {
     #[inline]
     pub fn push(&mut self, value: A::Item) {
         unsafe {
-            let (mut ptr, mut len, cap) = self.triple_mut();
-            if *len == cap {
-                self.reserve_one_unchecked();
-                let (heap_ptr, heap_len) = self.data.heap_mut();
-                ptr = heap_ptr;
-                len = heap_len;
-            }
-            ptr::write(ptr.as_ptr().add(*len), value);
-            *len += 1;
+            if self.spilled() {
+                let (mut ptr, mut len_ptr) = self.data.heap_mut();
+                if *len_ptr == self.capacity {
+                    self.reserve_one_unchecked();
+                    let (heap_ptr, heap_len) = self.data.heap_mut();
+                    ptr = heap_ptr;
+                    len_ptr = heap_len;
+                }
+                ptr::write(ptr.as_ptr().add(*len_ptr), value);
+                *len_ptr += 1;
+            } else {
+                let mut ptr = self.data.inline_mut();
+                let mut len_ptr = &mut self.capacity;
+                if *len_ptr == Self::inline_capacity() {
+                    self.reserve_one_unchecked();
+                    let (heap_ptr, heap_len) = self.data.heap_mut();
+                    ptr = heap_ptr;
+                    len_ptr = heap_len;
+                }
+                ptr::write(ptr.as_ptr().add(*len_ptr), value);
+                *len_ptr += 1;
+            };
         }
     }
 
