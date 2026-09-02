@@ -1127,10 +1127,11 @@ impl<T, const N: usize> SmallVec<T, N> {
             // We have to do this so that Miri doesn't report a "Stacked
             // Borrows" rule violation. See PR/406
 
-            let new_len = len + 1;
-            debug_assert!(new_len <= self.capacity());
-            let on_heap = self.len.on_heap();
-            self.len = TaggedLen::new(new_len, on_heap);
+            debug_assert!(len + 1 <= self.capacity());
+            // SAFETY: we have wrote the value to the address already
+            unsafe {
+                self.len.increment();
+            }
         }
 
         // SAFETY: `ptr` is aligned, non-null and points to the element
@@ -1146,8 +1147,11 @@ impl<T, const N: usize> SmallVec<T, N> {
             return None;
         }
         let new_len = len - 1;
-        // SAFETY: new_len < len since len is non-zero
-        unsafe { self.set_len(new_len) };
+        // SAFETY: new_len < len since len is non-zero and
+        // we are returning ownership of the current value.
+        unsafe {
+            self.len.decrement();
+        }
         // SAFETY: this element was initialized and we just gave up ownership of
         // it, so we can give it away
         let value = unsafe { self.as_mut_ptr().add(new_len).read() };
@@ -1464,10 +1468,11 @@ impl<T, const N: usize> SmallVec<T, N> {
             // We have to do this so that Miri doesn't report a "Stacked
             // Borrows" rule violation. See PR/406
 
-            let new_len = len + 1;
-            debug_assert!(new_len <= self.capacity());
-            let on_heap = self.len.on_heap();
-            self.len = TaggedLen::new(new_len, on_heap);
+            debug_assert!(len + 1 <= self.capacity());
+            // SAFETY: we have wrote the value to the address already
+            unsafe {
+                self.len.increment();
+            }
         }
 
         // SAFETY: `ptr` is aligned, non-null and points to the element
