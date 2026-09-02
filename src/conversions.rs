@@ -1,6 +1,11 @@
-use crate::SmallVec;
-use alloc::vec::Vec;
-use core::{mem::ManuallyDrop, ptr::copy_nonoverlapping};
+use {
+    crate::SmallVec,
+    alloc::vec::Vec,
+    core::{
+        mem::ManuallyDrop,
+        ptr::copy_nonoverlapping
+    }
+};
 
 impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N> {
     #[inline]
