@@ -2547,9 +2547,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     where I: Iterator<Item = T> {
         let (size, _) = iter.size_hint();
         let mut v = Self::with_capacity(size);
-        for x in iter {
-            v.push(x);
-        }
+        v.extend_fallback(iter);
         v
     }
 
