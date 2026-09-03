@@ -396,10 +396,7 @@ fn append() {
     assert_eq!(v.len(), 6);
     assert_eq!(n.len(), 0);
 
-    assert_eq!(
-        &v.iter().map(|v| *v).collect::<Vec<_>>(),
-        &[0, 1, 2, 3, 5, 6]
-    );
+    assert_eq!(v.iter().copied().collect::<Vec<_>>(), [0, 1, 2, 3, 5, 6]);
 }
 
 #[test]
@@ -425,20 +422,14 @@ fn extend_from_slice() {
     }
     assert_eq!(v.len(), 4);
     v.extend_from_slice(&[5, 6]);
-    assert_eq!(
-        &v.iter().map(|v| *v).collect::<Vec<_>>(),
-        &[0, 1, 2, 3, 5, 6]
-    );
+    assert_eq!(v.iter().copied().collect::<Vec<_>>(), [0, 1, 2, 3, 5, 6]);
 }
 
 #[test]
 fn extend_from_within() {
     let mut v: SmallVec<u8, 8> = SmallVec::from([0, 1, 2, 3]);
     v.extend_from_within(1..3);
-    assert_eq!(
-        &v.iter().map(|v| *v).collect::<Vec<_>>(),
-        &[0, 1, 2, 3, 1, 2],
-    );
+    assert_eq!(v.iter().copied().collect::<Vec<_>>(), [0, 1, 2, 3, 1, 2],);
 }
 
 #[test]
@@ -653,9 +644,9 @@ fn into_iter_as_slice() {
 fn into_iter_clone() {
     // Test that the cloned iterator yields identical elements and that it owns
     // its own copy (i.e. no use after move errors).
-    let mut iter = SmallVec::<u8, 2>::from_iter(0..3).into_iter();
+    let iter = SmallVec::<u8, 2>::from_iter(0..3).into_iter();
     let mut clone_iter = iter.clone();
-    while let Some(x) = iter.next() {
+    for x in iter {
         assert_eq!(x, clone_iter.next().unwrap());
     }
     assert_eq!(clone_iter.next(), None);
@@ -665,9 +656,9 @@ fn into_iter_clone() {
 fn into_iter_clone_partially_consumed_iterator() {
     // Test that the cloned iterator only contains the remaining elements of the
     // original iterator.
-    let mut iter = SmallVec::<u8, 2>::from_iter(0..3).into_iter().skip(1);
+    let iter = SmallVec::<u8, 2>::from_iter(0..3).into_iter().skip(1);
     let mut clone_iter = iter.clone();
-    while let Some(x) = iter.next() {
+    for x in iter {
         assert_eq!(x, clone_iter.next().unwrap());
     }
     assert_eq!(clone_iter.next(), None);
@@ -1012,7 +1003,7 @@ fn collect_from_iter() {
     const ELEMENTS: usize = 1000;
     #[cfg(not(miri))]
     const ELEMENTS: usize = 1_000_000;
-    let iter = IterNoHint(std::iter::repeat(1u8).take(ELEMENTS));
+    let iter = IterNoHint(std::iter::repeat_n(1u8, ELEMENTS));
 
     let _y: SmallVec<u8, 1> = SmallVec::from_iter(iter);
 }
@@ -1047,6 +1038,6 @@ fn spare_capacity_mut() {
     v.push(3);
     assert!(v.spilled());
     let spare = v.spare_capacity_mut();
-    assert!(spare.len() >= 1);
+    assert!(!spare.is_empty());
     assert_eq!(spare.as_ptr().cast::<u8>(), unsafe { v.as_ptr().add(3) });
 }

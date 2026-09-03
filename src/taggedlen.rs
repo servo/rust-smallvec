@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 /// Vec guarantees that its length is always less than [`isize::MAX`] in
 /// *bytes*.
 ///
-/// For a non ZST, this means that the length is less than `isize::MAX` objects,
+/// For a non-ZST, this means that the length is less than `isize::MAX` objects,
 /// which implies we have at least one free bit we can use. We use the least
 /// significant bit for the tag. And store the length in the `usize::BITS - 1`
 /// most significant bits.
@@ -12,15 +12,12 @@ use core::marker::PhantomData;
 #[repr(transparent)]
 pub struct TaggedLen<T>(usize, PhantomData<T>);
 
+// We don't use `#[derive(Clone, Copy)]` instead because `T` doesn't need to be
+// `Copy` or `Clone`.
 impl<T> Clone for TaggedLen<T> {
     #[inline]
     fn clone(&self) -> Self {
-        Self(self.0, PhantomData)
-    }
-
-    #[inline]
-    fn clone_from(&mut self, source: &Self) {
-        self.0 = source.0;
+        *self
     }
 }
 
@@ -58,6 +55,12 @@ impl<T> TaggedLen<T> {
     /// Returns the same tag with the length increased by one.
     ///
     /// This increases the length without rereading the `on heap` flag.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that after incrementing, the length would still
+    /// be less than [`isize::MAX`] in bytes. For non-ZSTs this means the
+    /// length must be less than `isize::MAX - 1` before the call.
     #[inline]
     pub const unsafe fn increment(&mut self) {
         self.0 += if Self::IS_ZST {
@@ -71,6 +74,11 @@ impl<T> TaggedLen<T> {
     /// Returns the same tag with the length decreased by one.
     ///
     /// This decreases the length without rereading the `on heap` flag.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the length is greater than zero before the
+    /// call.
     #[inline]
     pub const unsafe fn decrement(&mut self) {
         debug_assert!(self.value() > 0);

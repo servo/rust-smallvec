@@ -1132,7 +1132,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             // We have to do this so that Miri doesn't report a "Stacked
             // Borrows" rule violation. See PR/406
 
-            debug_assert!(len + 1 <= self.capacity());
+            debug_assert!(len < self.capacity());
             // SAFETY: we have wrote the value to the address already
             unsafe {
                 self.len.increment();
@@ -1473,7 +1473,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             // We have to do this so that Miri doesn't report a "Stacked
             // Borrows" rule violation. See PR/406
 
-            debug_assert!(len + 1 <= self.capacity());
+            debug_assert!(len < self.capacity());
             // SAFETY: we have wrote the value to the address already
             unsafe {
                 self.len.increment();

@@ -50,6 +50,10 @@ jobs:
         if: matrix.nightly
         run: rustup component add rustfmt && cargo fmt --all --check
 
+      - name: Clippy check
+        if: matrix.nightly
+        run: rustup component add clippy && cargo clippy --all-features --all-targets -- -D warnings
+
       - name: Build
         run: cargo build --verbose
 
