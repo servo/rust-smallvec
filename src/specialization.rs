@@ -10,7 +10,7 @@ use {
 /// A trait for specializing the implementation of [`from_elem`].
 ///
 /// [`from_elem`]: crate::from_elem
-pub(crate) trait SpecFromElem<T> {
+pub trait SpecFromElem<T> {
     /// Creates a `Smallvec` value where `elem` is repeated `n` times.
     /// This will use the inline storage, not the heap.
     ///
@@ -58,7 +58,7 @@ impl<T: Copy, const N: usize> SpecFromElem<T> for SmallVec<T, N> {
 /// [`extend_from_slice`].
 ///
 /// [`extend_from_slice`]: crate::SmallVec::extend_from_slice
-pub(crate) trait SpecExtend<T, I> {
+pub trait SpecExtend<T, I> {
     fn spec_extend(&mut self, iter: I);
 }
 
@@ -169,7 +169,7 @@ where T: Copy
 /// A trait for specializing the implementation of [`extend_from_within`].
 ///
 /// [`extend_from_within`]: crate::SmallVec::extend_from_within
-pub(crate) trait SpecExtendFromWithin<T> {
+pub trait SpecExtendFromWithin<T> {
     /// Main worker for [`extend_from_within`].
     ///
     /// # Safety
@@ -218,7 +218,7 @@ impl<T: Copy, const N: usize> SpecExtendFromWithin<T> for SmallVec<T, N> {
 /// A trait for specializing the implementation of [`FromIterator`].
 ///
 /// [`clone_from`]: Clone::clone_from
-pub(crate) trait SpecFromIterator<T, I> {
+pub trait SpecFromIterator<T, I> {
     fn spec_from_iter(iter: I) -> Self;
 }
 
@@ -252,7 +252,7 @@ where I: core::iter::TrustedLen<Item = T>
 /// A trait for specializing the implementation of [`clone_from`].
 ///
 /// [`clone_from`]: Clone::clone_from
-pub(crate) trait SpecCloneFrom<T> {
+pub trait SpecCloneFrom<T> {
     fn spec_clone_from(&mut self, source: &[T]);
 }
 
@@ -272,7 +272,7 @@ impl<T: Copy, const N: usize> SpecCloneFrom<T> for SmallVec<T, N> {
 
 /// A trait for specializing the implementation of [`From`]
 /// with the source type being slices.
-pub(crate) trait SpecFromSlice<T> {
+pub trait SpecFromSlice<T> {
     /// Creates a `SmallVec` value based on the contents of `slice`.
     /// This will use the inline storage, not the heap.
     ///
