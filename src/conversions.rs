@@ -19,7 +19,7 @@ impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N> {
             unsafe {
                 #[cfg(feature = "specialization")]
                 {
-                    <Self as crate::spec_traits::SpecFromSlice<T>>::spec_from(slice)
+                    <Self as crate::specialization::SpecFromSlice<T>>::spec_from(slice)
                 }
 
                 #[cfg(not(feature = "specialization"))]
