@@ -27,6 +27,13 @@ pub union RawSmallVec<T, const N: usize> {
     pub heap: (NonNull<T>, usize)
 }
 
+impl<T, const N: usize> Default for RawSmallVec<T, N> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T, const N: usize> RawSmallVec<T, N> {
     const IS_ZST: bool = size_of::<T>() == 0;
 
