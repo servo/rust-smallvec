@@ -38,6 +38,8 @@ malloc_size_of = { version = "0.1", optional = true, default-features = false }
 [dev-dependencies]
 serde_test = "1.0"
 criterion = "0.8"
+defmt2log = "0.2"
+log = "0.4"
 
 [[test]]
 name = "arbitrary"
@@ -50,6 +52,10 @@ required-features = ["borsh"]
 [[test]]
 name = "bytes"
 required-features = ["bytes"]
+
+[[test]]
+name = "defmt"
+required-features = ["defmt"]
 
 [[test]]
 name = "encase"
