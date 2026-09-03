@@ -1191,9 +1191,7 @@ impl<A: Array> SmallVec<A> {
                 let (mut ptr, mut len_ptr) = self.data.heap_mut();
                 if *len_ptr == self.capacity {
                     self.reserve_one_unchecked();
-                    let (heap_ptr, heap_len) = self.data.heap_mut();
-                    ptr = heap_ptr;
-                    len_ptr = heap_len;
+                    (ptr, len_ptr) = self.data.heap_mut();
                 }
                 ptr::write(ptr.as_ptr().add(*len_ptr), value);
                 *len_ptr += 1;
@@ -1202,9 +1200,7 @@ impl<A: Array> SmallVec<A> {
                 let mut len_ptr = &mut self.capacity;
                 if *len_ptr == Self::inline_capacity() {
                     self.reserve_one_unchecked();
-                    let (heap_ptr, heap_len) = self.data.heap_mut();
-                    ptr = heap_ptr;
-                    len_ptr = heap_len;
+                    (ptr, len_ptr) = self.data.heap_mut();
                 }
                 ptr::write(ptr.as_ptr().add(*len_ptr), value);
                 *len_ptr += 1;
@@ -1461,9 +1457,7 @@ impl<A: Array> SmallVec<A> {
             let (mut ptr, mut len_ptr, cap) = self.triple_mut();
             if *len_ptr == cap {
                 self.reserve_one_unchecked();
-                let (heap_ptr, heap_len_ptr) = self.data.heap_mut();
-                ptr = heap_ptr;
-                len_ptr = heap_len_ptr;
+                (ptr, len_ptr) = self.data.heap_mut();
             }
             let mut ptr = ptr.as_ptr();
             let len = *len_ptr;
