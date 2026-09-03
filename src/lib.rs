@@ -706,13 +706,21 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 
+    pub fn try_with_capacity(capacity: usize) -> Result<Self, CollectionAllocErr> {
+        let mut this = Self::new();
+        if capacity > Self::inline_size() && !Self::IS_ZST {
+            // SAFETY: we checked all the preconditions
+            unsafe { this.raw.try_grow_raw(TaggedLen::new(0, false), capacity) }?;
+
+            // SAFETY: the allocation succeeded, so self.raw.heap is now active
+            unsafe { this.set_on_heap() };
+        }
+        Ok(this)
+    }
+
     #[inline]
     pub fn with_capacity(capacity: usize) -> Self {
-        let mut this = Self::new();
-        if capacity > Self::inline_size() {
-            this.grow(capacity);
-        }
-        this
+        infallible(Self::try_with_capacity(capacity))
     }
 
     #[inline]
