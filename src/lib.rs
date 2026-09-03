@@ -52,6 +52,11 @@
 //! [Rustonomicon](https://doc.rust-lang.org/1.42.0/nomicon/dropck.html#an-escape-hatch).
 //!
 //! Tracking issue: [rust-lang/rust#34761](https://github.com/rust-lang/rust/issues/34761)
+//!
+//! ### `encase`
+//!
+//! When this optional dependency is enabled, `SmallVec` implements `encase`'s
+//! traits.
 
 #![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -2814,3 +2819,6 @@ impl<T: Format, const N: usize> Format for SmallVec<T, N> {
         dewrite!(fmt, "{=[?]}", self.as_ref());
     }
 }
+
+#[cfg(feature = "encase")]
+encase::rts_array::impl_rts_array!(SmallVec<T, N>; (T, const N: usize); using len truncate);
