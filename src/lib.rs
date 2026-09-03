@@ -1726,12 +1726,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     where F: FnMut() -> T {
         let old_len = self.len();
         if old_len < new_len {
-            let mut f = f;
-            let additional = new_len - old_len;
-            self.reserve(additional);
-            for _ in 0..additional {
-                self.push(f());
-            }
+            self.extend(core::iter::repeat_with(f).take(new_len - old_len));
         } else if old_len > new_len {
             self.truncate(new_len);
         }
