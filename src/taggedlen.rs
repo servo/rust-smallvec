@@ -55,16 +55,30 @@ impl<T> TaggedLen<T> {
         if Self::IS_ZST { self.0 } else { self.0 >> 1 }
     }
 
+    #[inline]
+    pub const unsafe fn add(&mut self, n: usize) {
+        self.0 += if Self::IS_ZST {
+            n
+        } else {
+            debug_assert!(self.value() + n < isize::MAX as usize);
+            n << 1
+        }
+    }
+
+    #[inline]
+    pub const unsafe fn sub(&mut self, n: usize) {
+        debug_assert!(self.value() >= n);
+
+        self.0 -= if Self::IS_ZST { n } else { n << 1 };
+    }
+
     /// Returns the same tag with the length increased by one.
     ///
     /// This increases the length without rereading the `on heap` flag.
     #[inline]
     pub const unsafe fn increment(&mut self) {
-        self.0 += if Self::IS_ZST {
-            1
-        } else {
-            debug_assert!(self.value() + 1 < isize::MAX as usize);
-            0b10
+        unsafe {
+            self.add(1);
         }
     }
 
@@ -73,7 +87,8 @@ impl<T> TaggedLen<T> {
     /// This decreases the length without rereading the `on heap` flag.
     #[inline]
     pub const unsafe fn decrement(&mut self) {
-        debug_assert!(self.value() > 0);
-        self.0 -= if Self::IS_ZST { 1 } else { 0b10 };
+        unsafe {
+            self.sub(1);
+        }
     }
 }

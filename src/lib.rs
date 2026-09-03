@@ -287,7 +287,7 @@ impl<'a, T: 'a, const N: usize> Drop for Drain<'a, T, N> {
                             let dst = ptr.add(start);
                             core::ptr::copy(src, dst, self.0.tail_len);
                         }
-                        source_vec.set_len(start + self.0.tail_len);
+                        source_vec.len.add(self.0.tail_len);
                     }
                 }
             }
@@ -306,7 +306,7 @@ impl<'a, T: 'a, const N: usize> Drop for Drain<'a, T, N> {
             unsafe {
                 let vec = vec.as_mut();
                 let old_len = vec.len();
-                vec.set_len(old_len + drop_len + self.tail_len);
+                vec.len.add(drop_len + self.tail_len);
                 vec.truncate(old_len + self.tail_len);
             }
 
@@ -372,7 +372,7 @@ impl<T, const N: usize> Drain<'_, T, N> {
             if let Some(new_item) = replace_with.next() {
                 unsafe {
                     core::ptr::write(place, new_item);
-                    vec.set_len(vec.len() + 1);
+                    vec.len.increment();
                 }
             } else {
                 return false;
@@ -1186,7 +1186,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         // SAFETY: we have a mutable reference to each vector and each uniquely
         // owns its memory. so the ranges can't overlap
         unsafe { copy_nonoverlapping(other.as_ptr(), ptr, other_len) };
-        unsafe { self.set_len(total_len) }
+        unsafe { self.len.add(other_len) }
     }
 
     #[inline]
@@ -1386,7 +1386,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             let value = core::ptr::read(self.as_ptr().add(index));
             let base_ptr = self.as_mut_ptr();
             core::ptr::copy(base_ptr.add(new_len), base_ptr.add(index), 1);
-            self.set_len(new_len);
+            self.len.decrement();
             value
         }
     }
@@ -1421,7 +1421,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         let new_len = len - 1;
         unsafe {
             // SAFETY: new_len < len
-            self.set_len(new_len);
+            self.len.decrement();
             let ptr = self.as_mut_ptr();
             let ith = ptr.add(index);
             // This item is initialized since index < len
@@ -1904,7 +1904,7 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
         unsafe {
             let dst = self.as_mut_ptr().add(l);
             copy_nonoverlapping(src, dst, len);
-            self.set_len(l + len);
+            self.len.add(len);
         }
     }
 
@@ -1928,7 +1928,7 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
             let l = self.len();
             let ptr = self.as_mut_ptr();
             copy_nonoverlapping(ptr.add(start), ptr.add(l), len);
-            self.set_len(l + len);
+            self.len.add(len);
         }
     }
 
@@ -1949,7 +1949,7 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
             copy_nonoverlapping(other.as_ptr(), ith_ptr, len);
 
             // SAFETY: all the elements are initialized
-            self.set_len(l + len);
+            self.len.add(len);
         }
     }
 
@@ -2195,7 +2195,7 @@ mod spec_traits {
                 }
 
                 // The elements have been initialized in the loop above.
-                self.set_len(len + guard.len);
+                self.len.add(guard.len);
                 core::mem::forget(guard);
             }
         }
@@ -2219,7 +2219,7 @@ mod spec_traits {
 
             // SAFETY: The elements were initialized above.
             unsafe {
-                self.set_len(old_len + len);
+                self.len.add(len);
             }
 
             // Mark the iterator as fully consumed.
@@ -2258,7 +2258,7 @@ mod spec_traits {
 
             // SAFETY: The elements were initialized above.
             unsafe {
-                self.set_len(old_len + len);
+                self.len.add(len);
             }
         }
     }
@@ -2307,7 +2307,7 @@ mod spec_traits {
 
             // SAFETY: The elements were initialized above.
             unsafe {
-                self.set_len(old_len + len);
+                self.len.add(len);
             }
         }
     }
@@ -2544,7 +2544,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
         // SAFETY: The elements were initialized in the loop above.
         unsafe {
-            self.set_len(old_len + len);
+            self.len.add(len);
         }
     }
 
@@ -2802,7 +2802,7 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
         }
 
         // Addition will not overflow since the sum is at most the capacity.
-        unsafe { self.set_len(len + cnt) };
+        unsafe { self.len.add(cnt) };
     }
 
     #[inline]
