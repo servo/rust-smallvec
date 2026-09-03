@@ -1736,12 +1736,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     where F: FnMut() -> T {
         let old_len = self.len();
         if old_len < new_len {
-            let mut f = f;
-            let additional = new_len - old_len;
-            self.reserve(additional);
-            for _ in 0..additional {
-                self.push(f());
-            }
+            self.extend(core::iter::repeat_with(f).take(new_len - old_len));
         } else if old_len > new_len {
             self.truncate(new_len);
         }
@@ -2459,11 +2454,55 @@ impl<T, const N: usize> SmallVec<T, N> {
 
     fn extend_fallback<I>(&mut self, iter: I)
     where I: IntoIterator<Item = T> {
-        let iter = iter.into_iter();
-        let (size, _) = iter.size_hint();
-        self.reserve(size);
-        for x in iter {
-            self.push(x);
+        struct SetLenOnDrop<'a, T, const N: usize> {
+            vec: &'a mut SmallVec<T, N>,
+            len: usize
+        }
+        impl<T, const N: usize> Drop for SetLenOnDrop<'_, T, N> {
+            #[inline(always)]
+            fn drop(&mut self) {
+                // SAFETY: restores `len` only len of initialized items.
+                unsafe { self.vec.set_len(self.len) };
+            }
+        }
+
+        let mut iter = iter.into_iter();
+        let (lower, _) = iter.size_hint();
+        self.reserve(lower);
+
+        // gaurd will auto drop with return statements inside loop
+        let mut guard = SetLenOnDrop {
+            len: self.len(),
+            vec: self
+        };
+
+        loop {
+            let capacity = guard.vec.capacity();
+            // ptr stays valid until we reserve(memory relocation)
+            let ptr = guard.vec.as_mut_ptr();
+
+            // fast path for when size_hint provides exact length
+            while guard.len < capacity {
+                let Some(value) = iter.next() else { return };
+                // SAFETY: `guard.len < capacity` and slot is uninitialized.
+                unsafe { ptr.add(guard.len).write(value) };
+                guard.len += 1;
+            }
+            // exit happens mostly in the while body `else { return }`,
+            // if we are here iterator is not exact size.
+            let Some(value) = iter.next() else { return };
+            let (lower, _) = iter.size_hint();
+            // restore vector length before requesting reserve
+            // SAFETY: elements up to `guard.len` are initialized.
+            unsafe { guard.vec.set_len(guard.len) };
+            // UNSAFE TO USE `ptr` AFTER THIS POINT.
+            // reserve pessimistic lower+1.
+            guard.vec.reserve(lower.saturating_add(1));
+            // write the currently read value
+            // SAFETY: `reserve` made room for us.
+            unsafe { guard.vec.as_mut_ptr().add(guard.len).write(value) };
+            guard.len += 1;
+            // retry in the fast path
         }
     }
 
@@ -2513,9 +2552,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     where I: Iterator<Item = T> {
         let (size, _) = iter.size_hint();
         let mut v = Self::with_capacity(size);
-        for x in iter {
-            v.push(x);
-        }
+        v.extend_fallback(iter);
         v
     }
 
