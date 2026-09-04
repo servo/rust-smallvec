@@ -71,24 +71,4 @@ impl<T> TaggedLen<T> {
 
         self.0 -= if Self::IS_ZST { n } else { n << 1 };
     }
-
-    /// Returns the same tag with the length increased by one.
-    ///
-    /// This increases the length without rereading the `on heap` flag.
-    #[inline]
-    pub const unsafe fn increment(&mut self) {
-        unsafe {
-            self.add(1);
-        }
-    }
-
-    /// Returns the same tag with the length decreased by one.
-    ///
-    /// This decreases the length without rereading the `on heap` flag.
-    #[inline]
-    pub const unsafe fn decrement(&mut self) {
-        unsafe {
-            self.sub(1);
-        }
-    }
 }

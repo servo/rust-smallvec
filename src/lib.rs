@@ -372,7 +372,7 @@ impl<T, const N: usize> Drain<'_, T, N> {
             if let Some(new_item) = replace_with.next() {
                 unsafe {
                     core::ptr::write(place, new_item);
-                    vec.len.increment();
+                    vec.len.add(1);
                 }
             } else {
                 return false;
@@ -1135,7 +1135,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             debug_assert!(len + 1 <= self.capacity());
             // SAFETY: we have wrote the value to the address already
             unsafe {
-                self.len.increment();
+                self.len.add(1);
             }
         }
 
@@ -1155,7 +1155,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         // SAFETY: new_len < len since len is non-zero and
         // we are returning ownership of the current value.
         unsafe {
-            self.len.decrement();
+            self.len.sub(1);
         }
         // SAFETY: this element was initialized and we just gave up ownership of
         // it, so we can give it away
@@ -1386,7 +1386,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             let value = core::ptr::read(self.as_ptr().add(index));
             let base_ptr = self.as_mut_ptr();
             core::ptr::copy(base_ptr.add(new_len), base_ptr.add(index), 1);
-            self.len.decrement();
+            self.len.sub(1);
             value
         }
     }
@@ -1421,7 +1421,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         let new_len = len - 1;
         unsafe {
             // SAFETY: new_len < len
-            self.len.decrement();
+            self.len.sub(1);
             let ptr = self.as_mut_ptr();
             let ith = ptr.add(index);
             // This item is initialized since index < len
@@ -1476,7 +1476,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             debug_assert!(len + 1 <= self.capacity());
             // SAFETY: we have wrote the value to the address already
             unsafe {
-                self.len.increment();
+                self.len.add(1);
             }
         }
 
