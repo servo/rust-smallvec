@@ -126,7 +126,7 @@ impl<T, const N: usize, const M: usize> SpecExtend<T, IntoIter<T, M>> for SmallV
         }
 
         // Mark the iterator as fully consumed.
-        iter.begin = iter.end.value();
+        iter.begin = iter.end.len();
     }
 }
 

@@ -35,6 +35,7 @@ impl<T, const N: usize> Default for RawSmallVec<T, N> {
 }
 
 impl<T, const N: usize> RawSmallVec<T, N> {
+    pub const INLINE_CAP: usize = if Self::IS_ZST { usize::MAX } else { N };
     const IS_ZST: bool = size_of::<T>() == 0;
 
     #[inline]
@@ -74,18 +75,38 @@ impl<T, const N: usize> RawSmallVec<T, N> {
 
     /// # Safety
     ///
-    /// The vector must be on the heap
-    #[inline]
-    pub const unsafe fn as_ptr_heap(&self) -> *const T {
-        unsafe { self.heap.0.as_ptr() }
+    /// `on_heap` must be true if and only if `self.heap` is the active member.
+    #[inline(always)]
+    pub const unsafe fn as_ptr(&self, on_heap: bool) -> *const T {
+        if on_heap {
+            unsafe { self.heap.0.as_ptr() }
+        } else {
+            self.as_ptr_inline()
+        }
     }
 
     /// # Safety
     ///
-    /// The vector must be on the heap
-    #[inline]
-    pub const unsafe fn as_mut_ptr_heap(&mut self) -> *mut T {
-        unsafe { self.heap.0.as_ptr() }
+    /// `on_heap` must be true if and only if `self.heap` is the active member.
+    #[inline(always)]
+    pub const unsafe fn as_mut_ptr(&mut self, on_heap: bool) -> *mut T {
+        if on_heap {
+            unsafe { self.heap.0.as_ptr() }
+        } else {
+            self.as_mut_ptr_inline()
+        }
+    }
+
+    /// # Safety
+    ///
+    /// `on_heap` must be true if and only if `self.heap` is the active member.
+    #[inline(always)]
+    pub const unsafe fn capacity(&self, on_heap: bool) -> usize {
+        if on_heap {
+            unsafe { self.heap.1 }
+        } else {
+            Self::INLINE_CAP
+        }
     }
 
     /// # Safety
@@ -101,17 +122,12 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             alloc,
             realloc
         };
+        let (len, was_on_heap) = len.parts();
         debug_assert!(!Self::IS_ZST);
-        debug_assert!(new_capacity > 0);
-        debug_assert!(new_capacity >= len.value());
+        debug_assert!(new_capacity > 0 && new_capacity >= len);
 
-        let was_on_heap = len.on_heap();
-        let ptr = if was_on_heap {
-            unsafe { self.as_mut_ptr_heap() }
-        } else {
-            self.as_mut_ptr_inline()
-        };
-        let len = len.value();
+        // SAFETY: the tag tells which member is active
+        let ptr = unsafe { self.as_mut_ptr(was_on_heap) };
 
         let new_layout =
             Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;

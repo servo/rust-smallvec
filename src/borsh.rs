@@ -24,7 +24,7 @@ use {
 
 impl<Type: BorshSerialize, const INLINE: usize> BorshSerialize for SmallVec<Type, INLINE> {
     fn serialize<Writer: Write>(&self, writer: &mut Writer) -> Serial<()> {
-        (self.len.value() as u64).serialize(writer)?;
+        (self.len() as u64).serialize(writer)?;
         for element in self {
             element.serialize(writer)?;
         }
