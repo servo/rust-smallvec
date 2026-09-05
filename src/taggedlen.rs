@@ -23,49 +23,53 @@ impl<T> Clone for TaggedLen<T> {
 
 impl<T> Copy for TaggedLen<T> {}
 
+#[allow(clippy::len_without_is_empty)]
 impl<T> TaggedLen<T> {
-    const IS_ZST: bool = size_of::<T>() == 0;
+    const MAX_LEN: usize = usize::MAX >> Self::SHIFT;
+    const SHIFT: u32 = (size_of::<T>() != 0) as u32;
+    const TAG: usize = Self::SHIFT as usize;
 
-    #[inline]
+    #[inline(always)]
     pub const fn new(len: usize, on_heap: bool) -> Self {
-        if Self::IS_ZST {
-            debug_assert!(!on_heap);
-            Self(len, PhantomData)
-        } else {
-            debug_assert!(len < isize::MAX as usize);
-            Self((len << 1) | on_heap as usize, PhantomData)
-        }
+        debug_assert!(len < Self::MAX_LEN);
+        debug_assert!(!on_heap || Self::TAG != 0);
+        Self(
+            (len << Self::SHIFT) | ((on_heap as usize) & Self::TAG),
+            PhantomData
+        )
     }
 
-    #[inline]
+    #[inline(always)]
+    pub const fn len(self) -> usize {
+        self.0 >> Self::SHIFT
+    }
+
+    #[inline(always)]
     #[must_use]
     pub const fn on_heap(self) -> bool {
-        if Self::IS_ZST {
-            false
-        } else {
-            (self.0 & 1_usize) == 1
-        }
+        self.0 & Self::TAG != 0
     }
 
-    #[inline]
-    pub const fn value(self) -> usize {
-        if Self::IS_ZST { self.0 } else { self.0 >> 1 }
+    #[inline(always)]
+    pub const fn parts(self) -> (usize, bool) {
+        (self.0 >> Self::SHIFT, (self.0 & Self::TAG) != 0)
     }
 
-    #[inline]
+    /// # Safety
+    ///
+    /// current len+n must be smaller than MAX_LEN
+    #[inline(always)]
     pub const unsafe fn add(&mut self, n: usize) {
-        self.0 += if Self::IS_ZST {
-            n
-        } else {
-            debug_assert!(self.value() + n < isize::MAX as usize);
-            n << 1
-        }
+        debug_assert!(self.len() + n < Self::MAX_LEN);
+        self.0 += n << Self::SHIFT;
     }
 
-    #[inline]
+    /// # Safety
+    ///
+    /// current len must be greater equal than n
+    #[inline(always)]
     pub const unsafe fn sub(&mut self, n: usize) {
-        debug_assert!(self.value() >= n);
-
-        self.0 -= if Self::IS_ZST { n } else { n << 1 };
+        debug_assert!(self.len() >= n);
+        self.0 -= n << Self::SHIFT;
     }
 }
