@@ -421,7 +421,8 @@ impl<'a, T: 'a + Array> Drop for Drain<'a, T> {
                 let tail = self.tail_start;
                 if tail != start {
                     // as_mut_ptr creates a &mut, invalidating other pointers.
-                    // This pattern avoids calling it with a pointer already present.
+                    // This pattern avoids calling it with a pointer already
+                    // present.
                     let ptr = source_vec.as_mut_ptr();
                     let src = ptr.add(tail);
                     let dst = ptr.add(start);
@@ -492,9 +493,10 @@ where
                 self.panic_flag = true;
                 let drained = (self.pred)(&mut v[i]);
                 self.panic_flag = false;
-                // Update the index *after* the predicate is called. If the index
-                // is updated prior and the predicate panics, the element at this
-                // index would be leaked.
+                // Update the index *after* the predicate is called. If the
+                // index is updated prior and the predicate
+                // panics, the element at this index would be
+                // leaked.
                 self.idx += 1;
                 if drained {
                     self.del += 1;
@@ -538,12 +540,15 @@ where
             fn drop(&mut self) {
                 unsafe {
                     if self.drain.idx < self.drain.old_len && self.drain.del > 0 {
-                        // This is a pretty messed up state, and there isn't really an
-                        // obviously right thing to do. We don't want to keep trying
-                        // to execute `pred`, so we just backshift all the unprocessed
-                        // elements and tell the vec that they still exist. The backshift
-                        // is required to prevent a double-drop of the last successfully
-                        // drained item prior to a panic in the predicate.
+                        // This is a pretty messed up state, and there isn't
+                        // really an obviously right
+                        // thing to do. We don't want to keep trying
+                        // to execute `pred`, so we just backshift all the
+                        // unprocessed elements and tell
+                        // the vec that they still exist. The backshift
+                        // is required to prevent a double-drop of the last
+                        // successfully drained item
+                        // prior to a panic in the predicate.
                         let ptr = self.drain.vec.as_mut_ptr();
                         let src = ptr.add(self.drain.idx);
                         let dst = src.sub(self.drain.del);
@@ -600,14 +605,14 @@ where
         //        \_______/ ^-- idx
         //                \-- del
         //
-        // Normally `Drop` impl would drop [tail] (via .for_each(drop), ie still calling
-        // `pred`)
+        // Normally `Drop` impl would drop [tail] (via .for_each(drop), ie still
+        // calling `pred`)
         //
         // 1. Move [tail] after [kept]
-        // 2. Update length of the original vec to `old_len - del` a. In case of ZST,
-        //    this is the only thing we want to do
-        // 3. Do *not* drop self, as everything is put in a consistent state already,
-        //    there is nothing to do
+        // 2. Update length of the original vec to `old_len - del` a. In case of
+        //    ZST, this is the only thing we want to do
+        // 3. Do *not* drop self, as everything is put in a consistent state
+        //    already, there is nothing to do
         let mut this = ManuallyDrop::new(self);
 
         unsafe {
@@ -662,18 +667,19 @@ impl<A: Array> SmallVecData<A> {
         }
     }
     // Workaround for https://github.com/rust-lang/rust/issues/157743: when from_inline is
-    // called with MaybeUninit::uninit(), rustc 1.93+ GVN propagates const <uninit>
-    // into the ManuallyDrop::new() aggregate, causing LLVM to materialize a
-    // global constant that MemCpyOpt then collapses into a memset over the
-    // whole struct. Using assume_init() of a doubly-wrapped MaybeUninit
-    // produces Immediate::Uninit instead of const <uninit>, which
-    // codegen handles as undef without emitting any global. This function also
-    // avoids introducing an intermediate local that would inflate stack frames
-    // in debug builds.
+    // called with MaybeUninit::uninit(), rustc 1.93+ GVN propagates const
+    // <uninit> into the ManuallyDrop::new() aggregate, causing LLVM to
+    // materialize a global constant that MemCpyOpt then collapses into a
+    // memset over the whole struct. Using assume_init() of a doubly-wrapped
+    // MaybeUninit produces Immediate::Uninit instead of const <uninit>,
+    // which codegen handles as undef without emitting any global. This
+    // function also avoids introducing an intermediate local that would
+    // inflate stack frames in debug builds.
     #[inline]
     fn empty() -> SmallVecData<A> {
-        // SAFETY: ManuallyDrop<MaybeUninit<A>> is valid for any bit pattern including
-        // uninitialized bytes, so assume_init() on a MaybeUninit of that type is sound.
+        // SAFETY: ManuallyDrop<MaybeUninit<A>> is valid for any bit pattern
+        // including uninitialized bytes, so assume_init() on a
+        // MaybeUninit of that type is sound.
         SmallVecData {
             inline: unsafe { MaybeUninit::uninit().assume_init() },
         }
@@ -743,8 +749,9 @@ impl<A: Array> SmallVecData<A> {
     // See the comment on the union variant's empty() for why this exists.
     #[inline]
     fn empty() -> SmallVecData<A> {
-        // SAFETY: MaybeUninit<A> is valid for any bit pattern including uninitialized
-        // bytes, so assume_init() on a MaybeUninit of that type is sound.
+        // SAFETY: MaybeUninit<A> is valid for any bit pattern including
+        // uninitialized bytes, so assume_init() on a MaybeUninit of
+        // that type is sound.
         SmallVecData::Inline(unsafe { MaybeUninit::uninit().assume_init() })
     }
     #[inline]
@@ -969,17 +976,18 @@ impl<A: Array> SmallVec<A> {
         if mem::size_of::<A::Item>() > 0 {
             A::size()
         } else {
-            // For zero-size items code like `ptr.add(offset)` always returns the same
-            // pointer. Therefore all items are at the same address,
-            // and any array size has capacity for infinitely many items.
-            // The capacity is limited by the bit width of the length field.
+            // For zero-size items code like `ptr.add(offset)` always returns
+            // the same pointer. Therefore all items are at the same
+            // address, and any array size has capacity for
+            // infinitely many items. The capacity is limited by the
+            // bit width of the length field.
             //
             // `Vec` also does this:
             // https://github.com/rust-lang/rust/blob/1.44.0/src/liballoc/raw_vec.rs#L186
             //
-            // In our case, this also ensures that a smallvec of zero-size items never
-            // spills, and we never try to allocate zero bytes which
-            // `std::alloc::alloc` disallows.
+            // In our case, this also ensures that a smallvec of zero-size items
+            // never spills, and we never try to allocate zero bytes
+            // which `std::alloc::alloc` disallows.
             core::usize::MAX
         }
     }
@@ -1304,8 +1312,8 @@ impl<A: Array> SmallVec<A> {
     ///
     /// May reserve more space to avoid frequent reallocations.
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
-        // prefer triple_mut() even if triple() would work so that the optimizer removes
-        // duplicated calls to it from callers.
+        // prefer triple_mut() even if triple() would work so that the optimizer
+        // removes duplicated calls to it from callers.
         let (_, &mut len, cap) = self.triple_mut();
         if cap - len >= additional {
             return Ok(());
@@ -1469,7 +1477,8 @@ impl<A: Array> SmallVec<A> {
         }
 
         let (lower_size_bound, _) = iter.size_hint();
-        assert!(lower_size_bound <= core::isize::MAX as usize); // Ensure offset is indexable
+        assert!(lower_size_bound <= core::isize::MAX as usize); // Ensure offset
+                                                                // is indexable
         assert!(index + lower_size_bound >= index); // Protect against overflow
 
         let mut num_added = 0;
@@ -1485,8 +1494,8 @@ impl<A: Array> SmallVec<A> {
             // Move the trailing elements.
             ptr::copy(ptr, ptr.add(lower_size_bound), old_len - index);
 
-            // In case the iterator panics, don't double-drop the items we just copied
-            // above.
+            // In case the iterator panics, don't double-drop the items we just
+            // copied above.
             self.set_len(0);
             let mut guard = DropOnPanic {
                 start,
@@ -1494,8 +1503,8 @@ impl<A: Array> SmallVec<A> {
                 len: old_len + lower_size_bound,
             };
 
-            // The set_len above invalidates the previous pointers, so we must re-create
-            // them.
+            // The set_len above invalidates the previous pointers, so we must
+            // re-create them.
             let start = self.as_mut_ptr();
             let ptr = start.add(index);
 
@@ -1511,15 +1520,16 @@ impl<A: Array> SmallVec<A> {
             }
 
             if num_added < lower_size_bound {
-                // Iterator provided fewer elements than the hint. Move the tail backward.
+                // Iterator provided fewer elements than the hint. Move the tail
+                // backward.
                 ptr::copy(
                     ptr.add(lower_size_bound),
                     ptr.add(num_added),
                     old_len - index,
                 );
             }
-            // There are no more duplicate or uninitialized slots, so the guard is not
-            // needed.
+            // There are no more duplicate or uninitialized slots, so the guard
+            // is not needed.
             self.set_len(old_len + num_added);
             mem::forget(guard);
         }
@@ -1611,9 +1621,9 @@ impl<A: Array> SmallVec<A> {
 
     /// Retains only the elements specified by the predicate.
     ///
-    /// This method is identical in behaviour to [`SmallVec::retain`]; it is included only
-    /// to maintain api-compatibility with `std::Vec`, where the methods are
-    /// separate for historical reasons.
+    /// This method is identical in behaviour to [`SmallVec::retain`]; it is
+    /// included only to maintain api-compatibility with `std::Vec`, where
+    /// the methods are separate for historical reasons.
     pub fn retain_mut<F: FnMut(&mut A::Item) -> bool>(&mut self, f: F) {
         self.retain(f)
     }
@@ -2401,7 +2411,8 @@ impl<A: Array> IntoIterator for SmallVec<A> {
     type Item = A::Item;
     fn into_iter(mut self) -> Self::IntoIter {
         unsafe {
-            // Set SmallVec len to zero as `IntoIter` drop handles dropping of the elements
+            // Set SmallVec len to zero as `IntoIter` drop handles dropping of
+            // the elements
             let len = self.len();
             self.set_len(0);
             IntoIter {
@@ -2613,11 +2624,12 @@ where
 
         let mut vec = SmallVec::with_capacity(len);
         if unty::type_equal::<A::Item, u8>() {
-            // Initialize the smallvec's buffer.  Note that we need to do this through
-            // the raw pointer as we cannot name the type [u8; N] even though A::Item is u8.
+            // Initialize the smallvec's buffer.  Note that we need to do this
+            // through the raw pointer as we cannot name the type
+            // [u8; N] even though A::Item is u8.
             let ptr = vec.as_mut_ptr();
-            // SAFETY: A::Item is u8 and the smallvec has been allocated with enough
-            // capacity
+            // SAFETY: A::Item is u8 and the smallvec has been allocated with
+            // enough capacity
             unsafe {
                 core::ptr::write_bytes(ptr, 0, len);
                 vec.set_len(len);
@@ -2655,11 +2667,12 @@ where
 
         let mut vec = SmallVec::with_capacity(len);
         if unty::type_equal::<A::Item, u8>() {
-            // Initialize the smallvec's buffer.  Note that we need to do this through
-            // the raw pointer as we cannot name the type [u8; N] even though A::Item is u8.
+            // Initialize the smallvec's buffer.  Note that we need to do this
+            // through the raw pointer as we cannot name the type
+            // [u8; N] even though A::Item is u8.
             let ptr = vec.as_mut_ptr();
-            // SAFETY: A::Item is u8 and the smallvec has been allocated with enough
-            // capacity
+            // SAFETY: A::Item is u8 and the smallvec has been allocated with
+            // enough capacity
             unsafe {
                 core::ptr::write_bytes(ptr, 0, len);
                 vec.set_len(len);
