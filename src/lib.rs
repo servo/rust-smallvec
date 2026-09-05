@@ -4,69 +4,16 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! Small vectors in various sizes. These store a certain number of elements
-//! inline, and fall back to the heap for larger allocations.  This can be a
-//! useful optimization for improving cache locality and reducing allocator
-//! traffic for workloads that fit within the inline buffer.
-//!
-//! ## `no_std` support
-//!
-//! By default, `smallvec` does not depend on `std`.  However, the optional
-//! `write` feature implements the `std::io::Write` trait for vectors of `u8`.
-//! When this feature is enabled, `smallvec` depends on `std`.
-//!
-//! ## Optional features
-//!
-//! ### `std`
-//!
-//! When this feature is enabled, traits available from `std` are implemented:
-//!
-//! * `SmallVec<u8, _>` implements the [`std::io::Write`] trait.
-//! * [`CollectionAllocErr`] implements [`std::error::Error`].
-//!
-//! This feature is not compatible with `#![no_std]` programs.
-//!
-//! ### `serde`
-//!
-//! When this optional dependency is enabled, `SmallVec` implements the
-//! `serde::Serialize` and `serde::Deserialize` traits.
-//!
-//! ### `specialization`
-//!
-//! **This feature is unstable and requires a nightly build of the Rust
-//! toolchain.**
-//!
-//! When this feature is enabled, `SmallVec::from(slice)` has improved
-//! performance for slices of `Copy` types.  (Without this feature, you can use
-//! `SmallVec::from_slice` to get optimal performance for `Copy` types.)
-//!
-//! Tracking issue: [rust-lang/rust#31844](https://github.com/rust-lang/rust/issues/31844)
-//!
-//! ### `may_dangle`
-//!
-//! **This feature is unstable and requires a nightly build of the Rust
-//! toolchain.**
-//!
-//! This feature makes the Rust compiler less strict about use of vectors that
-//! contain borrowed references. For details, see the
-//! [Rustonomicon](https://doc.rust-lang.org/1.42.0/nomicon/dropck.html#an-escape-hatch).
-//!
-//! Tracking issue: [rust-lang/rust#34761](https://github.com/rust-lang/rust/issues/34761)
-//!
-//! ### `encase`
-//!
-//! When this optional dependency is enabled, `SmallVec` implements `encase`'s
-//! traits.
+#![doc = include_str!("../README.md")]
 
 #![no_std]
+
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization, trusted_len))]
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 
-#[doc(hidden)]
 extern crate alloc;
-
 #[cfg(feature = "std")]
 extern crate std;
 
