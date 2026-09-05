@@ -1611,7 +1611,7 @@ impl<A: Array> SmallVec<A> {
 
     /// Retains only the elements specified by the predicate.
     ///
-    /// This method is identical in behaviour to [`retain`]; it is included only
+    /// This method is identical in behaviour to [`SmallVec::retain`]; it is included only
     /// to maintain api-compatibility with `std::Vec`, where the methods are
     /// separate for historical reasons.
     pub fn retain_mut<F: FnMut(&mut A::Item) -> bool>(&mut self, f: F) {
