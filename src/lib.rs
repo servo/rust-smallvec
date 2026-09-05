@@ -980,6 +980,7 @@ impl<A: Array> SmallVec<A> {
             // In our case, this also ensures that a smallvec of zero-size items never
             // spills, and we never try to allocate zero bytes which
             // `std::alloc::alloc` disallows.
+            #[allow(deprecated)]
             core::usize::MAX
         }
     }
@@ -1469,7 +1470,8 @@ impl<A: Array> SmallVec<A> {
         }
 
         let (lower_size_bound, _) = iter.size_hint();
-        assert!(lower_size_bound <= core::isize::MAX as usize); // Ensure offset is indexable
+        #[allow(deprecated)]
+        {assert!(lower_size_bound <= core::isize::MAX as usize)} // Ensure offset is indexable
         assert!(index + lower_size_bound >= index); // Protect against overflow
 
         let mut num_added = 0;
