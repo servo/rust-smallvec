@@ -29,6 +29,7 @@ jobs:
             nightly: true
           - name: MSRV
             toolchain: "1.86.0"
+            skip: --skip defmt
           - name: no_std
             toolchain: stable
             target: thumbv7m-none-eabi
@@ -59,7 +60,9 @@ jobs:
 
       - name: Run tests
         if: ${{ !matrix.no_std }}
-        run: cargo test --verbose
+        # The `defmt` test requires a newer Rust version, so skip the test
+        # for the MSRV.
+        run: cargo test --verbose -- ${{ matrix.skip }}
 
       - name: Cargo test all features
         if: matrix.nightly
