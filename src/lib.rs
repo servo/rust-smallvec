@@ -985,9 +985,9 @@ impl<A: Array> SmallVec<A> {
             // `Vec` also does this:
             // https://github.com/rust-lang/rust/blob/1.44.0/src/liballoc/raw_vec.rs#L186
             //
-            // In our case, this also ensures that a smallvec of zero-size items never
-            // spills, and we never try to allocate zero bytes which
-            // `std::alloc::alloc` disallows.
+            // In our case, this also ensures that a smallvec of zero-size items
+            // never spills, and we never try to allocate zero bytes
+            // which `std::alloc::alloc` disallows.
             #[allow(deprecated)]
             core::usize::MAX
         }
@@ -1492,7 +1492,9 @@ impl<A: Array> SmallVec<A> {
 
         let (lower_size_bound, _) = iter.size_hint();
         #[allow(deprecated)]
-        {assert!(lower_size_bound <= core::isize::MAX as usize)} // Ensure offset is indexable
+        {
+            assert!(lower_size_bound <= core::isize::MAX as usize)
+        } // Ensure offset is indexable
         assert!(index + lower_size_bound >= index); // Protect against overflow
 
         let mut num_added = 0;
