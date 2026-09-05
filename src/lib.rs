@@ -5,9 +5,7 @@
 // except according to those terms.
 
 #![doc = include_str!("../README.md")]
-
 #![no_std]
-
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization, trusted_len))]
