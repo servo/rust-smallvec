@@ -16,8 +16,6 @@ macro_rules! __impl_slice_eq1 {
         {
             #[inline]
             fn eq(&self, other: &$rhs) -> bool { self[..] == other[..] }
-            #[inline]
-            fn ne(&self, other: &$rhs) -> bool { self[..] != other[..] }
         }
     };
 }
