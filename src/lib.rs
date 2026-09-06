@@ -449,21 +449,19 @@ where F: FnMut(&mut T) -> bool
         unsafe {
             while self.idx < self.end {
                 let i = self.idx;
-                let v = core::slice::from_raw_parts_mut(self.vec.as_mut_ptr(), self.old_len);
-                let drained = (self.pred)(&mut v[i]);
+                // SAFETY: `i < self.end <= self.old_len`
+                let cur = self.vec.as_mut_ptr().add(i);
+                let drained = (self.pred)(&mut *cur);
                 // Update the index *after* the predicate is called. If the
-                // index is updated prior and the predicate
-                // panics, the element at this index would be
-                // leaked.
+                // index is updated prior and the predicate panics,
+                // the element at this index would be leaked.
                 self.idx += 1;
                 if drained {
                     self.del += 1;
-                    return Some(core::ptr::read(&v[i]));
+                    return Some(core::ptr::read(cur));
                 } else if self.del > 0 {
-                    let del = self.del;
-                    let src: *const T = &v[i];
-                    let dst: *mut T = &mut v[i - del];
-                    core::ptr::copy_nonoverlapping(src, dst, 1);
+                    // SAFETY: `self.del <= i` therefore `i - self.del` is valid
+                    core::ptr::copy_nonoverlapping(cur, cur.sub(self.del), 1);
                 }
             }
             None
