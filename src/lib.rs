@@ -1099,6 +1099,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         if len == self.capacity() {
             self.reserve(1);
         }
+        debug_assert!(len < self.capacity());
 
         // SAFETY: `len < capacity` after the reserve,
         //         so the offset stays in bounds of the allocation.
@@ -1112,8 +1113,6 @@ impl<T, const N: usize> SmallVec<T, N> {
             // This block is an exact copy of `self.set_len`.
             // We have to do this so that Miri doesn't report a "Stacked
             // Borrows" rule violation. See PR/406
-
-            debug_assert!(len < self.capacity());
             // SAFETY: we have wrote the value to the address already
             unsafe {
                 self.len.add(1);
@@ -1434,6 +1433,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             assert_failed(index, len);
         }
         self.reserve(1);
+        debug_assert!(len < self.capacity());
 
         // SAFETY: `index <= len <= capacity`,
         //         so the offset stays in bounds of the allocation.
@@ -1456,7 +1456,6 @@ impl<T, const N: usize> SmallVec<T, N> {
             // We have to do this so that Miri doesn't report a "Stacked
             // Borrows" rule violation. See PR/406
 
-            debug_assert!(len < self.capacity());
             // SAFETY: we have wrote the value to the address already
             unsafe {
                 self.len.add(1);
