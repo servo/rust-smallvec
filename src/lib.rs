@@ -1773,12 +1773,9 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// # Examples
     ///
     /// ```
-    /// use smallvec::{
-    ///     SmallVec,
-    ///     smallvec
-    /// };
+    /// use smallvec::SmallVec;
     ///
-    /// let mut v: SmallVec<_, 1> = smallvec![1, 2, 3];
+    /// let mut v: SmallVec<_, 1> = SmallVec::from([1, 2, 3]);
     ///
     /// // Pull out the important parts of `v`.
     /// let p = v.as_mut_ptr();
