@@ -212,6 +212,22 @@ fn splice() {
 }
 
 #[test]
+fn splice_inline_fill_then_move_tail_ub_test() {
+    let mut v: SmallVec<Box<usize>, 16> = (0..6).map(Box::new).collect();
+    assert!(!v.spilled());
+    let out: Vec<usize> = v
+        .splice(1..3, (100..103).map(Box::new))
+        .map(|b| *b)
+        .collect();
+    assert_eq!(out, [1, 2]);
+    assert_eq!(
+        v.iter().map(|b| **b).collect::<Vec<usize>>(),
+        [0, 100, 101, 102, 3, 4, 5]
+    );
+    assert!(!v.spilled());
+}
+
+#[test]
 fn into_iter() {
     let mut v: SmallVec<u8, 2> = SmallVec::new();
     v.push(3);
