@@ -615,8 +615,12 @@ impl<T, const N: usize> IntoIter<T, N> {
         // `self.begin..end` are all initialized. So the pointer arithmetic is
         // valid, and so is the construction of the slice
         unsafe {
-            let ptr = self.raw.as_ptr(on_heap);
-            core::slice::from_raw_parts(ptr.add(self.begin), end - self.begin)
+            let ptr = if on_heap {
+                self.raw.as_heap()
+            } else {
+                self.raw.as_inline()
+            }.as_ptr();
+            core::slice::from_raw_parts(ptr.add(self.begin).cast(), end - self.begin)
         }
     }
 
@@ -625,8 +629,12 @@ impl<T, const N: usize> IntoIter<T, N> {
         let (end, on_heap) = self.end.parts();
         // SAFETY: see above
         unsafe {
-            let ptr = self.raw.as_mut_ptr(on_heap);
-            core::slice::from_raw_parts_mut(ptr.add(self.begin), end - self.begin)
+            let ptr = if on_heap {
+                self.raw.as_mut_heap()
+            } else {
+                self.raw.as_mut_inline()
+            }.as_mut_ptr();
+            core::slice::from_raw_parts_mut(ptr.add(self.begin).cast(), end - self.begin)
         }
     }
 }
@@ -642,8 +650,12 @@ impl<T, const N: usize> Iterator for IntoIter<T, N> {
         } else {
             // SAFETY: see above
             unsafe {
-                let ptr = self.raw.as_mut_ptr(on_heap);
-                let value = ptr.add(self.begin).read();
+                let reference = if on_heap {
+                    self.raw.as_heap()
+                } else {
+                    self.raw.as_inline()
+                };
+                let value = reference[self.begin].assume_init_read();
                 self.begin += 1;
                 Some(value)
             }
@@ -666,9 +678,13 @@ impl<T, const N: usize> DoubleEndedIterator for IntoIter<T, N> {
         } else {
             // SAFETY: see above
             unsafe {
-                let ptr = self.raw.as_mut_ptr(on_heap);
+                let reference = if on_heap {
+                    self.raw.as_heap()
+                } else {
+                    self.raw.as_inline()
+                };
                 self.end.sub(1);
-                let value = ptr.add(end - 1).read();
+                let value = reference[end - 1].assume_init_read();
                 Some(value)
             }
         }
@@ -744,17 +760,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         };
         // Deallocate the remaining elements so no memory is leaked.
         unsafe {
-            // SAFETY: both the input and output pointers are in range of the
-            // stack allocation
-            let remainder_ptr = vec.raw.as_mut_ptr_inline().add(len);
-            let remainder_len = N - len;
-
-            // SAFETY: the values are initialized, so dropping them here is
-            // fine.
-            core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(
-                remainder_ptr,
-                remainder_len
-            ));
+            vec.raw.as_mut_inline()[len .. N - len].assume_init_drop();
         }
 
         vec
@@ -825,11 +831,11 @@ impl<T, const N: usize> SmallVec<T, N> {
             let cap = vec.capacity();
             // SAFETY: vec.capacity is not `0` (checked above), so the pointer
             // can not dangle and thus specifically cannot be null.
-            let ptr = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
+            let ptr = unsafe { NonNull::new_unchecked(core::ptr::slice_from_raw_parts_mut(vec.as_mut_ptr().cast(), cap)) };
 
             Self {
                 len: TaggedLen::new(len, true),
-                raw: RawSmallVec::new_heap(ptr, cap),
+                raw: RawSmallVec::new_heap(ptr),
                 _marker: PhantomData
             }
         }
@@ -1202,15 +1208,15 @@ impl<T, const N: usize> SmallVec<T, N> {
             if on_heap {
                 unsafe {
                     // SAFETY: heap member is active
-                    let (ptr, old_cap) = self.raw.heap;
+                    let ptr = self.raw.heap;
                     // inline member is now active
 
                     // SAFETY: len <= new_capacity <= Self::inline_size()
                     // so the copy is within bounds of the inline member
-                    copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
+                    copy_nonoverlapping(ptr.as_ptr().cast(), self.raw.as_mut_inline(), len);
                     drop(DropDealloc {
                         ptr: ptr.cast(),
-                        size_bytes: old_cap * size_of::<T>(),
+                        size_bytes: ptr.len() * size_of::<T>(),
                         align: align_of::<T>()
                     });
                     self.set_inline();
@@ -1283,13 +1289,14 @@ impl<T, const N: usize> SmallVec<T, N> {
         if len <= Self::inline_size() {
             // SAFETY: on_heap is true, so we're on the heap
             unsafe {
-                let (ptr, capacity) = self.raw.heap;
-                self.raw = RawSmallVec::new_inline([const {MaybeUninit::uninit()}; N]);
-                copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
+                //let (ptr, capacity) = self.raw.heap;
+                let ptr = self.raw.heap;
+                self.raw = RawSmallVec::new();
+                copy_nonoverlapping(ptr.as_ptr().cast(), self.raw.as_mut_inline(), len);
                 self.set_inline();
                 alloc::alloc::dealloc(
                     ptr.cast().as_ptr(),
-                    Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>())
+                    Layout::from_size_align_unchecked(ptr.len() * size_of::<T>(), align_of::<T>())
                 );
             }
         } else if len < self.capacity() {
@@ -1307,25 +1314,26 @@ impl<T, const N: usize> SmallVec<T, N> {
             return;
         }
         // SAFETY: the vector is on the heap
-        let capacity = unsafe { self.raw.heap.1 };
-        if capacity > min_capacity {
+        //let capacity = unsafe { self.raw.heap.len() };
+        let ptr = unsafe { self.raw.heap };
+        let cap = ptr.len();
+        if cap > min_capacity {
             let target = core::cmp::max(len, min_capacity);
             if target <= Self::inline_size() {
                 // SAFETY: on_heap is true, so we're on the heap
                 unsafe {
-                    let (ptr, capacity) = self.raw.heap;
-                    self.raw = RawSmallVec::new_inline([const {MaybeUninit::uninit()}; N]);
-                    copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
+                    self.raw = RawSmallVec::new();
+                    copy_nonoverlapping(ptr.as_ptr().cast(), self.raw.as_mut_inline(), len);
                     self.set_inline();
                     alloc::alloc::dealloc(
                         ptr.cast().as_ptr(),
                         Layout::from_size_align_unchecked(
-                            capacity * size_of::<T>(),
+                            cap * size_of::<T>(),
                             align_of::<T>()
                         )
                     );
                 }
-            } else if target < capacity {
+            } else if target < cap {
                 // SAFETY: len > Self::inline_size() >= 0
                 // so new capacity is non zero, it is equal to the length
                 // T can't be a ZST because SmallVec<ZST, N> is never spilled.
@@ -1476,26 +1484,49 @@ impl<T, const N: usize> SmallVec<T, N> {
     pub const fn as_slice(&self) -> &[T] {
         let (len, on_heap) = self.len.parts();
         // SAFETY: all the elements in `..len` are initialized
-        unsafe { core::slice::from_raw_parts(self.raw.as_ptr(on_heap), len) }
+        //unsafe { core::slice::from_raw_parts(self.raw.as_ptr(on_heap), len) }
+        unsafe {
+            let ptr = if on_heap {
+                self.raw.as_heap()
+            } else {
+                self.raw.as_inline()
+            }.as_ptr();
+            core::slice::from_raw_parts(ptr.cast(), len)
+        }
     }
 
     #[inline]
     pub const fn as_mut_slice(&mut self) -> &mut [T] {
         let (len, on_heap) = self.len.parts();
         // SAFETY: see above
-        unsafe { core::slice::from_raw_parts_mut(self.raw.as_mut_ptr(on_heap), len) }
+        unsafe {
+            let ptr = if on_heap {
+                self.raw.as_mut_heap()
+            } else {
+                self.raw.as_mut_inline()
+            }.as_mut_ptr();
+            core::slice::from_raw_parts_mut(ptr.cast(), len)
+        }
     }
 
     #[inline]
     pub const fn as_ptr(&self) -> *const T {
         // SAFETY: the tag tells which member is active
-        unsafe { self.raw.as_ptr(self.len.on_heap()) }
+        unsafe {if self.spilled() {
+            self.raw.as_heap()
+        } else {
+            self.raw.as_inline()
+        }.as_ptr().cast()}
     }
 
     #[inline]
     pub const fn as_mut_ptr(&mut self) -> *mut T {
         // SAFETY: see above
-        unsafe { self.raw.as_mut_ptr(self.len.on_heap()) }
+        unsafe {if self.spilled() {
+            self.raw.as_mut_heap()
+        } else {
+            self.raw.as_mut_inline()
+        }.as_mut_ptr().cast()}
     }
 
     #[inline]
@@ -1509,7 +1540,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             // the length we don't drop the elements we previously
             // held
             unsafe {
-                copy_nonoverlapping(this.raw.as_ptr_inline(), vec.as_mut_ptr(), len);
+                copy_nonoverlapping(this.raw.as_inline().as_ptr().cast(), vec.as_mut_ptr(), len);
                 vec.set_len(len);
             }
             vec
@@ -1523,8 +1554,8 @@ impl<T, const N: usize> SmallVec<T, N> {
             // - the first `len` entries are proper `T`-values
             // - the allocation is not larger than `isize::MAX`
             unsafe {
-                let (ptr, cap) = this.raw.heap;
-                Vec::from_raw_parts(ptr.as_ptr(), len, cap)
+                let ptr = this.raw.heap;
+                Vec::from_raw_parts(ptr.as_ptr().cast(), len, ptr.len())
             }
         }
     }
@@ -1726,7 +1757,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             );
         }
         let mut me = ManuallyDrop::new(self);
-        unsafe { core::slice::from_raw_parts_mut(me.raw.as_mut_ptr(true), len) }
+        unsafe { core::slice::from_raw_parts_mut(me.raw.as_mut_heap().as_mut_ptr().cast(), len) }
     }
 
     /// Returns the remaining spare capacity of the vector as a slice of
@@ -1740,8 +1771,13 @@ impl<T, const N: usize> SmallVec<T, N> {
         let (len, on_heap) = self.len.parts();
         unsafe {
             let capacity = self.raw.capacity(on_heap);
+            let ptr = if on_heap {
+                self.raw.as_mut_heap()
+            } else {
+                self.raw.as_mut_inline()
+            }.as_mut_ptr();
             core::slice::from_raw_parts_mut(
-                self.raw.as_mut_ptr(on_heap).add(len) as *mut MaybeUninit<T>,
+                ptr.add(len) as *mut MaybeUninit<T>,
                 capacity - len
             )
         }
@@ -1826,7 +1862,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
         SmallVec {
             len: TaggedLen::new(length, true),
-            raw: RawSmallVec::new_heap(ptr, capacity),
+            raw: RawSmallVec::new_heap(NonNull::slice_from_raw_parts(ptr.cast(), capacity)),
             _marker: PhantomData
         }
     }
@@ -1991,12 +2027,17 @@ impl Drop for DropDealloc {
 unsafe impl<#[may_dangle] T, const N: usize> Drop for SmallVec<T, N> {
     fn drop(&mut self) {
         let (len, on_heap) = self.len.parts();
-        let ptr = unsafe { self.raw.as_mut_ptr(on_heap) };
+        //let ptr = unsafe { self.raw.as_mut_ptr(on_heap) };
+        let ptr = unsafe {if on_heap {
+            self.raw.as_mut_heap()
+        } else {
+            self.raw.as_mut_inline()
+        }}.as_mut_ptr();
         // SAFETY: we first drop the elements, then `_drop_dealloc` is dropped,
         // releasing memory we used to own
         unsafe {
             let _drop_dealloc = if on_heap {
-                let capacity = self.raw.heap.1;
+                let capacity = self.raw.heap.len();
                 Some(DropDealloc {
                     ptr: NonNull::new_unchecked(ptr as *mut u8),
                     size_bytes: capacity * size_of::<T>(),
@@ -2015,7 +2056,11 @@ impl<T, const N: usize> Drop for SmallVec<T, N> {
     fn drop(&mut self) {
         let (len, on_heap) = self.len.parts();
         // SAFETY: the tag tells which member is active
-        let ptr = unsafe { self.raw.as_mut_ptr(on_heap) };
+        let ptr = unsafe {if on_heap {
+            self.raw.as_mut_heap()
+        } else {
+            self.raw.as_mut_inline()
+        }}.as_mut_ptr();
         // SAFETY: see above
         unsafe {
             let _drop_dealloc = if on_heap {
@@ -2039,9 +2084,13 @@ impl<T, const N: usize> Drop for IntoIter<T, N> {
         unsafe {
             let (end, on_heap) = self.end.parts();
             let begin = self.begin;
-            let ptr = self.raw.as_mut_ptr(on_heap);
+            let ptr = if on_heap {
+                self.raw.as_mut_heap()
+            } else {
+                self.raw.as_mut_inline()
+            }.as_mut_ptr();
             let _drop_dealloc = if on_heap {
-                let capacity = self.raw.heap.1;
+                let capacity = self.raw.heap.len();
                 Some(DropDealloc {
                     ptr: NonNull::new_unchecked(ptr as *mut u8),
                     size_bytes: capacity * size_of::<T>(),
@@ -2094,7 +2143,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         let mut result = Self::new();
 
         if n > 0 {
-            let ptr = result.raw.as_mut_ptr_inline();
+            let ptr = unsafe { result.raw.as_mut_inline().as_mut_ptr().cast::<T>() };
             let mut guard = DropGuard {
                 ptr,
                 len: 0
@@ -2483,7 +2532,11 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
         let (len, on_heap) = self.len.parts();
         // SAFETY: the tag tells which member is active
         let cap = unsafe { self.raw.capacity(on_heap) };
-        let ptr = unsafe { self.raw.as_mut_ptr(on_heap) };
+        let ptr = unsafe {if on_heap {
+            self.raw.as_mut_heap()
+        } else {
+            self.raw.as_mut_inline()
+        }}.as_mut_ptr().cast::<u8>();
         // SAFETY: Since `ptr` is valid for `cap` bytes, `ptr.add(len)` must be
         // valid for `cap - len` bytes. The subtraction will not underflow since
         // `len <= cap`.

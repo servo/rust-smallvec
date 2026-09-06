@@ -13,6 +13,10 @@ use {
             NonNull,
             copy_nonoverlapping
         }
+    },
+    alloc::alloc::{
+        alloc,
+        realloc
     }
 };
 
@@ -24,7 +28,7 @@ use {
 #[repr(C)]
 pub union RawSmallVec<T, const N: usize> {
     pub inline: ManuallyDrop<[MaybeUninit<T>; N]>,
-    pub heap: (NonNull<T>, usize)
+    pub heap: NonNull<[MaybeUninit<T>]>
 }
 
 impl<T, const N: usize> Default for RawSmallVec<T, N> {
@@ -51,50 +55,50 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     }
 
     #[inline]
-    pub const fn new_heap(ptr: NonNull<T>, capacity: usize) -> Self {
+    pub const fn new_heap(ptr: NonNull<[MaybeUninit<T>]>) -> Self {
         Self {
-            heap: (ptr, capacity)
+            heap: ptr
         }
     }
 
+    /// # Safety
+    /// 
+    /// `inline` must be the active variant
+    /// otherwise it reads pointer as elements
     #[inline]
-    pub const fn as_ptr_inline(&self) -> *const T {
+    pub const unsafe fn as_inline(&self) -> &[MaybeUninit<T>; N] {
         // SAFETY: it is safe because we aren't reading the value, just getting
         // a reference to it. reading it would be UB potentially, but
         // for that downstream unsafe is required
-        #[allow(unused_unsafe, reason = "Unsafe in MSRV")]
-        (unsafe { &raw const self.inline }).cast()
+        unsafe { (&raw const self.inline).cast::<[MaybeUninit<T>; N]>().as_ref_unchecked() }
     }
 
+    /// # Safety
+    /// 
+    /// `inline` must be the active variant
+    /// otherwise it reads pointer as elements
     #[inline]
-    pub const fn as_mut_ptr_inline(&mut self) -> *mut T {
+    pub const unsafe fn as_mut_inline(&mut self) -> &mut [MaybeUninit<T>; N] {
         // SAFETY: same as above
-        #[allow(unused_unsafe, reason = "Unsafe in MSRV")]
-        (unsafe { &raw mut self.inline }).cast()
+        unsafe { (&raw mut self.inline).cast::<[MaybeUninit<T>; N]>().as_mut_unchecked() }
     }
 
     /// # Safety
-    ///
-    /// `on_heap` must be true if and only if `self.heap` is the active member.
-    #[inline(always)]
-    pub const unsafe fn as_ptr(&self, on_heap: bool) -> *const T {
-        if on_heap {
-            unsafe { self.heap.0.as_ptr() }
-        } else {
-            self.as_ptr_inline()
-        }
+    /// 
+    /// `heap` must be the active variant
+    /// otherwise it reads inlined elements as pointer
+    #[inline]
+    pub const unsafe fn as_heap(&self) -> &[MaybeUninit<T>] {
+        unsafe { self.heap.as_ref() }
     }
 
     /// # Safety
-    ///
-    /// `on_heap` must be true if and only if `self.heap` is the active member.
-    #[inline(always)]
-    pub const unsafe fn as_mut_ptr(&mut self, on_heap: bool) -> *mut T {
-        if on_heap {
-            unsafe { self.heap.0.as_ptr() }
-        } else {
-            self.as_mut_ptr_inline()
-        }
+    /// 
+    /// `heap` must be the active variant
+    /// otherwise it reads inlined elements as pointer
+    #[inline]
+    pub const unsafe fn as_mut_heap(&mut self) -> &mut [MaybeUninit<T>] {
+        unsafe { self.heap.as_mut() }
     }
 
     /// # Safety
@@ -103,7 +107,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     #[inline(always)]
     pub const unsafe fn capacity(&self, on_heap: bool) -> usize {
         if on_heap {
-            unsafe { self.heap.1 }
+            unsafe {self.as_heap().len()}
         } else {
             Self::INLINE_CAP
         }
@@ -118,16 +122,16 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         len: TaggedLen<T>,
         new_capacity: usize
     ) -> Result<(), CollectionAllocErr> {
-        use alloc::alloc::{
-            alloc,
-            realloc
-        };
         let (len, was_on_heap) = len.parts();
         debug_assert!(!Self::IS_ZST);
         debug_assert!(new_capacity > 0 && new_capacity >= len);
 
         // SAFETY: the tag tells which member is active
-        let ptr = unsafe { self.as_mut_ptr(was_on_heap) };
+        let ptr = if was_on_heap {
+            unsafe { self.as_mut_heap() }
+        } else {
+            unsafe { self.as_mut_inline() }
+        }.as_mut_ptr();
 
         let new_layout =
             Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
@@ -137,11 +141,12 @@ impl<T, const N: usize> RawSmallVec<T, N> {
 
         let new_ptr = if !was_on_heap {
             // get a fresh allocation
-            let new_ptr = unsafe { alloc(new_layout) } as *mut T; // `new_layout` has nonzero size.
+            
+            let new_ptr = unsafe { alloc(new_layout) } as *mut MaybeUninit<T>; // `new_layout` has nonzero size.
             let new_ptr = NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr {
                 layout: new_layout
             })?;
-            unsafe { copy_nonoverlapping(ptr, new_ptr.as_ptr(), len) };
+            unsafe { copy_nonoverlapping(ptr.cast(), new_ptr.as_ptr(), len) };
             new_ptr
         } else {
             // use realloc
@@ -149,7 +154,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             // this can't overflow since we already constructed an equivalent
             // layout during the previous allocation
             let old_layout = unsafe {
-                Layout::from_size_align_unchecked(self.heap.1 * size_of::<T>(), align_of::<T>())
+                Layout::from_size_align_unchecked(self.heap.len() * size_of::<T>(), align_of::<T>())
             };
 
             // SAFETY: ptr was allocated with this allocator
@@ -159,12 +164,12 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             // alignment. since it was constructed
             // with Layout::array
             let new_ptr =
-                unsafe { realloc(ptr as *mut u8, old_layout, new_layout.size()) } as *mut T;
+                unsafe { realloc(ptr.cast(), old_layout, new_layout.size()) } as *mut MaybeUninit<T>;
             NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr {
                 layout: new_layout
             })?
         };
-        *self = Self::new_heap(new_ptr, new_capacity);
+        *self = Self::new_heap(NonNull::slice_from_raw_parts(new_ptr, len));
         Ok(())
     }
 }

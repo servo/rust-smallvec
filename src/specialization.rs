@@ -33,14 +33,13 @@ impl<T: Copy, const N: usize> SpecFromElem<T> for SmallVec<T, N> {
         let mut result = Self::new();
 
         if n > 0 {
-            let ptr = result.raw.as_mut_ptr_inline();
+            // SAFETY: the active variant is `inline`
+            let inline = unsafe { result.raw.as_mut_inline() };
 
-            // SAFETY: The caller ensures that the first `n`
-            // is smaller than the inline size.
-            unsafe {
-                for i in 0..n {
-                    ptr.add(i).write(elem);
-                }
+            for i in 0..n {
+                // SAFETY: The caller ensures that the first `n`
+                // is smaller than the inline size.
+                unsafe { inline.get_unchecked_mut(i).write(elem); }
             }
         }
 
