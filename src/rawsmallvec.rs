@@ -70,7 +70,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         // SAFETY: it is safe because we aren't reading the value, just getting
         // a reference to it. reading it would be UB potentially, but
         // for that downstream unsafe is required
-        unsafe { (&raw const self.inline).cast::<[MaybeUninit<T>; N]>().as_ref_unchecked() }
+        unsafe { (&raw const self.inline).cast::<[MaybeUninit<T>; N]>().as_ref().unwrap_unchecked() }
     }
 
     /// # Safety
@@ -80,7 +80,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     #[inline]
     pub const unsafe fn as_mut_inline(&mut self) -> &mut [MaybeUninit<T>; N] {
         // SAFETY: same as above
-        unsafe { (&raw mut self.inline).cast::<[MaybeUninit<T>; N]>().as_mut_unchecked() }
+        unsafe { (&raw mut self.inline).cast::<[MaybeUninit<T>; N]>().as_mut().unwrap_unchecked() }
     }
 
     /// # Safety
