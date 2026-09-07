@@ -762,7 +762,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         };
         // Deallocate the remaining elements so no memory is leaked.
         unsafe {
-            vec.raw.as_mut_inline()[len..N - len].assume_init_drop();
+            vec.raw.as_mut_inline()[len..N - len].as_mut_ptr().drop_in_place();
         }
 
         vec
