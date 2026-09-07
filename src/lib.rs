@@ -762,7 +762,11 @@ impl<T, const N: usize> SmallVec<T, N> {
         };
         // Deallocate the remaining elements so no memory is leaked.
         unsafe {
-            core::ptr::slice_from_raw_parts_mut(vec.raw.as_mut_inline().as_mut_ptr().add(len), N - len).drop_in_place();
+            core::ptr::slice_from_raw_parts_mut(
+                vec.raw.as_mut_inline().as_mut_ptr().add(len),
+                N - len
+            )
+            .drop_in_place();
         }
 
         vec
