@@ -1321,7 +1321,6 @@ impl<T, const N: usize> SmallVec<T, N> {
             return;
         }
         // SAFETY: the vector is on the heap
-        // let capacity = unsafe { self.raw.heap.len() };
         let ptr = unsafe { self.raw.heap };
         let cap = ptr.len();
         if cap > min_capacity {
@@ -2082,7 +2081,7 @@ impl<T, const N: usize> Drop for SmallVec<T, N> {
         // SAFETY: see above
         unsafe {
             let _drop_dealloc = if on_heap {
-                let capacity = self.raw.heap.1;
+                let capacity = self.raw.heap.len();
                 Some(DropDealloc {
                     ptr: NonNull::new_unchecked(ptr as *mut u8),
                     size_bytes: capacity * size_of::<T>(),
