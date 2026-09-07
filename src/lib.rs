@@ -1231,7 +1231,9 @@ impl<T, const N: usize> SmallVec<T, N> {
                 self.set_inline();
             }
             Ok(())
-        } else {Ok(())}
+        } else {
+            Ok(())
+        }
     }
 
     #[inline]
