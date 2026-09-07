@@ -705,6 +705,25 @@ fn shrink_after_from_empty_vec() {
 }
 
 #[test]
+#[should_panic]
+fn into_raw_parts_inline() {
+    let v: SmallVec<i32, 10> = SmallVec::from([1, 2, 3]);
+    v.into_raw_parts();
+}
+
+#[test]
+fn into_raw_parts_heap() {
+    let v: SmallVec<i32, 1> = SmallVec::from([1, 2, 3]);
+    let (ptr, length, capacity) = v.into_raw_parts();
+
+    // It should be safe to create a standard `Vec` from the result.
+    // SAFETY: allocated using `Global`, no changes to the element type.
+    unsafe {
+        Vec::from_raw_parts(ptr, length, capacity);
+    }
+}
+
+#[test]
 fn into_vec() {
     let vec = SmallVec::<u8, 2>::from_iter(0..2);
     assert_eq!(vec.into_vec(), Vec::from([0, 1]));
