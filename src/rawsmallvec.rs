@@ -3,6 +3,10 @@ use {
         CollectionAllocErr,
         taggedlen::TaggedLen
     },
+    alloc::alloc::{
+        alloc,
+        realloc
+    },
     core::{
         alloc::Layout,
         mem::{
@@ -13,10 +17,6 @@ use {
             NonNull,
             copy_nonoverlapping
         }
-    },
-    alloc::alloc::{
-        alloc,
-        realloc
     }
 };
 
@@ -44,7 +44,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
 
     #[inline]
     pub const fn new() -> Self {
-        Self::new_inline([const {MaybeUninit::uninit()}; N])
+        Self::new_inline([const { MaybeUninit::uninit() }; N])
     }
 
     #[inline]
@@ -62,7 +62,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     }
 
     /// # Safety
-    /// 
+    ///
     /// `inline` must be the active variant
     /// otherwise it reads pointer as elements
     #[inline]
@@ -70,21 +70,31 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         // SAFETY: it is safe because we aren't reading the value, just getting
         // a reference to it. reading it would be UB potentially, but
         // for that downstream unsafe is required
-        unsafe { (&raw const self.inline).cast::<[MaybeUninit<T>; N]>().as_ref().unwrap_unchecked() }
+        unsafe {
+            (&raw const self.inline)
+                .cast::<[MaybeUninit<T>; N]>()
+                .as_ref()
+                .unwrap_unchecked()
+        }
     }
 
     /// # Safety
-    /// 
+    ///
     /// `inline` must be the active variant
     /// otherwise it reads pointer as elements
     #[inline]
     pub const unsafe fn as_mut_inline(&mut self) -> &mut [MaybeUninit<T>; N] {
         // SAFETY: same as above
-        unsafe { (&raw mut self.inline).cast::<[MaybeUninit<T>; N]>().as_mut().unwrap_unchecked() }
+        unsafe {
+            (&raw mut self.inline)
+                .cast::<[MaybeUninit<T>; N]>()
+                .as_mut()
+                .unwrap_unchecked()
+        }
     }
 
     /// # Safety
-    /// 
+    ///
     /// `heap` must be the active variant
     /// otherwise it reads inlined elements as pointer
     #[inline]
@@ -93,7 +103,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     }
 
     /// # Safety
-    /// 
+    ///
     /// `heap` must be the active variant
     /// otherwise it reads inlined elements as pointer
     #[inline]
@@ -107,7 +117,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     #[inline(always)]
     pub const unsafe fn capacity(&self, on_heap: bool) -> usize {
         if on_heap {
-            unsafe {self.as_heap().len()}
+            unsafe { self.as_heap().len() }
         } else {
             Self::INLINE_CAP
         }
@@ -131,7 +141,8 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             unsafe { self.as_mut_heap() }
         } else {
             unsafe { self.as_mut_inline() }
-        }.as_mut_ptr();
+        }
+        .as_mut_ptr();
 
         let new_layout =
             Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
@@ -141,8 +152,8 @@ impl<T, const N: usize> RawSmallVec<T, N> {
 
         let new_ptr = if !was_on_heap {
             // get a fresh allocation
-            
-            let new_ptr = unsafe { alloc(new_layout) } as *mut MaybeUninit<T>; // `new_layout` has nonzero size.
+
+            let new_ptr = unsafe { alloc(new_layout) } as *mut MaybeUninit<T>;
             let new_ptr = NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr {
                 layout: new_layout
             })?;
@@ -163,8 +174,8 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             // than zero does not overflow when rounded up to
             // alignment. since it was constructed
             // with Layout::array
-            let new_ptr =
-                unsafe { realloc(ptr.cast(), old_layout, new_layout.size()) } as *mut MaybeUninit<T>;
+            let new_ptr = unsafe { realloc(ptr.cast(), old_layout, new_layout.size()) }
+                as *mut MaybeUninit<T>;
             NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr {
                 layout: new_layout
             })?

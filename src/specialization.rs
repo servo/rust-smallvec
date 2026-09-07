@@ -39,7 +39,9 @@ impl<T: Copy, const N: usize> SpecFromElem<T> for SmallVec<T, N> {
             for i in 0..n {
                 // SAFETY: The caller ensures that the first `n`
                 // is smaller than the inline size.
-                unsafe { inline.get_unchecked_mut(i).write(elem); }
+                unsafe {
+                    inline.get_unchecked_mut(i).write(elem);
+                }
             }
         }
 
