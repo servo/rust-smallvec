@@ -180,7 +180,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
                 layout: new_layout
             })?
         };
-        *self = Self::new_heap(NonNull::slice_from_raw_parts(new_ptr, len));
+        *self = Self::new_heap(NonNull::slice_from_raw_parts(new_ptr, new_capacity));
         Ok(())
     }
 }

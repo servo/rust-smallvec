@@ -1214,27 +1214,24 @@ impl<T, const N: usize> SmallVec<T, N> {
                 unsafe { self.set_on_heap() };
             }
             result
-        } else {
+        } else if on_heap {
             // new_capacity <= Self::inline_size()
-            if on_heap {
-                unsafe {
-                    // SAFETY: heap member is active
-                    let ptr = self.raw.heap;
-                    // inline member is now active
-
-                    // SAFETY: len <= new_capacity <= Self::inline_size()
-                    // so the copy is within bounds of the inline member
-                    copy_nonoverlapping(ptr.as_ptr().cast(), self.raw.as_mut_inline(), len);
-                    drop(DropDealloc {
-                        ptr: ptr.cast(),
-                        size_bytes: ptr.len() * size_of::<T>(),
-                        align: align_of::<T>()
-                    });
-                    self.set_inline();
-                }
+            unsafe {
+                // SAFETY: heap member is active
+                let ptr = self.raw.heap;
+                // inline member is now active
+                // SAFETY: len <= new_capacity <= Self::inline_size()
+                // so the copy is within bounds of the inline member
+                copy_nonoverlapping(ptr.as_ptr().cast(), self.raw.as_mut_inline(), len);
+                drop(DropDealloc {
+                    ptr: ptr.cast(),
+                    size_bytes: ptr.len() * size_of::<T>(),
+                    align: align_of::<T>()
+                });
+                self.set_inline();
             }
             Ok(())
-        }
+        } else {Ok(())}
     }
 
     #[inline]
