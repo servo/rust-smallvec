@@ -21,7 +21,10 @@
 
 [Release notes](https://github.com/servo/rust-smallvec/releases)
 
-"Small vector" optimization for Rust: store up to a small number of items on the stack
+Small vectors in various sizes. These store a certain number of elements
+inline, and fall back to the heap for larger allocations.  This can be a
+useful optimization for improving cache locality and reducing allocator
+traffic for workloads that fit within the inline buffer.
 
 ## Example
 
@@ -40,3 +43,22 @@ v.push(5);
 v[0] = v[1] + v[2];
 v.sort();
 ```
+
+## Feature List
+
+By default, SmallVec does not make use of any feature. SmallVec without any features enabled does not make use of the standard library.
+
+- `arbitrary`: implements `Arbitrary` for any `SmallVec` storing elements that implement `Arbitrary`
+- `borsh`: implements `BorshSerialize`, `BorshDeserialize` and `BorshSchema`
+- `bytes`: implements `BufMut` for SmallVec
+- `defmt`: implements `defmt::Format` for SmallVec
+- `encase`: implements encasing as a runtime-sized array
+- `internals`: exports through the public API `TaggedLen` and `RawSmallVec`
+- `malloc_size_of`: implements `MallocSizeOf` and `MallocShallowSizeOf`
+- `may_dangle` (nightly): enables the eyepatch optimization for dropping
+- `rayon`: implements parallel iteration
+- `serde`: implements serde's serialization and deserialization
+- `specialization` (nightly): enables specialization, improving performance on some cases
+- `std`: implements the `std::io::Write` type for `SmallVec<u8, N>`
+
+> The `rayon` feature implicitly requires `std`.

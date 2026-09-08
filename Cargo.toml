@@ -19,12 +19,14 @@ debug = false
 strip = true
 
 [features]
-std = []
-specialization = []
+internals = []
 may_dangle = []
+rayon = ["std", "dep:rayon"]
 serde = ["dep:serde_core"]
 internals = []
 default = ["allocator-api2"]
+specialization = []
+std = []
 
 [dependencies]
 allocator-api2 = { version = "0.4", optional = true, features = ["alloc"], default-features = false }
