@@ -2,7 +2,6 @@ use {
     super::{
         Allocator,
         CollectionAllocErr,
-        infallible,
         taggedlen::TaggedLen
     },
     core::{
@@ -168,7 +167,12 @@ impl<T, const N: usize, A: Allocator> RawSmallVec<T, N, A> {
             // alignment. since it was constructed
             // with Layout::array
             unsafe {
-                self.alloc.grow(
+                (if self.inner.heap.1 < new_capacity {
+                    A::grow
+                } else {
+                    A::shrink
+                })(
+                    &self.alloc,
                     NonNull::new(ptr as *mut u8).unwrap(),
                     old_layout,
                     new_layout
@@ -181,42 +185,5 @@ impl<T, const N: usize, A: Allocator> RawSmallVec<T, N, A> {
         };
         self.inner.heap = (new_ptr, new_capacity);
         Ok(())
-    }
-
-    /// # Safety
-    ///
-    /// `new_capacity` must be non zero, and smaller or equal to the current
-    /// one. T must not be a ZST. Items must be stored on the heap.
-    pub unsafe fn shrink_to_raw(&mut self, target: usize) {
-        unsafe {
-            // this can't overflow since it's smaller than one we already made
-            let new_layout =
-                Layout::from_size_align_unchecked(target * size_of::<T>(), align_of::<T>());
-
-            self.inner.heap = (
-                infallible(
-                    // SAFETY: ptr was allocated with this allocator
-                    // old_layout is the same as the layout used to
-                    // allocate the previous
-                    // memory block
-                    self.alloc
-                        .shrink(
-                            NonNull::new(self.inner.heap.0.as_ptr() as *mut u8).unwrap(),
-                            // this can't overflow since we already constructed an equivalent
-                            // layout during the previous allocation
-                            Layout::from_size_align_unchecked(
-                                self.inner.heap.1 * size_of::<T>(),
-                                align_of::<T>()
-                            ),
-                            new_layout
-                        )
-                        .map_err(|_| CollectionAllocErr::AllocErr {
-                            layout: new_layout
-                        })
-                )
-                .cast(),
-                target
-            );
-        }
     }
 }

@@ -1339,7 +1339,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             // SAFETY: len > Self::inline_size() >= 0
             // so new capacity is non zero, it is equal to the length
             // T can't be a ZST because SmallVec<ZST, N> is never spilled.
-            unsafe { self.raw.shrink_to_raw(len) };
+            unsafe { infallible(self.raw.try_grow_raw(self.len, len)) };
         }
     }
 
@@ -1371,7 +1371,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 // SAFETY: len > Self::inline_size() >= 0
                 // so new capacity is non zero, it is equal to the length
                 // T can't be a ZST because SmallVec<ZST, N> is never spilled.
-                unsafe { self.raw.shrink_to_raw(target) };
+                unsafe { infallible(self.raw.try_grow_raw(self.len, target)) };
             }
         }
     }
