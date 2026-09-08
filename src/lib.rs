@@ -113,8 +113,6 @@ extern crate std;
 #[cfg(test)]
 mod tests;
 
-#[cfg(feature = "serde")]
-use core::marker::PhantomData;
 #[cfg(feature = "drain_keep_rest")]
 use core::mem::ManuallyDrop;
 #[cfg(feature = "malloc_size_of")]
@@ -140,6 +138,7 @@ use {
         hash::{Hash, Hasher},
         hint::unreachable_unchecked,
         iter::{repeat, FromIterator, FusedIterator, IntoIterator},
+        marker::PhantomData,
         mem::{self, MaybeUninit},
         ops::{self, Range, RangeBounds},
         ptr::{self, NonNull},
@@ -812,6 +811,25 @@ unsafe impl<A: Array + Sync> Sync for SmallVecData<A> {}
 /// assert_eq!(v.len(), 5);
 /// assert!(v.spilled());
 /// ```
+///
+/// References used by an element's destructor must outlive the vector, even
+/// with the `may_dangle` feature and no inline storage:
+///
+/// ```compile_fail,E0597
+/// use smallvec::SmallVec;
+///
+/// struct PrintOnDrop<'a>(&'a str);
+/// impl Drop for PrintOnDrop<'_> {
+///     fn drop(&mut self) {
+///         println!("{}", self.0);
+///     }
+/// }
+///
+/// let mut v = SmallVec::<[PrintOnDrop<'_>; 0]>::new();
+/// let text = String::from("borrowed");
+/// v.push(PrintOnDrop(&text));
+/// // `text` is dropped before `v`, whose elements still need it.
+/// ```
 pub struct SmallVec<A: Array> {
     // The capacity field is used to determine which of the storage variants is active:
     // If capacity <= Self::inline_capacity() then the inline variant is used and capacity holds
@@ -820,6 +838,9 @@ pub struct SmallVec<A: Array> {
     // memory allocation.
     capacity: usize,
     data: SmallVecData<A>,
+    // Own A::Item, including when A has length zero and all items are on the heap.
+    // This is required for sound drop checking with #[may_dangle].
+    _marker: PhantomData<A::Item>,
 }
 
 impl<A: Array> SmallVec<A> {
@@ -835,6 +856,7 @@ impl<A: Array> SmallVec<A> {
         SmallVec {
             capacity: 0,
             data: SmallVecData::empty(),
+            _marker: PhantomData,
         }
     }
 
@@ -886,6 +908,7 @@ impl<A: Array> SmallVec<A> {
                 SmallVec {
                     capacity: len,
                     data,
+                    _marker: PhantomData,
                 }
             }
         } else {
@@ -898,6 +921,7 @@ impl<A: Array> SmallVec<A> {
             SmallVec {
                 capacity: cap,
                 data: SmallVecData::from_heap(ptr, len),
+                _marker: PhantomData,
             }
         }
     }
@@ -918,6 +942,7 @@ impl<A: Array> SmallVec<A> {
         SmallVec {
             capacity: A::size(),
             data: SmallVecData::from_inline(MaybeUninit::new(buf)),
+            _marker: PhantomData,
         }
     }
 
@@ -957,6 +982,7 @@ impl<A: Array> SmallVec<A> {
         SmallVec {
             capacity: len,
             data: SmallVecData::from_inline(buf),
+            _marker: PhantomData,
         }
     }
 
@@ -1820,6 +1846,7 @@ impl<A: Array> SmallVec<A> {
         SmallVec {
             capacity,
             data: SmallVecData::from_heap(ptr, length),
+            _marker: PhantomData,
         }
     }
 
@@ -1862,6 +1889,7 @@ where
                     );
                     data
                 }),
+                _marker: PhantomData,
             }
         } else {
             let mut b = slice.to_vec();
@@ -1871,6 +1899,7 @@ where
             SmallVec {
                 capacity: cap,
                 data: SmallVecData::from_heap(ptr, len),
+                _marker: PhantomData,
             }
         }
     }
@@ -2511,6 +2540,7 @@ impl<T, const N: usize> SmallVec<[T; N]> {
         SmallVec {
             capacity: 0,
             data: SmallVecData::from_const(MaybeUninit::uninit()),
+            _marker: PhantomData,
         }
     }
 
@@ -2526,6 +2556,7 @@ impl<T, const N: usize> SmallVec<[T; N]> {
         SmallVec {
             capacity: N,
             data: SmallVecData::from_const(MaybeUninit::new(items)),
+            _marker: PhantomData,
         }
     }
 
@@ -2542,6 +2573,7 @@ impl<T, const N: usize> SmallVec<[T; N]> {
         SmallVec {
             capacity: len,
             data: SmallVecData::from_const(MaybeUninit::new(items)),
+            _marker: PhantomData,
         }
     }
 }
