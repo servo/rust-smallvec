@@ -12,7 +12,7 @@ use {
 
 macro_rules! __impl_slice_eq1 {
     ([$($vars:tt)*] $lhs:ty, $rhs:ty $(where $ty:ty: $bound:ident)?) => {
-        impl<T, U, A: Allocator, $($vars)*> PartialEq<$rhs> for $lhs
+        impl<T, U, A: Allocator, const N: usize, $($vars)*> PartialEq<$rhs> for $lhs
         where
             T: PartialEq<U>,
             $($ty: $bound)?
@@ -23,19 +23,19 @@ macro_rules! __impl_slice_eq1 {
     };
 }
 
-__impl_slice_eq1! { [const N: usize, const M: usize] SmallVec<T, M, A>, SmallVec<U, N, A> }
-__impl_slice_eq1! { [const N: usize, const M: usize] SmallVec<T, M, A>, [U; N] }
-__impl_slice_eq1! { [const N: usize, const M: usize] SmallVec<T, M, A>, &[U; N] }
-__impl_slice_eq1! { [const N: usize] SmallVec<T, N, A>, [U] }
-__impl_slice_eq1! { [const N: usize] SmallVec<T, N, A>, &[U] }
-__impl_slice_eq1! { [const N: usize] SmallVec<T, N, A>, &mut [U] }
-__impl_slice_eq1! { [const N: usize] [T], SmallVec<U, N, A> }
-__impl_slice_eq1! { [const N: usize] &[T], SmallVec<U, N, A> }
-__impl_slice_eq1! { [const N: usize] &mut [T], SmallVec<U, N, A> }
-__impl_slice_eq1! { [const N: usize] Vec<T>, SmallVec<U, N, A> }
-__impl_slice_eq1! { [const N: usize] SmallVec<T, N, A>, Vec<U> }
-__impl_slice_eq1! { [const N: usize] Cow<'_, [T]>, SmallVec<U, N, A> where T: Clone }
-__impl_slice_eq1! { [const N: usize] SmallVec<T, N, A>, Cow<'_, [U]> where U: Clone }
+__impl_slice_eq1! { [const M: usize, A2: Allocator] SmallVec<T, M, A>, SmallVec<U, N, A2> }
+__impl_slice_eq1! { [const M: usize] SmallVec<T, M, A>, [U; N] }
+__impl_slice_eq1! { [const M: usize] SmallVec<T, M, A>, &[U; N] }
+__impl_slice_eq1! { [] SmallVec<T, N, A>, [U] }
+__impl_slice_eq1! { [] SmallVec<T, N, A>, &[U] }
+__impl_slice_eq1! { [] SmallVec<T, N, A>, &mut [U] }
+__impl_slice_eq1! { [] [T], SmallVec<U, N, A> }
+__impl_slice_eq1! { [] &[T], SmallVec<U, N, A> }
+__impl_slice_eq1! { [] &mut [T], SmallVec<U, N, A> }
+__impl_slice_eq1! { [] Vec<T>, SmallVec<U, N, A> }
+__impl_slice_eq1! { [] SmallVec<T, N, A>, Vec<U> }
+__impl_slice_eq1! { [] Cow<'_, [T]>, SmallVec<U, N, A> where T: Clone }
+__impl_slice_eq1! { [] SmallVec<T, N, A>, Cow<'_, [U]> where U: Clone }
 
 impl<T, U, const N: usize, A: Allocator> PartialEq<SmallVec<U, N, A>> for VecDeque<T>
 where T: PartialEq<U>
