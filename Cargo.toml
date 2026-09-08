@@ -24,8 +24,10 @@ specialization = []
 may_dangle = []
 serde = ["dep:serde_core"]
 internals = []
+default = ["allocator-api2"]
 
 [dependencies]
+allocator-api2 = { version = "0.4", optional = true, features = ["alloc"], default-features = false }
 arbitrary = { version = "1.4", optional = true, default-features = false }
 borsh = { version = "1.8", optional = true, features = ["derive", "unstable__schema"], default-features = false }
 bytes = { version = "1.12", optional = true, default-features = false }

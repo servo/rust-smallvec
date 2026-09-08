@@ -1,5 +1,8 @@
 use {
-    crate::SmallVec,
+    crate::{
+        Allocator,
+        SmallVec
+    },
     alloc::vec::Vec,
     core::{
         mem::ManuallyDrop,
@@ -73,11 +76,11 @@ impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N> {
     }
 }
 
-impl<T, const N: usize, const M: usize> TryFrom<SmallVec<T, N>> for [T; M] {
-    type Error = SmallVec<T, N>;
+impl<T, const N: usize, const M: usize, A: Allocator> TryFrom<SmallVec<T, N, A>> for [T; M] {
+    type Error = SmallVec<T, N, A>;
 
     #[inline]
-    fn try_from(mut this: SmallVec<T, N>) -> Result<[T; M], SmallVec<T, N>> {
+    fn try_from(mut this: SmallVec<T, N, A>) -> Result<[T; M], SmallVec<T, N, A>> {
         if this.len() != M {
             Err(this)
         } else {

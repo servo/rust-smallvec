@@ -1,5 +1,6 @@
 use {
     super::{
+        Allocator,
         CollectionAllocErr,
         taggedlen::TaggedLen
     },
@@ -16,44 +17,48 @@ use {
     }
 };
 
+#[repr(C)]
+pub(crate) union RawSmallVecInner<T, const N: usize> {
+    pub(crate) inline: ManuallyDrop<MaybeUninit<[T; N]>>,
+    pub(crate) heap: (NonNull<T>, usize)
+}
+
 /// Either a stack array with `length <= N` or a heap array
 /// whose pointer and capacity are stored here.
 ///
 /// We store a `NonNull<T>` instead of a `*mut T` so that type is covariant
 /// with respect to `T`, and since the heap pointer is never null.
-#[repr(C)]
-pub union RawSmallVec<T, const N: usize> {
-    pub inline: ManuallyDrop<MaybeUninit<[T; N]>>,
-    pub heap: (NonNull<T>, usize)
+pub struct RawSmallVec<T, const N: usize, A> {
+    pub(crate) inner: RawSmallVecInner<T, N>,
+    pub(crate) alloc: A
 }
 
-impl<T, const N: usize> Default for RawSmallVec<T, N> {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T, const N: usize> RawSmallVec<T, N> {
+impl<T, const N: usize, A: Allocator> RawSmallVec<T, N, A> {
     pub const INLINE_CAP: usize = if Self::IS_ZST { usize::MAX } else { N };
     const IS_ZST: bool = size_of::<T>() == 0;
 
     #[inline]
-    pub const fn new() -> Self {
-        Self::new_inline(MaybeUninit::uninit())
+    pub const fn new(alloc: A) -> Self {
+        Self::new_inline(MaybeUninit::uninit(), alloc)
     }
 
     #[inline]
-    pub const fn new_inline(inline: MaybeUninit<[T; N]>) -> Self {
+    pub const fn new_inline(inline: MaybeUninit<[T; N]>, alloc: A) -> Self {
         Self {
-            inline: ManuallyDrop::new(inline)
+            inner: RawSmallVecInner {
+                inline: ManuallyDrop::new(inline)
+            },
+            alloc
         }
     }
 
     #[inline]
-    pub const fn new_heap(ptr: NonNull<T>, capacity: usize) -> Self {
+    pub const fn new_heap(ptr: NonNull<T>, capacity: usize, alloc: A) -> Self {
         Self {
-            heap: (ptr, capacity)
+            inner: RawSmallVecInner {
+                heap: (ptr, capacity)
+            },
+            alloc
         }
     }
 
@@ -63,14 +68,14 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         // a reference to it. reading it would be UB potentially, but
         // for that downstream unsafe is required
         #[allow(unused_unsafe, reason = "Unsafe in MSRV")]
-        (unsafe { &raw const self.inline }).cast()
+        (unsafe { &raw const self.inner.inline }).cast()
     }
 
     #[inline]
     pub const fn as_mut_ptr_inline(&mut self) -> *mut T {
         // SAFETY: same as above
         #[allow(unused_unsafe, reason = "Unsafe in MSRV")]
-        (unsafe { &raw mut self.inline }).cast()
+        (unsafe { &raw mut self.inner.inline }).cast()
     }
 
     /// # Safety
@@ -79,7 +84,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     #[inline(always)]
     pub const unsafe fn as_ptr(&self, on_heap: bool) -> *const T {
         if on_heap {
-            unsafe { self.heap.0.as_ptr() }
+            unsafe { self.inner.heap.0.as_ptr() }
         } else {
             self.as_ptr_inline()
         }
@@ -91,7 +96,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     #[inline(always)]
     pub const unsafe fn as_mut_ptr(&mut self, on_heap: bool) -> *mut T {
         if on_heap {
-            unsafe { self.heap.0.as_ptr() }
+            unsafe { self.inner.heap.0.as_ptr() }
         } else {
             self.as_mut_ptr_inline()
         }
@@ -103,7 +108,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     #[inline(always)]
     pub const unsafe fn capacity(&self, on_heap: bool) -> usize {
         if on_heap {
-            unsafe { self.heap.1 }
+            unsafe { self.inner.heap.1 }
         } else {
             Self::INLINE_CAP
         }
@@ -149,7 +154,10 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             // this can't overflow since we already constructed an equivalent
             // layout during the previous allocation
             let old_layout = unsafe {
-                Layout::from_size_align_unchecked(self.heap.1 * size_of::<T>(), align_of::<T>())
+                Layout::from_size_align_unchecked(
+                    self.inner.heap.1 * size_of::<T>(),
+                    align_of::<T>()
+                )
             };
 
             // SAFETY: ptr was allocated with this allocator
@@ -164,7 +172,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
                 layout: new_layout
             })?
         };
-        *self = Self::new_heap(new_ptr, new_capacity);
+        self.inner.heap = (new_ptr, new_capacity);
         Ok(())
     }
 }
