@@ -20,7 +20,7 @@ use {
 const VEC_SIZE: usize = 16;
 const SPILLED_SIZE: usize = 100;
 
-trait Vector<T>: for<'a> From<&'a [T]> + Extend<T> {
+trait Vector<T>: for<'a> From<&'a [T]> + Extend<T> + FromIterator<T> {
     fn new() -> Self;
     fn push(&mut self, val: T);
     fn pop(&mut self) -> Option<T>;
@@ -280,7 +280,7 @@ fn gen_extend_filtered<V: Vector<u64>>(n: u64, b: &mut Bencher) {
 fn gen_from_iter<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     let v: Vec<u64> = (0..black_box(n)).collect();
     b.iter(|| {
-        let vec = V::from(black_box(&v));
+        let vec: V = black_box(&v).iter().copied().collect();
         black_box(vec)
     });
 }
@@ -328,7 +328,7 @@ fn gen_from_elem<V: Vector<u64>>(n: usize, b: &mut Bencher) {
 
 fn gen_retain_mut_half<V: Vector<u64>>(n: usize, b: &mut Bencher) {
     b.iter_with_setup(
-        || V::from_elem(16, black_box(n)),
+        || (0..black_box(n) as u64).collect::<V>(),
         |mut vec| {
             vec.retain_mut(|x| black_box(*x) % 2 == 0);
             vec
