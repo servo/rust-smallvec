@@ -1,5 +1,6 @@
 use {
     crate::{
+        Allocator,
         DropGuard,
         IntoIter,
         SmallVec
@@ -62,7 +63,7 @@ pub trait SpecExtend<T, I> {
     fn spec_extend(&mut self, iter: I);
 }
 
-impl<T, I, const N: usize> SpecExtend<T, I> for SmallVec<T, N>
+impl<T, I, const N: usize, A: Allocator> SpecExtend<T, I> for SmallVec<T, N, A>
 where I: Iterator<Item = T>
 {
     #[inline]
@@ -71,7 +72,7 @@ where I: Iterator<Item = T>
     }
 }
 
-impl<T, I, const N: usize> SpecExtend<T, I> for SmallVec<T, N>
+impl<T, I, const N: usize, A: Allocator> SpecExtend<T, I> for SmallVec<T, N, A>
 where I: core::iter::TrustedLen<Item = T>
 {
     fn spec_extend(&mut self, iter: I) {
@@ -104,8 +105,10 @@ where I: core::iter::TrustedLen<Item = T>
     }
 }
 
-impl<T, const N: usize, const M: usize> SpecExtend<T, IntoIter<T, M>> for SmallVec<T, N> {
-    fn spec_extend(&mut self, mut iter: IntoIter<T, M>) {
+impl<T, const N: usize, const M: usize, A: Allocator> SpecExtend<T, IntoIter<T, M, A>>
+    for SmallVec<T, N, A>
+{
+    fn spec_extend(&mut self, mut iter: IntoIter<T, M, A>) {
         let slice = iter.as_slice();
         let len = slice.len();
         let old_len = self.len();
@@ -130,7 +133,7 @@ impl<T, const N: usize, const M: usize> SpecExtend<T, IntoIter<T, M>> for SmallV
     }
 }
 
-impl<'a, T: 'a, const N: usize, I> SpecExtend<&'a T, I> for SmallVec<T, N>
+impl<'a, T: 'a, const N: usize, I, A: Allocator> SpecExtend<&'a T, I> for SmallVec<T, N, A>
 where
     I: Iterator<Item = &'a T>,
     T: Clone
@@ -141,7 +144,8 @@ where
     }
 }
 
-impl<'a, T: 'a, const N: usize> SpecExtend<&'a T, core::slice::Iter<'a, T>> for SmallVec<T, N>
+impl<'a, T: 'a, const N: usize, A: Allocator> SpecExtend<&'a T, core::slice::Iter<'a, T>>
+    for SmallVec<T, N, A>
 where T: Copy
 {
     fn spec_extend(&mut self, iter: core::slice::Iter<'a, T>) {
@@ -182,7 +186,7 @@ pub trait SpecExtendFromWithin<T> {
     unsafe fn spec_extend_from_within(&mut self, src: core::ops::Range<usize>);
 }
 
-impl<T: Clone, const N: usize> SpecExtendFromWithin<T> for SmallVec<T, N> {
+impl<T: Clone, const N: usize, A: Allocator> SpecExtendFromWithin<T> for SmallVec<T, N, A> {
     default unsafe fn spec_extend_from_within(&mut self, src: core::ops::Range<usize>) {
         // SAFETY: Safety conditions are identical.
         unsafe {
@@ -191,7 +195,7 @@ impl<T: Clone, const N: usize> SpecExtendFromWithin<T> for SmallVec<T, N> {
     }
 }
 
-impl<T: Copy, const N: usize> SpecExtendFromWithin<T> for SmallVec<T, N> {
+impl<T: Copy, const N: usize, A: Allocator> SpecExtendFromWithin<T> for SmallVec<T, N, A> {
     unsafe fn spec_extend_from_within(&mut self, src: core::ops::Range<usize>) {
         let old_len = self.len();
 
@@ -256,14 +260,14 @@ pub trait SpecCloneFrom<T> {
     fn spec_clone_from(&mut self, source: &[T]);
 }
 
-impl<T: Clone, const N: usize> SpecCloneFrom<T> for SmallVec<T, N> {
+impl<T: Clone, const N: usize, A: Allocator> SpecCloneFrom<T> for SmallVec<T, N, A> {
     #[inline]
     default fn spec_clone_from(&mut self, source: &[T]) {
         self.clone_from_fallback(source);
     }
 }
 
-impl<T: Copy, const N: usize> SpecCloneFrom<T> for SmallVec<T, N> {
+impl<T: Copy, const N: usize, A: Allocator> SpecCloneFrom<T> for SmallVec<T, N, A> {
     fn spec_clone_from(&mut self, source: &[T]) {
         self.clear();
         self.extend_from_slice(source);
