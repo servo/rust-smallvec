@@ -1,5 +1,9 @@
 # Contributing to rust-smallvec
 
+> [!WARNING]
+> AI contributions are not allowed in any [**@servo**](https://github.com/servo) repository.
+> Please read the [AI contributions policy](https://book.servo.org/contributing/getting-started.html#ai-contributions) before contributing.
+
 This branch contains the code for SmallVec v2, which is on pre-release.
 
 Visit [the wiki](https://github.com/servo/rust-smallvec/wiki) for more information about the status and management of v2. Visit it before making any contribution.
