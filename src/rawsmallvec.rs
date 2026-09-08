@@ -2,6 +2,7 @@ use {
     super::{
         Allocator,
         CollectionAllocErr,
+        infallible,
         taggedlen::TaggedLen
     },
     core::{
@@ -123,10 +124,6 @@ impl<T, const N: usize, A: Allocator> RawSmallVec<T, N, A> {
         len: TaggedLen<T>,
         new_capacity: usize
     ) -> Result<(), CollectionAllocErr> {
-        use alloc::alloc::{
-            alloc,
-            realloc
-        };
         let (len, was_on_heap) = len.parts();
         debug_assert!(!Self::IS_ZST);
         debug_assert!(new_capacity > 0 && new_capacity >= len);
@@ -142,14 +139,18 @@ impl<T, const N: usize, A: Allocator> RawSmallVec<T, N, A> {
 
         let new_ptr = if !was_on_heap {
             // get a fresh allocation
-            let new_ptr = unsafe { alloc(new_layout) } as *mut T; // `new_layout` has nonzero size.
-            let new_ptr = NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr {
-                layout: new_layout
-            })?;
+            // `new_layout` has nonzero size.
+            let new_ptr = self
+                .alloc
+                .allocate(new_layout)
+                .map_err(|_| CollectionAllocErr::AllocErr {
+                    layout: new_layout
+                })?
+                .cast();
             unsafe { copy_nonoverlapping(ptr, new_ptr.as_ptr(), len) };
             new_ptr
         } else {
-            // use realloc
+            // use grow
 
             // this can't overflow since we already constructed an equivalent
             // layout during the previous allocation
@@ -166,13 +167,56 @@ impl<T, const N: usize, A: Allocator> RawSmallVec<T, N, A> {
             // than zero does not overflow when rounded up to
             // alignment. since it was constructed
             // with Layout::array
-            let new_ptr =
-                unsafe { realloc(ptr as *mut u8, old_layout, new_layout.size()) } as *mut T;
-            NonNull::new(new_ptr).ok_or(CollectionAllocErr::AllocErr {
+            unsafe {
+                self.alloc.grow(
+                    NonNull::new(ptr as *mut u8).unwrap(),
+                    old_layout,
+                    new_layout
+                )
+            }
+            .map_err(|_| CollectionAllocErr::AllocErr {
                 layout: new_layout
             })?
+            .cast()
         };
         self.inner.heap = (new_ptr, new_capacity);
         Ok(())
+    }
+
+    /// # Safety
+    ///
+    /// `new_capacity` must be non zero, and smaller or equal to the current
+    /// one. T must not be a ZST. Items must be stored on the heap.
+    pub unsafe fn shrink_to_raw(&mut self, target: usize) {
+        unsafe {
+            // this can't overflow since it's smaller than one we already made
+            let new_layout =
+                Layout::from_size_align_unchecked(target * size_of::<T>(), align_of::<T>());
+
+            self.inner.heap = (
+                infallible(
+                    // SAFETY: ptr was allocated with this allocator
+                    // old_layout is the same as the layout used to
+                    // allocate the previous
+                    // memory block
+                    self.alloc
+                        .shrink(
+                            NonNull::new(self.inner.heap.0.as_ptr() as *mut u8).unwrap(),
+                            // this can't overflow since we already constructed an equivalent
+                            // layout during the previous allocation
+                            Layout::from_size_align_unchecked(
+                                self.inner.heap.1 * size_of::<T>(),
+                                align_of::<T>()
+                            ),
+                            new_layout
+                        )
+                        .map_err(|_| CollectionAllocErr::AllocErr {
+                            layout: new_layout
+                        })
+                )
+                .cast(),
+                target
+            );
+        }
     }
 }

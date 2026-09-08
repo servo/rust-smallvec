@@ -1254,7 +1254,8 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                     drop(DropDealloc {
                         ptr: ptr.cast(),
                         size_bytes: old_cap * size_of::<T>(),
-                        align: align_of::<T>()
+                        align: align_of::<T>(),
+                        alloc: &self.raw.alloc
                     });
                     self.set_inline();
                 }
@@ -1329,8 +1330,8 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 let (ptr, capacity) = self.raw.inner.heap;
                 copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
                 self.set_inline();
-                alloc::alloc::dealloc(
-                    ptr.cast().as_ptr(),
+                self.raw.alloc.deallocate(
+                    ptr.cast(),
                     Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>())
                 );
             }
@@ -1338,7 +1339,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             // SAFETY: len > Self::inline_size() >= 0
             // so new capacity is non zero, it is equal to the length
             // T can't be a ZST because SmallVec<ZST, N> is never spilled.
-            unsafe { infallible(self.raw.try_grow_raw(self.len, len)) };
+            unsafe { self.raw.shrink_to_raw(len) };
         }
     }
 
@@ -1358,8 +1359,8 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                     let (ptr, capacity) = self.raw.inner.heap;
                     copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
                     self.set_inline();
-                    alloc::alloc::dealloc(
-                        ptr.cast().as_ptr(),
+                    self.raw.alloc.deallocate(
+                        ptr.cast(),
                         Layout::from_size_align_unchecked(
                             capacity * size_of::<T>(),
                             align_of::<T>()
@@ -1370,7 +1371,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 // SAFETY: len > Self::inline_size() >= 0
                 // so new capacity is non zero, it is equal to the length
                 // T can't be a ZST because SmallVec<ZST, N> is never spilled.
-                unsafe { infallible(self.raw.try_grow_raw(self.len, target)) };
+                unsafe { self.raw.shrink_to_raw(target) };
             }
         }
     }
@@ -1974,19 +1975,20 @@ impl<T> Drop for DropGuard<T> {
     }
 }
 
-struct DropDealloc {
+struct DropDealloc<'a, A: Allocator> {
     ptr: NonNull<u8>,
     size_bytes: usize,
-    align: usize
+    align: usize,
+    alloc: &'a A
 }
 
-impl Drop for DropDealloc {
+impl<A: Allocator> Drop for DropDealloc<'_, A> {
     #[inline]
     fn drop(&mut self) {
         unsafe {
             if self.size_bytes > 0 {
-                alloc::alloc::dealloc(
-                    self.ptr.as_ptr(),
+                self.alloc.deallocate(
+                    self.ptr,
                     Layout::from_size_align_unchecked(self.size_bytes, self.align)
                 );
             }
@@ -2007,7 +2009,8 @@ unsafe impl<#[may_dangle] T, const N: usize, A: Allocator> Drop for SmallVec<T, 
                 Some(DropDealloc {
                     ptr: NonNull::new_unchecked(ptr as *mut u8),
                     size_bytes: capacity * size_of::<T>(),
-                    align: align_of::<T>()
+                    align: align_of::<T>(),
+                    alloc: &self.raw.alloc
                 })
             } else {
                 None
@@ -2030,7 +2033,8 @@ impl<T, const N: usize, A: Allocator> Drop for SmallVec<T, N, A> {
                 Some(DropDealloc {
                     ptr: NonNull::new_unchecked(ptr as *mut u8),
                     size_bytes: capacity * size_of::<T>(),
-                    align: align_of::<T>()
+                    align: align_of::<T>(),
+                    alloc: &self.raw.alloc
                 })
             } else {
                 None
@@ -2052,7 +2056,8 @@ impl<T, const N: usize, A: Allocator> Drop for IntoIter<T, N, A> {
                 Some(DropDealloc {
                     ptr: NonNull::new_unchecked(ptr as *mut u8),
                     size_bytes: capacity * size_of::<T>(),
-                    align: align_of::<T>()
+                    align: align_of::<T>(),
+                    alloc: &self.raw.alloc
                 })
             } else {
                 None
