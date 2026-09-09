@@ -19,11 +19,11 @@ debug = false
 strip = true
 
 [features]
+default = ["allocator-api2"]
 internals = []
 may_dangle = []
 rayon = ["std", "dep:rayon"]
 serde = ["dep:serde_core"]
-default = ["allocator-api2"]
 specialization = []
 std = []
 
