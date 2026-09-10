@@ -240,13 +240,13 @@ fn splice_reserve_panic() {
     for capacity in [4, 8] {
         for additional in [usize::MAX, isize::MAX as usize] {
             let drops = Cell::new(0);
-            let mut v: SmallVec<CountDrop<'_>, 4> = SmallVec::with_capacity(capacity);
-            v.push(CountDrop(&drops));
+            let mut v: SmallVec<Box<CountDrop<'_>>, 4> = SmallVec::with_capacity(capacity);
+            v.push(Box::new(CountDrop(&drops)));
 
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 drop(v.splice(
                     0..0,
-                    std::iter::repeat_with(|| CountDrop(&drops)).take(additional)
+                    std::iter::repeat_with(|| Box::new(CountDrop(&drops))).take(additional)
                 ));
             }));
 
