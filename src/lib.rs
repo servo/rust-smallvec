@@ -615,12 +615,7 @@ impl<T, const N: usize> IntoIter<T, N> {
         // `self.begin..end` are all initialized. So the pointer arithmetic is
         // valid, and so is the construction of the slice
         unsafe {
-            let ptr = if on_heap {
-                self.raw.as_heap()
-            } else {
-                self.raw.as_inline()
-            }
-            .as_ptr();
+            let ptr = self.raw.as_erased(on_heap).as_ptr();
             core::slice::from_raw_parts(ptr.add(self.begin).cast(), end - self.begin)
         }
     }
@@ -652,11 +647,7 @@ impl<T, const N: usize> Iterator for IntoIter<T, N> {
         } else {
             // SAFETY: see above
             unsafe {
-                let reference = if on_heap {
-                    self.raw.as_heap()
-                } else {
-                    self.raw.as_inline()
-                };
+                let reference = self.raw.as_erased(on_heap);
                 let value = reference[self.begin].assume_init_read();
                 self.begin += 1;
                 Some(value)
@@ -680,11 +671,7 @@ impl<T, const N: usize> DoubleEndedIterator for IntoIter<T, N> {
         } else {
             // SAFETY: see above
             unsafe {
-                let reference = if on_heap {
-                    self.raw.as_heap()
-                } else {
-                    self.raw.as_inline()
-                };
+                let reference = self.raw.as_erased(on_heap);
                 self.end.sub(1);
                 let value = reference[end - 1].assume_init_read();
                 Some(value)
