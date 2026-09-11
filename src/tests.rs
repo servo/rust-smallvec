@@ -786,15 +786,12 @@ fn test_retain() {
     assert_eq!(Rc::strong_count(&one), 1);
 }
 
-mod retain {
-    use crate::SmallVec;
-    use alloc::{rc::Rc, vec::Vec};
+#[test]
+fn test_retain_panic_preserves_unprocessed_tail() {
     use std::{
         cell::Cell,
         panic::{catch_unwind, AssertUnwindSafe},
-        thread_local,
     };
-    type V<T> = SmallVec<[T; 16]>;
 
     struct Tracked {
         id: usize,
@@ -822,6 +819,36 @@ mod retain {
         values.iter().map(|v| v.id).collect()
     }
 
+    for len in [8, 32].iter().copied() {
+        for panic_at in 0..len {
+            for drop_panics in [false, true].iter().copied() {
+                if drop_panics && panic_at % 2 == 0 {
+                    continue;
+                }
+                let destructor = if drop_panics { Some(panic_at) } else { None };
+                let (input, drops) = tracked(len, destructor);
+                let mut actual: SmallVec<[_; 16]> = input.into_iter().collect();
+                assert!(catch_unwind(AssertUnwindSafe(|| actual.retain(|x| {
+                    if !drop_panics {
+                        assert_ne!(x.id, panic_at);
+                    }
+                    x.id % 2 == 0
+                })))
+                .is_err());
+                let read = panic_at + if drop_panics { 1 } else { 0 };
+                let expected: Vec<_> = (0..panic_at).step_by(2).chain(read..len).collect();
+                assert_eq!(ids(&actual), expected);
+                drop(actual);
+                assert!(drops.iter().all(|x| x.get() == 1));
+            }
+        }
+    }
+}
+
+#[test]
+fn test_retain_patterns_and_zst() {
+    use std::{cell::Cell, thread_local};
+
     thread_local! { static ZST_DROPS: Cell<usize> = Cell::new(0); }
     struct Zst;
     impl Drop for Zst {
@@ -829,61 +856,32 @@ mod retain {
             ZST_DROPS.with(|x| x.set(x.get() + 1));
         }
     }
-    #[test]
-    fn retain_panic_preserves_unprocessed_tail() {
-        for len in [8, 32].iter().copied() {
-            for panic_at in 0..len {
-                for drop_panics in [false, true].iter().copied() {
-                    if drop_panics && panic_at % 2 == 0 {
-                        continue;
-                    }
-                    let destructor = if drop_panics { Some(panic_at) } else { None };
-                    let (input, drops) = tracked(len, destructor);
-                    let mut actual: V<_> = input.into_iter().collect();
-                    assert!(catch_unwind(AssertUnwindSafe(|| actual.retain(|x| {
-                        if !drop_panics {
-                            assert_ne!(x.id, panic_at);
-                        }
-                        x.id % 2 == 0
-                    })))
-                    .is_err());
-                    let read = panic_at + if drop_panics { 1 } else { 0 };
-                    let expected: Vec<_> = (0..panic_at).step_by(2).chain(read..len).collect();
-                    assert_eq!(ids(&actual), expected);
-                    drop(actual);
-                    assert!(drops.iter().all(|x| x.get() == 1));
-                }
+
+    for len in [0, 1, 15, 16, 17, 64].iter().copied() {
+        for keep in 0..3 {
+            let mut actual: SmallVec<[_; 16]> = (0..len).collect();
+            let mut expected: Vec<_> = (0..len).collect();
+            actual.retain(|x| {
+                *x += 1;
+                *x % 2 < keep
+            });
+            for x in &mut expected {
+                *x += 1;
             }
+            expected.retain(|x| *x % 2 < keep);
+            assert_eq!(actual.as_slice(), expected.as_slice());
         }
     }
-    #[test]
-    fn retain_patterns_and_zst() {
-        for len in [0, 1, 15, 16, 17, 64].iter().copied() {
-            for keep in 0..3 {
-                let mut actual: V<_> = (0..len).collect();
-                let mut expected: Vec<_> = (0..len).collect();
-                actual.retain(|x| {
-                    *x += 1;
-                    *x % 2 < keep
-                });
-                for x in &mut expected {
-                    *x += 1;
-                }
-                expected.retain(|x| *x % 2 < keep);
-                assert_eq!(actual.as_slice(), expected.as_slice());
-            }
-        }
-        ZST_DROPS.with(|x| x.set(0));
-        let mut values: V<_> = (0..32).map(|_| Zst).collect();
-        let mut seen = 0;
-        values.retain(|_| {
-            seen += 1;
-            seen % 2 == 0
-        });
-        assert_eq!(values.len(), 16);
-        drop(values);
-        ZST_DROPS.with(|x| assert_eq!(x.get(), 32));
-    }
+    ZST_DROPS.with(|x| x.set(0));
+    let mut values: SmallVec<[_; 16]> = (0..32).map(|_| Zst).collect();
+    let mut seen = 0;
+    values.retain(|_| {
+        seen += 1;
+        seen % 2 == 0
+    });
+    assert_eq!(values.len(), 16);
+    drop(values);
+    ZST_DROPS.with(|x| assert_eq!(x.get(), 32));
 }
 
 #[test]
