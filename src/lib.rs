@@ -24,8 +24,7 @@ mod macros;
 #[cfg(feature = "malloc_size_of")]
 mod mallocsizeof;
 mod rawsmallvec;
-#[cfg(feature = "rayon")]
-mod rayon;
+mod iterators;
 mod references;
 #[cfg(feature = "serde")]
 mod serde;
