@@ -20,11 +20,11 @@ mod borsh;
 mod comparisons;
 mod conversions;
 mod errors;
+mod iterators;
 mod macros;
 #[cfg(feature = "malloc_size_of")]
 mod mallocsizeof;
 mod rawsmallvec;
-mod iterators;
 mod references;
 #[cfg(feature = "serde")]
 mod serde;
