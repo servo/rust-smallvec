@@ -155,12 +155,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         debug_assert!(new_capacity > 0 && new_capacity >= len);
 
         // SAFETY: the tag tells which member is active
-        let ptr = if was_on_heap {
-            unsafe { self.as_mut_heap() }
-        } else {
-            unsafe { self.as_mut_inline() }
-        }
-        .as_mut_ptr();
+        let ptr = self.as_mut_erased(was_on_heap).as_mut_ptr();
 
         let new_layout =
             Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
