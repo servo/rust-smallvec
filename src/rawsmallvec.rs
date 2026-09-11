@@ -111,6 +111,24 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         unsafe { self.heap.as_mut() }
     }
 
+    #[inline]
+    pub const fn as_erased(&self, on_heap: bool) -> &[MaybeUninit<T>] {
+        if on_heap {
+            unsafe {self.as_heap()}
+        } else {
+            unsafe {self.as_inline()}
+        }
+    }
+
+    #[inline]
+    pub const fn as_mut_erased(&mut self, on_heap: bool) -> &mut [MaybeUninit<T>] {
+        if on_heap {
+            unsafe {self.as_mut_heap()}
+        } else {
+            unsafe {self.as_mut_inline()}
+        }
+    }
+
     /// # Safety
     ///
     /// `on_heap` must be true if and only if `self.heap` is the active member.

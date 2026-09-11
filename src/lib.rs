@@ -785,7 +785,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// };
     ///
     /// let buf = [1, 2, 3, 4, 5, 0, 0, 0];
-    /// let small_vec = unsafe { SmallVec::from_buf_and_len_unchecked(MaybeUninit::new(buf), 5) };
+    /// let small_vec = unsafe { SmallVec::from_buf_and_len_unchecked(MaybeUninit::new(buf).into(), 5) };
     ///
     /// assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
     /// ```
@@ -1302,7 +1302,7 @@ impl<T, const N: usize> SmallVec<T, N> {
                 // let (ptr, capacity) = self.raw.heap;
                 let ptr = self.raw.heap;
                 self.raw = RawSmallVec::new();
-                copy_nonoverlapping(ptr.as_ptr().cast(), self.raw.as_mut_inline(), len);
+                copy_nonoverlapping(ptr.as_ptr().cast::<T>(), self.raw.as_mut_inline().as_mut_ptr().cast(), len);
                 self.set_inline();
                 alloc::alloc::dealloc(
                     ptr.cast().as_ptr(),
@@ -2041,7 +2041,6 @@ impl Drop for DropDealloc {
 unsafe impl<#[may_dangle] T, const N: usize> Drop for SmallVec<T, N> {
     fn drop(&mut self) {
         let (len, on_heap) = self.len.parts();
-        // let ptr = unsafe { self.raw.as_mut_ptr(on_heap) };
         let ptr = unsafe {
             if on_heap {
                 self.raw.as_mut_heap()
@@ -2063,7 +2062,7 @@ unsafe impl<#[may_dangle] T, const N: usize> Drop for SmallVec<T, N> {
             } else {
                 None
             };
-            core::ptr::slice_from_raw_parts_mut(ptr, len).drop_in_place();
+            core::ptr::slice_from_raw_parts_mut(ptr.cast::<T>(), len).drop_in_place();
         }
     }
 }
@@ -2093,7 +2092,7 @@ impl<T, const N: usize> Drop for SmallVec<T, N> {
             } else {
                 None
             };
-            core::ptr::slice_from_raw_parts_mut(ptr, len).drop_in_place();
+            core::ptr::slice_from_raw_parts_mut(ptr.cast::<T>(), len).drop_in_place();
         }
     }
 }
@@ -2120,7 +2119,7 @@ impl<T, const N: usize> Drop for IntoIter<T, N> {
             } else {
                 None
             };
-            core::ptr::slice_from_raw_parts_mut(ptr.add(begin), end - begin).drop_in_place();
+            core::ptr::slice_from_raw_parts_mut(ptr.add(begin).cast::<T>(), end - begin).drop_in_place();
         }
     }
 }
