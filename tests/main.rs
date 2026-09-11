@@ -228,6 +228,52 @@ fn splice_inline_fill_then_move_tail_ub_test() {
 }
 
 #[test]
+fn splice_reserve_panic() {
+    struct CountDrop<'a>(&'a Cell<usize>);
+
+    impl Drop for CountDrop<'_> {
+        fn drop(&mut self) {
+            self.0.set(self.0.get() + 1);
+        }
+    }
+
+    for capacity in [4, 8] {
+        for additional in [usize::MAX, isize::MAX as usize] {
+            let drops = Cell::new(0);
+            let mut v: SmallVec<Box<CountDrop<'_>>, 4> = SmallVec::with_capacity(capacity);
+            v.push(Box::new(CountDrop(&drops)));
+
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                drop(v.splice(
+                    0..0,
+                    std::iter::repeat_with(|| Box::new(CountDrop(&drops))).take(additional)
+                ));
+            }));
+
+            assert!(result.is_err());
+            assert_eq!(v.len(), 1);
+            assert_eq!(drops.get(), 0);
+            drop(v);
+            assert_eq!(drops.get(), 1);
+        }
+    }
+}
+
+#[test]
+fn splice_spill_preserves_tail() {
+    let mut v: SmallVec<Box<usize>, 4> = (0..4).map(Box::new).collect();
+    assert!(!v.spilled());
+
+    drop(v.splice(1..2, (10..15).map(Box::new)));
+
+    assert!(v.spilled());
+    assert_eq!(
+        v.iter().map(|value| **value).collect::<Vec<_>>(),
+        [0, 10, 11, 12, 13, 14, 2, 3]
+    );
+}
+
+#[test]
 fn into_iter() {
     let mut v: SmallVec<u8, 2> = SmallVec::new();
     v.push(3);

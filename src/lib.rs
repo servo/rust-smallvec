@@ -336,11 +336,13 @@ impl<T, const N: usize, A: Allocator> Drain<'_, T, N, A> {
         let vec = unsafe { self.vec.as_mut() };
         let len = self.tail_start + self.tail_len;
 
-        // Test
+        // Include the tail when reserving so it survives a reallocation.
         let old_len = vec.len();
         unsafe { vec.set_len(len) }
-        vec.reserve(additional);
+        let result = vec.try_reserve(additional);
+        // Restore the prefix length before a reservation error can panic.
         unsafe { vec.set_len(old_len) };
+        infallible(result);
 
         let new_tail_start = self.tail_start + additional;
         unsafe {
