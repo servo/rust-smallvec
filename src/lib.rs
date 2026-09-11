@@ -625,12 +625,7 @@ impl<T, const N: usize> IntoIter<T, N> {
         let (end, on_heap) = self.end.parts();
         // SAFETY: see above
         unsafe {
-            let ptr = if on_heap {
-                self.raw.as_mut_heap()
-            } else {
-                self.raw.as_mut_inline()
-            }
-            .as_mut_ptr();
+            let ptr = self.raw.as_mut_erased(on_heap).as_mut_ptr();
             core::slice::from_raw_parts_mut(ptr.add(self.begin).cast(), end - self.begin)
         }
     }
@@ -1479,12 +1474,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         // SAFETY: all the elements in `..len` are initialized
         // unsafe { core::slice::from_raw_parts(self.raw.as_ptr(on_heap), len) }
         unsafe {
-            let ptr = if on_heap {
-                self.raw.as_heap()
-            } else {
-                self.raw.as_inline()
-            }
-            .as_ptr();
+            let ptr = self.raw.as_erased(on_heap).as_ptr();
             core::slice::from_raw_parts(ptr.cast(), len)
         }
     }
@@ -1494,12 +1484,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         let (len, on_heap) = self.len.parts();
         // SAFETY: see above
         unsafe {
-            let ptr = if on_heap {
-                self.raw.as_mut_heap()
-            } else {
-                self.raw.as_mut_inline()
-            }
-            .as_mut_ptr();
+            let ptr = self.raw.as_mut_erased(on_heap).as_mut_ptr();
             core::slice::from_raw_parts_mut(ptr.cast(), len)
         }
     }
@@ -1507,29 +1492,13 @@ impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
     pub const fn as_ptr(&self) -> *const T {
         // SAFETY: the tag tells which member is active
-        unsafe {
-            if self.spilled() {
-                self.raw.as_heap()
-            } else {
-                self.raw.as_inline()
-            }
-            .as_ptr()
-            .cast()
-        }
+        self.raw.as_erased(self.len.on_heap()).as_ptr().cast()
     }
 
     #[inline]
     pub const fn as_mut_ptr(&mut self) -> *mut T {
         // SAFETY: see above
-        unsafe {
-            if self.spilled() {
-                self.raw.as_mut_heap()
-            } else {
-                self.raw.as_mut_inline()
-            }
-            .as_mut_ptr()
-            .cast()
-        }
+        self.raw.as_mut_erased(self.len.on_heap()).as_mut_ptr().cast()
     }
 
     #[inline]
@@ -1774,12 +1743,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         let (len, on_heap) = self.len.parts();
         unsafe {
             let capacity = self.raw.capacity(on_heap);
-            let ptr = if on_heap {
-                self.raw.as_mut_heap()
-            } else {
-                self.raw.as_mut_inline()
-            }
-            .as_mut_ptr();
+            let ptr = self.raw.as_mut_erased(on_heap).as_mut_ptr();
             core::slice::from_raw_parts_mut(ptr.add(len) as *mut MaybeUninit<T>, capacity - len)
         }
     }
@@ -2028,14 +1992,7 @@ impl Drop for DropDealloc {
 unsafe impl<#[may_dangle] T, const N: usize> Drop for SmallVec<T, N> {
     fn drop(&mut self) {
         let (len, on_heap) = self.len.parts();
-        let ptr = unsafe {
-            if on_heap {
-                self.raw.as_mut_heap()
-            } else {
-                self.raw.as_mut_inline()
-            }
-        }
-        .as_mut_ptr();
+        let ptr = self.raw.as_mut_erased(on_heap).as_mut_ptr();
         // SAFETY: we first drop the elements, then `_drop_dealloc` is dropped,
         // releasing memory we used to own
         unsafe {
@@ -2059,14 +2016,7 @@ impl<T, const N: usize> Drop for SmallVec<T, N> {
     fn drop(&mut self) {
         let (len, on_heap) = self.len.parts();
         // SAFETY: the tag tells which member is active
-        let ptr = unsafe {
-            if on_heap {
-                self.raw.as_mut_heap()
-            } else {
-                self.raw.as_mut_inline()
-            }
-        }
-        .as_mut_ptr();
+        let ptr = self.raw.as_mut_erased(on_heap).as_mut_ptr();
         // SAFETY: see above
         unsafe {
             let _drop_dealloc = if on_heap {
@@ -2090,12 +2040,7 @@ impl<T, const N: usize> Drop for IntoIter<T, N> {
         unsafe {
             let (end, on_heap) = self.end.parts();
             let begin = self.begin;
-            let ptr = if on_heap {
-                self.raw.as_mut_heap()
-            } else {
-                self.raw.as_mut_inline()
-            }
-            .as_mut_ptr();
+            let ptr = self.raw.as_mut_erased(on_heap).as_mut_ptr();
             let _drop_dealloc = if on_heap {
                 let capacity = self.raw.heap.len();
                 Some(DropDealloc {
@@ -2539,15 +2484,7 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
         let (len, on_heap) = self.len.parts();
         // SAFETY: the tag tells which member is active
         let cap = unsafe { self.raw.capacity(on_heap) };
-        let ptr = unsafe {
-            if on_heap {
-                self.raw.as_mut_heap()
-            } else {
-                self.raw.as_mut_inline()
-            }
-        }
-        .as_mut_ptr()
-        .cast::<u8>();
+        let ptr = self.raw.as_mut_erased(on_heap).as_mut_ptr().cast::<u8>();
         // SAFETY: Since `ptr` is valid for `cap` bytes, `ptr.add(len)` must be
         // valid for `cap - len` bytes. The subtraction will not underflow since
         // `len <= cap`.
