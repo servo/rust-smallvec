@@ -13,6 +13,20 @@ pub fn test_zero() {
     assert_eq!(&*v, &[0]);
 }
 
+#[cfg(feature = "may_dangle")]
+#[test]
+fn may_dangle_without_element_drop() {
+    let mut inline = SmallVec::<[&str; 1]>::new();
+    let mut spilled = SmallVec::<[&str; 0]>::new();
+    let text = "borrowed".to_owned();
+    inline.push(&text);
+    spilled.push(&text);
+    assert!(!inline.spilled());
+    assert!(spilled.spilled());
+    // `text` is dropped first, but dropping the vectors never reads these
+    // references.
+}
+
 // We heap allocate all these strings so that double frees will show up under
 // valgrind.
 
