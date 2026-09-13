@@ -8,7 +8,6 @@ repository = "https://github.com/servo/rust-smallvec"
 description = "'Small vector' optimization: store up to a small number of items on the stack"
 keywords = ["small", "vec", "vector", "stack", "no_std"]
 categories = ["data-structures"]
-readme = "README.md"
 documentation = "https://docs.rs/smallvec/"
 include = ["Cargo.toml", "LICENSE-MIT", "LICENSE-APACHE", "README.md", "src/**/*.rs"]
 
