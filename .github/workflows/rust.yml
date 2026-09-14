@@ -61,6 +61,10 @@ jobs:
         if: ${{ !matrix.no_std }}
         run: cargo test --verbose
 
+      - name: Cargo test no default features
+        if: matrix.nightly
+        run: cargo test --verbose --no-default-features
+
       - name: Cargo test all features
         if: matrix.nightly
         run: cargo test --verbose --all-features
@@ -68,6 +72,10 @@ jobs:
       - name: Cargo doc all features
         if: matrix.nightly
         run: cargo doc --all-features --verbose
+
+      - name: Cargo bench no default features
+        if: matrix.nightly
+        run: cargo clean && cargo bench --verbose --no-default-features
 
       - name: Cargo bench all features
         if: matrix.nightly
