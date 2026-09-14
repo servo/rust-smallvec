@@ -66,7 +66,9 @@ impl<T> TaggedLen<T> {
             panic!("smallvec length overflow")
         }
         #[cfg(any(debug_assertions, not(target_pointer_width = "64")))]
-        if self.len().saturating_add(n) > Self::MAX_LEN {assert_failed();}
+        if self.len().saturating_add(n) > Self::MAX_LEN {
+            assert_failed();
+        }
         self.0 += n << Self::SHIFT;
     }
 
