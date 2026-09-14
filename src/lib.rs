@@ -58,6 +58,7 @@ use std::io;
 use {
     alloc::{
         boxed::Box,
+        vec,
         vec::Vec
     },
     core::{
@@ -2074,12 +2075,13 @@ impl<T, const N: usize, A: Allocator> Drop for IntoIter<T, N, A> {
 }
 
 /// This function is used in the [`smallvec`] macro.
-/// It is recommended to use the macro instead of using thís function.
+/// It is recommended to use the macro instead of using this function.
 #[doc(hidden)]
 #[track_caller]
 pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N> {
     if n > SmallVec::<T, N>::inline_size() {
-        repeat_n(elem, n).collect()
+        // Standard Rust vectors are already specialized.
+        SmallVec::from_vec(vec![elem; n])
     } else {
         #[cfg(feature = "specialization")]
         {
