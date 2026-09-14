@@ -107,21 +107,23 @@ impl<T: Copy> Vector<T> for SmallVec<T, VEC_SIZE> {
 }
 
 macro_rules! make_benches {
-    ($typ:ty { $($b_name:ident => $g_name:ident($($args:expr),*),)* }) => {
-        $(
-            fn $b_name(c: &mut Criterion) {
-                c.bench_function(stringify!($b_name), |b: &mut Bencher| {
-                    $g_name::<$typ>($($args,)* b)
+    ($group_name:ident => $typ:ty { $($b_name:ident => $gen_name:ident($($args:expr),*),)* }) => {
+        fn $group_name(c: &mut Criterion) {
+            let mut g = c.benchmark_group(stringify!($group_name));
+
+            $(
+                g.bench_function(stringify!($b_name), |b: &mut Bencher| {
+                    $gen_name::<$typ>($($args,)* b)
                 });
-            }
-        )*
+            )*
+        }
     }
 }
 
 // ----------  Bench generation (same list, just using the new macro)
 // ----------
 make_benches! {
-    SmallVec<u64, VEC_SIZE> {
+    bench_smallvec => SmallVec<u64, VEC_SIZE> {
         bench_push => gen_push(SPILLED_SIZE as _),
         bench_push_small => gen_push(VEC_SIZE as _),
         bench_insert_push => gen_insert_push(SPILLED_SIZE as _),
@@ -153,34 +155,34 @@ make_benches! {
 }
 
 make_benches! {
-    Vec<u64> {
-        bench_push_vec => gen_push(SPILLED_SIZE as _),
-        bench_push_vec_small => gen_push(VEC_SIZE as _),
-        bench_insert_push_vec => gen_insert_push(SPILLED_SIZE as _),
-        bench_insert_push_vec_small => gen_insert_push(VEC_SIZE as _),
-        bench_insert_vec => gen_insert(SPILLED_SIZE as _),
-        bench_insert_vec_small => gen_insert(VEC_SIZE as _),
-        bench_remove_vec => gen_remove(SPILLED_SIZE as _),
-        bench_remove_vec_small => gen_remove(VEC_SIZE as _),
-        bench_extend_vec => gen_extend(SPILLED_SIZE as _),
-        bench_extend_vec_small => gen_extend(VEC_SIZE as _),
-        bench_extend_vec_filtered => gen_extend_filtered(SPILLED_SIZE as _),
-        bench_extend_vec_filtered_small => gen_extend_filtered(VEC_SIZE as _),
-        bench_from_iter_vec => gen_from_iter(SPILLED_SIZE as _),
-        bench_from_iter_vec_small => gen_from_iter(VEC_SIZE as _),
-        bench_from_slice_vec => gen_from_slice(SPILLED_SIZE as _),
-        bench_from_slice_vec_small => gen_from_slice(VEC_SIZE as _),
-        bench_extend_from_slice_vec => gen_extend_from_slice(SPILLED_SIZE as _),
-        bench_extend_from_slice_vec_small => gen_extend_from_slice(VEC_SIZE as _),
-        bench_macro_from_elem_vec => gen_from_elem(SPILLED_SIZE as _),
-        bench_macro_from_elem_vec_small => gen_from_elem(VEC_SIZE as _),
-        bench_pushpop_vec => gen_pushpop(),
-        bench_retain_mut_vec_half => gen_retain_mut_half(SPILLED_SIZE as _),
-        bench_retain_mut_vec_half_small => gen_retain_mut_half(VEC_SIZE as _),
-        bench_retain_mut_vec_all => gen_retain_mut_all(SPILLED_SIZE as _),
-        bench_retain_mut_vec_all_small => gen_retain_mut_all(VEC_SIZE as _),
-        bench_retain_mut_vec_none => gen_retain_mut_none(SPILLED_SIZE as _),
-        bench_retain_mut_vec_none_small => gen_retain_mut_none(VEC_SIZE as _),
+    bench_vec => Vec<u64> {
+        bench_push => gen_push(SPILLED_SIZE as _),
+        bench_push_small => gen_push(VEC_SIZE as _),
+        bench_insert_push => gen_insert_push(SPILLED_SIZE as _),
+        bench_insert_push_small => gen_insert_push(VEC_SIZE as _),
+        bench_insert => gen_insert(SPILLED_SIZE as _),
+        bench_insert_small => gen_insert(VEC_SIZE as _),
+        bench_remove => gen_remove(SPILLED_SIZE as _),
+        bench_remove_small => gen_remove(VEC_SIZE as _),
+        bench_extend => gen_extend(SPILLED_SIZE as _),
+        bench_extend_small => gen_extend(VEC_SIZE as _),
+        bench_extend_filtered => gen_extend_filtered(SPILLED_SIZE as _),
+        bench_extend_filtered_small => gen_extend_filtered(VEC_SIZE as _),
+        bench_from_iter => gen_from_iter(SPILLED_SIZE as _),
+        bench_from_iter_small => gen_from_iter(VEC_SIZE as _),
+        bench_from_slice => gen_from_slice(SPILLED_SIZE as _),
+        bench_from_slice_small => gen_from_slice(VEC_SIZE as _),
+        bench_extend_from_slice => gen_extend_from_slice(SPILLED_SIZE as _),
+        bench_extend_from_slice_small => gen_extend_from_slice(VEC_SIZE as _),
+        bench_macro_from_elem => gen_from_elem(SPILLED_SIZE as _),
+        bench_macro_from_elem_small => gen_from_elem(VEC_SIZE as _),
+        bench_pushpop => gen_pushpop(),
+        bench_retain_mut_half => gen_retain_mut_half(SPILLED_SIZE as _),
+        bench_retain_mut_half_small => gen_retain_mut_half(VEC_SIZE as _),
+        bench_retain_mut_all => gen_retain_mut_all(SPILLED_SIZE as _),
+        bench_retain_mut_all_small => gen_retain_mut_all(VEC_SIZE as _),
+        bench_retain_mut_none => gen_retain_mut_none(SPILLED_SIZE as _),
+        bench_retain_mut_none_small => gen_retain_mut_none(VEC_SIZE as _),
     }
 }
 
@@ -377,67 +379,15 @@ fn bench_macro_from_list_vec(c: &mut Criterion) {
     });
 }
 
-criterion_group!(
+criterion_group! {
     name = benches;
     config = Criterion::default()
         .warm_up_time(Duration::from_millis(400))
         .measurement_time(Duration::from_millis(1100));
     targets =
-    bench_push,
-    bench_push_small,
-    bench_insert_push,
-    bench_insert_push_small,
-    bench_insert,
-    bench_insert_small,
-    bench_remove,
-    bench_remove_small,
-    bench_extend,
-    bench_extend_small,
-    bench_extend_filtered,
-    bench_extend_filtered_small,
-    bench_from_iter,
-    bench_from_iter_small,
-    bench_from_slice,
-    bench_from_slice_small,
-    bench_extend_from_slice,
-    bench_extend_from_slice_small,
-    bench_macro_from_elem,
-    bench_macro_from_elem_small,
-    bench_pushpop,
-    bench_retain_mut_half,
-    bench_retain_mut_half_small,
-    bench_retain_mut_all,
-    bench_retain_mut_all_small,
-    bench_retain_mut_none,
-    bench_retain_mut_none_small,
-    bench_push_vec,
-    bench_push_vec_small,
-    bench_insert_push_vec,
-    bench_insert_push_vec_small,
-    bench_insert_vec,
-    bench_insert_vec_small,
-    bench_remove_vec,
-    bench_remove_vec_small,
-    bench_extend_vec,
-    bench_extend_vec_small,
-    bench_extend_vec_filtered,
-    bench_extend_vec_filtered_small,
-    bench_from_iter_vec,
-    bench_from_iter_vec_small,
-    bench_from_slice_vec,
-    bench_from_slice_vec_small,
-    bench_extend_from_slice_vec,
-    bench_extend_from_slice_vec_small,
-    bench_macro_from_elem_vec,
-    bench_macro_from_elem_vec_small,
-    bench_pushpop_vec,
-    bench_retain_mut_vec_half,
-    bench_retain_mut_vec_half_small,
-    bench_retain_mut_vec_all,
-    bench_retain_mut_vec_all_small,
-    bench_retain_mut_vec_none,
-    bench_retain_mut_vec_none_small,
+    bench_smallvec,
+    bench_vec,
     bench_macro_from_list,
     bench_macro_from_list_vec
-);
+}
 criterion_main!(benches);
