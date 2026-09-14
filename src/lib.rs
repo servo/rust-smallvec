@@ -58,10 +58,7 @@ use std::io;
 use {
     alloc::{
         boxed::Box,
-        vec::{
-            self,
-            Vec
-        }
+        vec::Vec
     },
     core::{
         alloc::Layout,
@@ -2082,7 +2079,7 @@ impl<T, const N: usize, A: Allocator> Drop for IntoIter<T, N, A> {
 pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N> {
     if n > SmallVec::<T, N>::inline_size() {
         // Standard Rust vectors are already specialized.
-        SmallVec::from_vec(vec![elem; n])
+        SmallVec::from_vec(alloc::vec![elem; n])
     } else {
         #[cfg(feature = "specialization")]
         {
