@@ -19,7 +19,7 @@ debug = false
 strip = true
 
 [features]
-default = []
+default = ["allocator-api2"]
 internals = []
 may_dangle = []
 rayon = ["std", "dep:rayon"]
