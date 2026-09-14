@@ -57,10 +57,18 @@ impl<T> TaggedLen<T> {
 
     /// # Safety
     ///
-    /// current len+n must be smaller than MAX_LEN
+    /// current len+n must be smaller than MAX_LEN on 64-bit target
     #[inline(always)]
     pub const unsafe fn add(&mut self, n: usize) {
-        debug_assert!(self.len() + n < Self::MAX_LEN);
+        #[cold]
+        #[inline(never)]
+        const fn assert_failed() {
+            panic!("smallvec length overflow")
+        }
+        #[cfg(any(debug_assertions, not(target_pointer_width = "64")))]
+        if self.len().saturating_add(n) > Self::MAX_LEN {
+            assert_failed();
+        }
         self.0 += n << Self::SHIFT;
     }
 
