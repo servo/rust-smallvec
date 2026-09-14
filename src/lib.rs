@@ -5,15 +5,14 @@
 // except according to those terms.
 
 #![doc = include_str!("../README.md")]
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization, trusted_len))]
 #![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
+#![cfg_attr(not(feature = "allocator-api2"), feature(allocator_api))]
 
 extern crate alloc;
-#[cfg(feature = "std")]
-extern crate std;
 
 #[cfg(feature = "borsh")]
 mod borsh;
@@ -33,7 +32,7 @@ mod specialization;
 mod taggedlen;
 
 #[cfg(not(feature = "allocator-api2"))]
-use alloc::{
+use alloc::alloc::{
     Allocator,
     Global
 };
