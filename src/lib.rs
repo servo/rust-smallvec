@@ -67,7 +67,6 @@ use {
             Hash,
             Hasher
         },
-        iter::repeat_n,
         mem::{
             ManuallyDrop,
             MaybeUninit,
@@ -2074,12 +2073,13 @@ impl<T, const N: usize, A: Allocator> Drop for IntoIter<T, N, A> {
 }
 
 /// This function is used in the [`smallvec`] macro.
-/// It is recommended to use the macro instead of using thís function.
+/// It is recommended to use the macro instead of using this function.
 #[doc(hidden)]
 #[track_caller]
 pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N> {
     if n > SmallVec::<T, N>::inline_size() {
-        repeat_n(elem, n).collect()
+        // Standard Rust vectors are already specialized.
+        SmallVec::from_vec(alloc::vec![elem; n])
     } else {
         #[cfg(feature = "specialization")]
         {
@@ -2188,55 +2188,21 @@ impl<T, const N: usize> SmallVec<T, N> {
 impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     fn extend_fallback<I>(&mut self, iter: I)
     where I: IntoIterator<Item = T> {
-        struct SetLenOnDrop<'a, T, const N: usize, A: Allocator> {
-            vec: &'a mut SmallVec<T, N, A>,
-            len: usize
-        }
-        impl<T, const N: usize, A: Allocator> Drop for SetLenOnDrop<'_, T, N, A> {
-            #[inline(always)]
-            fn drop(&mut self) {
-                // SAFETY: restores `len` only len of initialized items.
-                unsafe { self.vec.set_len(self.len) };
+        let mut iterator = iter.into_iter();
+        while let Some(element) = iterator.next() {
+            let len = self.len();
+            if len == self.capacity() {
+                let (lower, _) = iterator.size_hint();
+                self.reserve(lower.saturating_add(1));
             }
-        }
-
-        let mut iter = iter.into_iter();
-        let (lower, _) = iter.size_hint();
-        self.reserve(lower);
-
-        // gaurd will auto drop with return statements inside loop
-        let mut guard = SetLenOnDrop {
-            len: self.len(),
-            vec: self
-        };
-
-        loop {
-            let capacity = guard.vec.capacity();
-            // ptr stays valid until we reserve(memory relocation)
-            let ptr = guard.vec.as_mut_ptr();
-
-            // fast path for when size_hint provides exact length
-            while guard.len < capacity {
-                let Some(value) = iter.next() else { return };
-                // SAFETY: `guard.len < capacity` and slot is uninitialized.
-                unsafe { ptr.add(guard.len).write(value) };
-                guard.len += 1;
+            unsafe {
+                core::ptr::write(self.as_mut_ptr().add(len), element);
+                // Since next() executes user code which can panic we have to
+                // bump the length after each step.
+                // NB can't overflow since we would have had to alloc the
+                // address space
+                self.len.add(1);
             }
-            // exit happens mostly in the while body `else { return }`,
-            // if we are here iterator is not exact size.
-            let Some(value) = iter.next() else { return };
-            let (lower, _) = iter.size_hint();
-            // restore vector length before requesting reserve
-            // SAFETY: elements up to `guard.len` are initialized.
-            unsafe { guard.vec.set_len(guard.len) };
-            // UNSAFE TO USE `ptr` AFTER THIS POINT.
-            // reserve pessimistic lower+1.
-            guard.vec.reserve(lower.saturating_add(1));
-            // write the currently read value
-            // SAFETY: `reserve` made room for us.
-            unsafe { guard.vec.as_mut_ptr().add(guard.len).write(value) };
-            guard.len += 1;
-            // retry in the fast path
         }
     }
 
