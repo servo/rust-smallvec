@@ -52,10 +52,15 @@ use defmt::{
     Formatter as DeFormatter,
     write as dewrite
 };
-pub use errors::CollectionAllocErr;
+pub use errors::{
+    AllocationError,
+    CapacityOverflow,
+    SmallVecError
+};
 #[cfg(feature = "std")]
 use std::io;
 use {
+    crate::errors::Handle,
     alloc::{
         boxed::Box,
         vec::Vec
@@ -91,17 +96,6 @@ use {
     rawsmallvec::RawSmallVec,
     taggedlen::TaggedLen
 };
-
-#[inline]
-fn infallible<T>(result: Result<T, CollectionAllocErr>) -> T {
-    match result {
-        Ok(x) => x,
-        Err(CollectionAllocErr::CapacityOverflow) => panic!("capacity overflow"),
-        Err(CollectionAllocErr::AllocErr {
-            layout
-        }) => alloc::alloc::handle_alloc_error(layout)
-    }
-}
 
 #[inline]
 /// A local copy of [`core::slice::range`]. The latter function is unstable
@@ -339,7 +333,7 @@ impl<T, const N: usize, A: Allocator> Drain<'_, T, N, A> {
         let result = vec.try_reserve(additional);
         // Restore the prefix length before a reservation error can panic.
         unsafe { vec.set_len(old_len) };
-        infallible(result);
+        result.handle();
 
         let new_tail_start = self.tail_start + additional;
         unsafe {
@@ -630,7 +624,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         Self::new_in(Global)
     }
 
-    pub fn try_with_capacity(capacity: usize) -> Result<Self, CollectionAllocErr> {
+    pub fn try_with_capacity(capacity: usize) -> Result<Self, SmallVecError> {
         Self::try_with_capacity_in(capacity, Global)
     }
 
@@ -1162,11 +1156,11 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
 
     #[inline]
     pub fn grow(&mut self, new_capacity: usize) {
-        infallible(self.try_grow(new_capacity));
+        self.try_grow(new_capacity).handle();
     }
 
     #[cold]
-    pub fn try_grow(&mut self, new_capacity: usize) -> Result<(), CollectionAllocErr> {
+    pub fn try_grow(&mut self, new_capacity: usize) -> Result<(), SmallVecError> {
         if Self::IS_ZST {
             return Ok(());
         }
@@ -1212,24 +1206,24 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     pub fn reserve(&mut self, additional: usize) {
         // can't overflow since len <= capacity
         if additional > self.capacity() - self.len() {
-            let new_capacity = infallible(
-                self.len()
-                    .checked_add(additional)
-                    .and_then(usize::checked_next_power_of_two)
-                    .ok_or(CollectionAllocErr::CapacityOverflow)
-            );
+            let new_capacity = self
+                .len()
+                .checked_add(additional)
+                .and_then(usize::checked_next_power_of_two)
+                .ok_or(CapacityOverflow)
+                .handle();
             self.grow(new_capacity);
         }
     }
 
     #[inline]
-    pub fn try_reserve(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
+    pub fn try_reserve(&mut self, additional: usize) -> Result<(), SmallVecError> {
         if additional > self.capacity() - self.len() {
             let new_capacity = self
                 .len()
                 .checked_add(additional)
                 .and_then(usize::checked_next_power_of_two)
-                .ok_or(CollectionAllocErr::CapacityOverflow)?;
+                .ok_or(SmallVecError::CapacityOverflow(CapacityOverflow))?;
             self.try_grow(new_capacity)
         } else {
             Ok(())
@@ -1240,22 +1234,22 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     pub fn reserve_exact(&mut self, additional: usize) {
         // can't overflow since len <= capacity
         if additional > self.capacity() - self.len() {
-            let new_capacity = infallible(
-                self.len()
-                    .checked_add(additional)
-                    .ok_or(CollectionAllocErr::CapacityOverflow)
-            );
+            let new_capacity = self
+                .len()
+                .checked_add(additional)
+                .ok_or(CapacityOverflow)
+                .handle();
             self.grow(new_capacity);
         }
     }
 
     #[inline]
-    pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
+    pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), SmallVecError> {
         if additional > self.capacity() - self.len() {
             let new_capacity = self
                 .len()
                 .checked_add(additional)
-                .ok_or(CollectionAllocErr::CapacityOverflow)?;
+                .ok_or(SmallVecError::CapacityOverflow(CapacityOverflow))?;
             self.try_grow(new_capacity)
         } else {
             Ok(())
@@ -1283,7 +1277,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             // SAFETY: len > Self::inline_size() >= 0
             // so new capacity is non zero, it is equal to the length
             // T can't be a ZST because SmallVec<ZST, N> is never spilled.
-            unsafe { infallible(self.raw.try_grow_raw(self.len, len)) };
+            unsafe { self.raw.try_grow_raw(self.len, len).handle() };
         }
     }
 
@@ -1315,7 +1309,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 // SAFETY: len > Self::inline_size() >= 0
                 // so new capacity is non zero, it is equal to the length
                 // T can't be a ZST because SmallVec<ZST, N> is never spilled.
-                unsafe { infallible(self.raw.try_grow_raw(self.len, target)) };
+                unsafe { self.raw.try_grow_raw(self.len, target).handle() };
             }
         }
     }
@@ -1864,7 +1858,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         }
     }
 
-    pub fn try_with_capacity_in(capacity: usize, alloc: A) -> Result<Self, CollectionAllocErr> {
+    pub fn try_with_capacity_in(capacity: usize, alloc: A) -> Result<Self, SmallVecError> {
         let mut this = Self::new_in(alloc);
         if capacity > Self::inline_size() && !Self::IS_ZST {
             // SAFETY: we checked all the preconditions
@@ -1877,7 +1871,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     }
 
     pub fn with_capacity_in(capacity: usize, alloc: A) -> Self {
-        infallible(Self::try_with_capacity_in(capacity, alloc))
+        Self::try_with_capacity_in(capacity, alloc).handle()
     }
 }
 
