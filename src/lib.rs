@@ -20,7 +20,7 @@ mod comparisons;
 mod conversions;
 mod errors;
 mod iterators;
-pub use iterators::ExtractIf;
+pub use iterators::extract_if::ExtractIf;
 mod macros;
 #[cfg(feature = "malloc_size_of")]
 mod mallocsizeof;

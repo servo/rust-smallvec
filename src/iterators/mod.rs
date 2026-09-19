@@ -1,5 +1,4 @@
-mod extract_if;
-pub use extract_if::ExtractIf;
+pub mod extract_if;
 
 #[cfg(feature = "rayon")]
 mod rayon;
