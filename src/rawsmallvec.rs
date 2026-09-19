@@ -1,7 +1,9 @@
 use {
     super::{
+        AllocationError,
         Allocator,
-        CollectionAllocErr,
+        CapacityOverflow,
+        SmallVecError,
         taggedlen::TaggedLen
     },
     core::{
@@ -122,7 +124,7 @@ impl<T, const N: usize, A: Allocator> RawSmallVec<T, N, A> {
         &mut self,
         len: TaggedLen<T>,
         new_capacity: usize
-    ) -> Result<(), CollectionAllocErr> {
+    ) -> Result<(), SmallVecError> {
         let (len, was_on_heap) = len.parts();
         debug_assert!(!Self::IS_ZST);
         debug_assert!(new_capacity > 0 && new_capacity >= len);
@@ -130,10 +132,10 @@ impl<T, const N: usize, A: Allocator> RawSmallVec<T, N, A> {
         // SAFETY: the tag tells which member is active
         let ptr = unsafe { self.as_mut_ptr(was_on_heap) };
 
-        let new_layout =
-            Layout::array::<T>(new_capacity).map_err(|_| CollectionAllocErr::CapacityOverflow)?;
+        let new_layout = Layout::array::<T>(new_capacity)
+            .map_err(|_| SmallVecError::CapacityOverflow(CapacityOverflow))?;
         if new_layout.size() > isize::MAX as usize {
-            return Err(CollectionAllocErr::CapacityOverflow);
+            return Err(SmallVecError::CapacityOverflow(CapacityOverflow));
         }
 
         let new_ptr = if !was_on_heap {
@@ -142,9 +144,7 @@ impl<T, const N: usize, A: Allocator> RawSmallVec<T, N, A> {
             let new_ptr = self
                 .alloc
                 .allocate(new_layout)
-                .map_err(|_| CollectionAllocErr::AllocErr {
-                    layout: new_layout
-                })?
+                .map_err(|_| SmallVecError::AllocationError(AllocationError(new_layout)))?
                 .cast();
             unsafe { copy_nonoverlapping(ptr, new_ptr.as_ptr(), len) };
             new_ptr
@@ -178,9 +178,7 @@ impl<T, const N: usize, A: Allocator> RawSmallVec<T, N, A> {
                     new_layout
                 )
             }
-            .map_err(|_| CollectionAllocErr::AllocErr {
-                layout: new_layout
-            })?
+            .map_err(|_| SmallVecError::AllocationError(AllocationError(new_layout)))?
             .cast()
         };
         self.inner.heap = (new_ptr, new_capacity);
