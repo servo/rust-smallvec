@@ -1,4 +1,8 @@
-use crate::{Allocator, SmallVec, infallible};
+use crate::{
+    Allocator,
+    SmallVec,
+    infallible
+};
 
 /// An iterator that removes the items from a `SmallVec` and yields them by
 /// value.
