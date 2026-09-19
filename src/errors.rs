@@ -6,16 +6,15 @@ use core::{
         Display,
         Formatter,
         Result as Format
-    }
+    },
+    convert::Infallible
 };
-
-pub enum Never {}
 
 #[derive(Debug)]
 pub struct CapacityOverflow;
 
 impl Handle for CapacityOverflow {
-    type Handled = Never;
+    type Handled = Infallible;
 
     #[inline]
     fn handle(self) -> Self::Handled {
@@ -35,7 +34,7 @@ impl Error for CapacityOverflow {}
 pub struct AllocationError(pub Layout);
 
 impl Handle for AllocationError {
-    type Handled = Never;
+    type Handled = Infallible;
 
     #[inline]
     fn handle(self) -> Self::Handled {
@@ -56,7 +55,7 @@ pub trait Handle {
     fn handle(self) -> Self::Handled;
 }
 
-impl<Type, Do: Handle<Handled = Never>> Handle for Result<Type, Do> {
+impl<Type, Do: Handle<Handled = Infallible>> Handle for Result<Type, Do> {
     type Handled = Type;
 
     #[inline]
@@ -76,7 +75,7 @@ pub enum SmallVecError {
 }
 
 impl Handle for SmallVecError {
-    type Handled = Never;
+    type Handled = Infallible;
 
     #[inline]
     fn handle(self) -> Self::Handled {
