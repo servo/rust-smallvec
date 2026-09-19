@@ -67,7 +67,11 @@ impl<T> TaggedLen<T> {
         }
         #[cfg(any(debug_assertions, not(target_pointer_width = "64")))]
         match self.len().checked_add(n) {
-            Some(value) => if value > Self::MAX_LEN {assert_failed()},
+            Some(value) => {
+                if value > Self::MAX_LEN {
+                    assert_failed()
+                }
+            }
             None => assert_failed()
         }
         self.0 += n << Self::SHIFT;
