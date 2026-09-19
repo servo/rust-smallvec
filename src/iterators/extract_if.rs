@@ -1,4 +1,7 @@
-use crate::{Allocator, SmallVec};
+use crate::{
+    Allocator,
+    SmallVec
+};
 
 /// An iterator which uses a closure to determine if an element should be
 /// removed.
