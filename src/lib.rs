@@ -20,7 +20,7 @@ mod comparisons;
 mod conversions;
 mod errors;
 mod iterators;
-pub use iterators::Drain;
+pub use iterators::drain::Drain;
 mod macros;
 #[cfg(feature = "malloc_size_of")]
 mod mallocsizeof;

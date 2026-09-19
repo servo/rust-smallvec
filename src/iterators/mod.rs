@@ -1,5 +1,4 @@
-mod drain;
-pub use drain::Drain;
+pub mod drain;
 
 #[cfg(feature = "rayon")]
 mod rayon;
