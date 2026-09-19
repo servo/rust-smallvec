@@ -24,7 +24,7 @@ impl Handle for CapacityOverflow {
 
 impl Display for CapacityOverflow {
     fn fmt(&self, f: &mut Formatter<'_>) -> Format {
-        write!(f, "Allocation error: {:?}", self)
+        write!(f, "Allocation error: {self:?}")
     }
 }
 
@@ -44,7 +44,7 @@ impl Handle for AllocationError {
 
 impl Display for AllocationError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Format {
-        write!(f, "Allocation error: {:?}", self)
+        write!(f, "Allocation error: {self:?}")
     }
 }
 
@@ -88,7 +88,7 @@ impl Handle for SmallVecError {
 
 impl Display for SmallVecError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Format {
-        write!(f, "Allocation error: {:?}", self)
+        write!(f, "Allocation error: {self:?}")
     }
 }
 
