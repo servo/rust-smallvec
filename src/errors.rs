@@ -1,13 +1,13 @@
 use core::{
     alloc::Layout,
+    convert::Infallible,
     error::Error,
     fmt::{
         Debug,
         Display,
         Formatter,
         Result as Format
-    },
-    convert::Infallible
+    }
 };
 
 #[derive(Debug)]
