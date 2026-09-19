@@ -63,7 +63,7 @@ impl<Type, Do: Handle<Handled = Never>> Handle for Result<Type, Do> {
     fn handle(self) -> Self::Handled {
         match self {
             Ok(value) => value,
-            #[allow(unused)]
+            #[allow(unreachable_code)]
             Err(error) => match error.handle() {}
         }
     }
