@@ -13,23 +13,23 @@ use {
     }
 };
 
-pub trait Handle {
-    type Handled;
-    fn handle(self) -> Self::Handled;
-}
-
 #[derive(Debug)]
 pub enum SmallVecError {
     CapacityOverflow,
     AllocationError(Layout)
 }
 
-impl Error for SmallVecError {}
-
 impl Display for SmallVecError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Format {
         write!(f, "Allocation error: {self:?}")
     }
+}
+
+impl Error for SmallVecError {}
+
+pub trait Handle {
+    type Handled;
+    fn handle(self) -> Self::Handled;
 }
 
 impl Handle for SmallVecError {
