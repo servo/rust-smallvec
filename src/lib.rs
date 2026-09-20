@@ -170,7 +170,7 @@ impl<T, const N: usize> Default for SmallVec<T, N> {
 /// Returned from [`SmallVec::extract_if`][1].
 ///
 /// [1]: struct.SmallVec.html#method.extract_if
-pub struct ExtractIf<'a, T, const N: usize, A: Allocator, F>
+pub struct ExtractIf<'a, T, const N: usize, F, A: Allocator = Global>
 where F: FnMut(&mut T) -> bool
 {
     vec: &'a mut SmallVec<T, N, A>,
@@ -187,7 +187,7 @@ where F: FnMut(&mut T) -> bool
     pred: F
 }
 
-impl<T, const N: usize, A: Allocator, F> core::fmt::Debug for ExtractIf<'_, T, N, A, F>
+impl<T, const N: usize, A: Allocator, F> core::fmt::Debug for ExtractIf<'_, T, N, F, A>
 where
     F: FnMut(&mut T) -> bool,
     T: core::fmt::Debug
@@ -199,7 +199,7 @@ where
     }
 }
 
-impl<T, F, const N: usize, A: Allocator> Iterator for ExtractIf<'_, T, N, A, F>
+impl<T, F, const N: usize, A: Allocator> Iterator for ExtractIf<'_, T, N, F, A>
 where F: FnMut(&mut T) -> bool
 {
     type Item = T;
@@ -233,7 +233,7 @@ where F: FnMut(&mut T) -> bool
     }
 }
 
-impl<T, F, const N: usize, A: Allocator> Drop for ExtractIf<'_, T, N, A, F>
+impl<T, F, const N: usize, A: Allocator> Drop for ExtractIf<'_, T, N, F, A>
 where F: FnMut(&mut T) -> bool
 {
     fn drop(&mut self) {
@@ -348,7 +348,7 @@ impl<I: Iterator, const N: usize> Drop for Splice<'_, I, N> {
 /// Returned from [`SmallVec::into_iter`][1].
 ///
 /// [1]: struct.SmallVec.html#method.into_iter
-pub struct IntoIter<T, const N: usize, A: Allocator> {
+pub struct IntoIter<T, const N: usize, A: Allocator = Global> {
     // # Safety
     //
     // `end` decides whether the data lives on the heap or not
@@ -861,7 +861,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// );
     /// assert_eq!(ones.len(), 3);
     /// ```
-    pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> ExtractIf<'_, T, N, A, F>
+    pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> ExtractIf<'_, T, N, F, A>
     where
         F: FnMut(&mut T) -> bool,
         R: core::ops::RangeBounds<usize>

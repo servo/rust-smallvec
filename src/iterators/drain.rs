@@ -1,5 +1,6 @@
 use crate::{
     Allocator,
+    Global,
     SmallVec,
     infallible
 };
@@ -10,7 +11,7 @@ use crate::{
 /// Returned from [`SmallVec::drain`][1].
 ///
 /// [1]: struct.SmallVec.html#method.drain
-pub struct Drain<'a, T: 'a, const N: usize, A: Allocator> {
+pub struct Drain<'a, T: 'a, const N: usize, A: Allocator = Global> {
     // `vec` points to a valid object within its lifetime.
     // This is ensured by the fact that we're holding an iterator to its items.
     //
