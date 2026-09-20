@@ -11,12 +11,7 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v7
-      - name: install fuzzing
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y binutils-dev libunwind8-dev libcurl4-openssl-dev 
-          sudo apt-get install -y libelf-dev libdw-dev cmake gcc libiberty-dev
-      - name: install toolchain
+      - name: install
         uses: dtolnay/rust-toolchain@stable
       - name: test no default features
         run: cargo test --no-default-features
@@ -24,14 +19,18 @@ jobs:
         run: cargo test
       - name: fuzz
         working-directory: fuzz
-        run: ./travis-fuzz.sh
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y binutils-dev libunwind8-dev libcurl4-openssl-dev 
+          sudo apt-get install -y libelf-dev libdw-dev cmake gcc libiberty-dev
+          ./travis-fuzz.sh
   nightly:
     name: Nightly
     runs-on: ubuntu-latest
     steps:
       - name: checkout
         uses: actions/checkout@v7
-      - name: install toolchain
+      - name: install
         uses: dtolnay/rust-toolchain@nightly
       - name: style check
         run: |
@@ -69,7 +68,7 @@ jobs:
       steps:
         - name: checkout
           uses: actions/checkout@v7
-        - name: install toolchain
+        - name: install
           uses: dtolnay/rust-toolchain@stable
           with:
             target: thumbv7m-none-eabi
@@ -83,7 +82,7 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v7
-      - name: install toolchain
+      - name: install
         uses: dtolnay/rust-toolchain@1.86
       - name: test no default features
         run: cargo test --no-default-features
