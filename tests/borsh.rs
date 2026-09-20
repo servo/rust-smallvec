@@ -1,3 +1,5 @@
+#![cfg(not(miri))]
+
 use {
     borsh::{
         BorshDeserialize,
@@ -7,7 +9,6 @@ use {
 };
 
 #[test]
-#[cfg(not(miri))]
 fn round_trip() {
     let smallvec = SmallVec::<u8, 6>::from([1, 2, 3]);
     let bytes = to_vec(&smallvec).unwrap();
