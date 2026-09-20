@@ -20,8 +20,10 @@ mod comparisons;
 mod conversions;
 mod errors;
 mod iterators;
-pub use iterators::drain::Drain;
-pub use iterators::extractif::ExtractIf;
+pub use iterators::{
+    drain::Drain,
+    extractif::ExtractIf
+};
 mod macros;
 #[cfg(feature = "malloc_size_of")]
 mod mallocsizeof;
