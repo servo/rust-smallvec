@@ -53,11 +53,7 @@ use defmt::{
     Formatter as DeFormatter,
     write as dewrite
 };
-pub use errors::{
-    AllocationError,
-    CapacityOverflow,
-    SmallVecError
-};
+pub use errors::SmallVecError;
 #[cfg(feature = "std")]
 use std::io;
 use {
@@ -1020,7 +1016,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 .len()
                 .checked_add(additional)
                 .and_then(usize::checked_next_power_of_two)
-                .ok_or(CapacityOverflow)
+                .ok_or(SmallVecError::CapacityOverflow)
                 .handle();
             self.grow(new_capacity);
         }
@@ -1033,7 +1029,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 .len()
                 .checked_add(additional)
                 .and_then(usize::checked_next_power_of_two)
-                .ok_or(SmallVecError::CapacityOverflow(CapacityOverflow))?;
+                .ok_or(SmallVecError::CapacityOverflow)?;
             self.try_grow(new_capacity)
         } else {
             Ok(())
@@ -1047,7 +1043,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             let new_capacity = self
                 .len()
                 .checked_add(additional)
-                .ok_or(CapacityOverflow)
+                .ok_or(SmallVecError::CapacityOverflow)
                 .handle();
             self.grow(new_capacity);
         }
@@ -1059,7 +1055,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             let new_capacity = self
                 .len()
                 .checked_add(additional)
-                .ok_or(SmallVecError::CapacityOverflow(CapacityOverflow))?;
+                .ok_or(SmallVecError::CapacityOverflow)?;
             self.try_grow(new_capacity)
         } else {
             Ok(())

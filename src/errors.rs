@@ -1,90 +1,29 @@
-use core::{
-    alloc::Layout,
-    convert::Infallible,
-    error::Error,
-    fmt::{
-        Debug,
-        Display,
-        Formatter,
-        Result as Format
-    }
+use {
+    core::{
+        alloc::Layout,
+        error::Error,
+        fmt::{
+            Debug,
+            Display,
+            Formatter,
+            Result as Format
+        }
+    },
+    alloc::alloc::handle_alloc_error
 };
-
-#[derive(Debug)]
-pub struct CapacityOverflow;
-
-impl Handle for CapacityOverflow {
-    type Handled = Infallible;
-
-    #[inline]
-    fn handle(self) -> Self::Handled {
-        panic!("capacity overflow")
-    }
-}
-
-impl Display for CapacityOverflow {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Format {
-        write!(f, "Allocation error: {self:?}")
-    }
-}
-
-impl Error for CapacityOverflow {}
-
-#[derive(Debug)]
-pub struct AllocationError(pub Layout);
-
-impl Handle for AllocationError {
-    type Handled = Infallible;
-
-    #[inline]
-    fn handle(self) -> Self::Handled {
-        alloc::alloc::handle_alloc_error(self.0)
-    }
-}
-
-impl Display for AllocationError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Format {
-        write!(f, "Allocation error: {self:?}")
-    }
-}
-
-impl Error for AllocationError {}
 
 pub trait Handle {
     type Handled;
     fn handle(self) -> Self::Handled;
 }
 
-impl<Type, Do: Handle<Handled = Infallible>> Handle for Result<Type, Do> {
-    type Handled = Type;
-
-    #[inline]
-    fn handle(self) -> Self::Handled {
-        match self {
-            Ok(value) => value,
-            #[allow(unreachable_code)]
-            Err(error) => match error.handle() {}
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum SmallVecError {
-    CapacityOverflow(CapacityOverflow),
-    AllocationError(AllocationError)
+    CapacityOverflow,
+    AllocationError(Layout)
 }
 
-impl Handle for SmallVecError {
-    type Handled = Infallible;
-
-    #[inline]
-    fn handle(self) -> Self::Handled {
-        match self {
-            Self::CapacityOverflow(error) => error.handle(),
-            Self::AllocationError(error) => error.handle()
-        }
-    }
-}
+impl Error for SmallVecError {}
 
 impl Display for SmallVecError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Format {
@@ -92,4 +31,13 @@ impl Display for SmallVecError {
     }
 }
 
-impl Error for SmallVecError {}
+impl<Type> Handle for Result<Type, SmallVecError> {
+    type Handled = Type;
+    fn handle(self) -> Self::Handled {
+        match self {
+            Ok(value) => value,
+            Err(SmallVecError::CapacityOverflow) => panic!("smallvec capacity overflow"),
+            Err(SmallVecError::AllocationError(layout)) => handle_alloc_error(layout)
+        }
+    }
+}

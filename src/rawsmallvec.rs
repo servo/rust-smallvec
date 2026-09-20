@@ -1,8 +1,6 @@
 use {
     super::{
-        AllocationError,
         Allocator,
-        CapacityOverflow,
         SmallVecError,
         taggedlen::TaggedLen
     },
@@ -133,9 +131,9 @@ impl<T, const N: usize, A: Allocator> RawSmallVec<T, N, A> {
         let ptr = unsafe { self.as_mut_ptr(was_on_heap) };
 
         let new_layout = Layout::array::<T>(new_capacity)
-            .map_err(|_| SmallVecError::CapacityOverflow(CapacityOverflow))?;
+            .map_err(|_| SmallVecError::CapacityOverflow)?;
         if new_layout.size() > isize::MAX as usize {
-            return Err(SmallVecError::CapacityOverflow(CapacityOverflow));
+            return Err(SmallVecError::CapacityOverflow);
         }
 
         let new_ptr = if !was_on_heap {
@@ -144,7 +142,7 @@ impl<T, const N: usize, A: Allocator> RawSmallVec<T, N, A> {
             let new_ptr = self
                 .alloc
                 .allocate(new_layout)
-                .map_err(|_| SmallVecError::AllocationError(AllocationError(new_layout)))?
+                .map_err(|_| SmallVecError::AllocationError(new_layout))?
                 .cast();
             unsafe { copy_nonoverlapping(ptr, new_ptr.as_ptr(), len) };
             new_ptr
@@ -178,7 +176,7 @@ impl<T, const N: usize, A: Allocator> RawSmallVec<T, N, A> {
                     new_layout
                 )
             }
-            .map_err(|_| SmallVecError::AllocationError(AllocationError(new_layout)))?
+            .map_err(|_| SmallVecError::AllocationError(new_layout))?
             .cast()
         };
         self.inner.heap = (new_ptr, new_capacity);
