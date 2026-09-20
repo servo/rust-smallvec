@@ -52,7 +52,7 @@ impl<Type> Handle for Result<Type, SmallVecError> {
     fn handle(self) -> Self::Handled {
         match self {
             Ok(value) => value,
-            Err(error) => error.handle()
+            Err(error) => match error.handle() {}
         }
     }
 }
