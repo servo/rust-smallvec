@@ -33,6 +33,7 @@ impl Display for SmallVecError {
 
 impl<Type> Handle for Result<Type, SmallVecError> {
     type Handled = Type;
+    #[inline]
     fn handle(self) -> Self::Handled {
         match self {
             Ok(value) => value,
