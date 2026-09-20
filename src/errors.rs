@@ -2,6 +2,7 @@ use {
     alloc::alloc::handle_alloc_error,
     core::{
         alloc::Layout,
+        convert::Infallible,
         error::Error,
         fmt::{
             Debug,
@@ -31,6 +32,19 @@ impl Display for SmallVecError {
     }
 }
 
+impl Handle for SmallVecError {
+    type Handled = Infallible;
+
+    #[cold]
+    #[inline(never)]
+    fn handle(self) -> Self::Handled {
+        match self {
+            SmallVecError::CapacityOverflow => panic!("smallvec capacity overflow"),
+            SmallVecError::AllocationError(layout) => handle_alloc_error(layout)
+        }
+    }
+}
+
 impl<Type> Handle for Result<Type, SmallVecError> {
     type Handled = Type;
 
@@ -38,8 +52,7 @@ impl<Type> Handle for Result<Type, SmallVecError> {
     fn handle(self) -> Self::Handled {
         match self {
             Ok(value) => value,
-            Err(SmallVecError::CapacityOverflow) => panic!("smallvec capacity overflow"),
-            Err(SmallVecError::AllocationError(layout)) => handle_alloc_error(layout)
+            Err(error) => error.handle()
         }
     }
 }
