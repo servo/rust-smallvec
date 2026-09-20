@@ -37,6 +37,7 @@ where
             .finish()
     }
 }
+
 impl<T, F, const N: usize, A: Allocator> Iterator for ExtractIf<'_, T, N, A, F>
 where F: FnMut(&mut T) -> bool
 {
