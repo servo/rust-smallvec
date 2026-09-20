@@ -1,7 +1,7 @@
 use crate::{
     Allocator,
     SmallVec,
-    errors::Handle
+    SmallVecError
 };
 
 /// An iterator that removes the items from a `SmallVec` and yields them by
@@ -180,7 +180,7 @@ impl<T, const N: usize, A: Allocator> Drain<'_, T, N, A> {
         let result = vec.try_reserve(additional);
         // Restore the prefix length before a reservation error can panic.
         unsafe { vec.set_len(old_len) };
-        result.handle();
+        result.unwrap_or_else(SmallVecError::handle);
 
         let new_tail_start = self.tail_start + additional;
         unsafe {

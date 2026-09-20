@@ -80,8 +80,7 @@ use {
             copy_nonoverlapping,
             drop_in_place
         }
-    },
-    errors::Handle
+    }
 };
 #[cfg(feature = "internals")]
 pub use {
@@ -962,7 +961,8 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
 
     #[inline]
     pub fn grow(&mut self, new_capacity: usize) {
-        self.try_grow(new_capacity).handle();
+        self.try_grow(new_capacity)
+            .unwrap_or_else(SmallVecError::handle);
     }
 
     #[cold]
@@ -1017,7 +1017,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 .checked_add(additional)
                 .and_then(usize::checked_next_power_of_two)
                 .ok_or(SmallVecError::CapacityOverflow)
-                .handle();
+                .unwrap_or_else(SmallVecError::handle);
             self.grow(new_capacity);
         }
     }
@@ -1044,7 +1044,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 .len()
                 .checked_add(additional)
                 .ok_or(SmallVecError::CapacityOverflow)
-                .handle();
+                .unwrap_or_else(SmallVecError::handle);
             self.grow(new_capacity);
         }
     }
@@ -1083,7 +1083,11 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             // SAFETY: len > Self::inline_size() >= 0
             // so new capacity is non zero, it is equal to the length
             // T can't be a ZST because SmallVec<ZST, N> is never spilled.
-            unsafe { self.raw.try_grow_raw(self.len, len).handle() };
+            unsafe {
+                self.raw
+                    .try_grow_raw(self.len, len)
+                    .unwrap_or_else(SmallVecError::handle)
+            };
         }
     }
 
@@ -1115,7 +1119,11 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 // SAFETY: len > Self::inline_size() >= 0
                 // so new capacity is non zero, it is equal to the length
                 // T can't be a ZST because SmallVec<ZST, N> is never spilled.
-                unsafe { self.raw.try_grow_raw(self.len, target).handle() };
+                unsafe {
+                    self.raw
+                        .try_grow_raw(self.len, target)
+                        .unwrap_or_else(SmallVecError::handle)
+                };
             }
         }
     }
@@ -1677,7 +1685,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     }
 
     pub fn with_capacity_in(capacity: usize, alloc: A) -> Self {
-        Self::try_with_capacity_in(capacity, alloc).handle()
+        Self::try_with_capacity_in(capacity, alloc).unwrap_or_else(SmallVecError::handle)
     }
 }
 
