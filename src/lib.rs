@@ -61,7 +61,6 @@ pub use errors::{
 #[cfg(feature = "std")]
 use std::io;
 use {
-    crate::errors::Handle,
     alloc::{
         boxed::Box,
         vec::Vec
@@ -85,7 +84,8 @@ use {
             copy_nonoverlapping,
             drop_in_place
         }
-    }
+    },
+    errors::Handle
 };
 #[cfg(feature = "internals")]
 pub use {
