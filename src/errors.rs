@@ -31,7 +31,7 @@ impl SmallVecError {
     #[inline(never)]
     pub fn handle<Type>(self) -> Type {
         match self {
-            SmallVecError::CapacityOverflow => panic!("smallvec capacity overflow"),
+            SmallVecError::CapacityOverflow => panic!("capacity overflow"),
             SmallVecError::AllocationError(layout) => handle_alloc_error(layout)
         }
     }
