@@ -258,7 +258,7 @@ impl<I: Iterator, const N: usize> Drop for Splice<'_, I, N> {
 /// Returned from [`SmallVec::into_iter`][1].
 ///
 /// [1]: struct.SmallVec.html#method.into_iter
-pub struct IntoIter<T, const N: usize, A: Allocator> {
+pub struct IntoIter<T, const N: usize, A: Allocator = Global> {
     // # Safety
     //
     // `end` decides whether the data lives on the heap or not
@@ -771,7 +771,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// );
     /// assert_eq!(ones.len(), 3);
     /// ```
-    pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> ExtractIf<'_, T, N, A, F>
+    pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> ExtractIf<'_, T, N, F, A>
     where
         F: FnMut(&mut T) -> bool,
         R: core::ops::RangeBounds<usize>
