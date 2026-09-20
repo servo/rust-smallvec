@@ -1,0 +1,36 @@
+name: performance
+on:
+  push:
+    branches: [v2]
+  workflow_dispatch:
+jobs:
+  no:
+    name: bench no default features
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+      - name: install
+        uses: dtolnay/rust-toolchain@nightly
+      - name: bench
+        run: cargo bench --no-default-features
+  default:
+    name: bench default features
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+      - name: install
+        uses: dtolnay/rust-toolchain@nightly
+      - name: bench
+        run: cargo bench
+  all:
+    name: bench all features
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+      - name: install
+        uses: dtolnay/rust-toolchain@nightly
+      - name: bench
+        run: cargo bench --all-features

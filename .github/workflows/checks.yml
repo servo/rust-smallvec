@@ -56,12 +56,6 @@ jobs:
         run: cargo miri test
       - name: miri all features
         run: cargo miri test --all-features
-      - name: bench no default features
-        run: cargo bench --no-default-features
-      - name: bench default features
-        run: cargo bench
-      - name: bench all features
-        run: cargo bench --all-features
   nostd:
       name: NoStd
       runs-on: ubuntu-latest
