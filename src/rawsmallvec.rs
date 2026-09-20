@@ -170,3 +170,9 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         Ok(())
     }
 }
+
+impl<Type, const N: usize> Default for RawSmallVec<Type, N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
