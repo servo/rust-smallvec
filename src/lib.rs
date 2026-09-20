@@ -904,7 +904,10 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
 
         if new_capacity > Self::inline_size() {
             // SAFETY: we checked all the preconditions
-            let result = unsafe { self.raw.try_grow_raw(self.len, new_capacity, &self.allocator) };
+            let result = unsafe {
+                self.raw
+                    .try_grow_raw(self.len, new_capacity, &self.allocator)
+            };
 
             if result.is_ok() {
                 // SAFETY: the allocation succeeded, so self.raw.heap is now
@@ -1597,7 +1600,10 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         let mut this = Self::new_in(alloc);
         if capacity > Self::inline_size() && !Self::IS_ZST {
             // SAFETY: we checked all the preconditions
-            unsafe { this.raw.try_grow_raw(TaggedLen::new(0, false), capacity, &this.allocator) }?;
+            unsafe {
+                this.raw
+                    .try_grow_raw(TaggedLen::new(0, false), capacity, &this.allocator)
+            }?;
 
             // SAFETY: the allocation succeeded, so self.raw.heap is now active
             unsafe { this.set_on_heap() };

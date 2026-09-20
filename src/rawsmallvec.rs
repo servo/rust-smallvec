@@ -102,7 +102,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     ///
     /// `new_capacity` must be non zero, and greater or equal to the length.
     /// T must not be a ZST.
-    /// 
+    ///
     /// the allocator must be the same one the data was allocated with
     pub unsafe fn try_grow_raw<A: Allocator>(
         &mut self,
@@ -140,10 +140,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             // this can't overflow since we already constructed an equivalent
             // layout during the previous allocation
             let old_layout = unsafe {
-                Layout::from_size_align_unchecked(
-                    self.heap.1 * size_of::<T>(),
-                    align_of::<T>()
-                )
+                Layout::from_size_align_unchecked(self.heap.1 * size_of::<T>(), align_of::<T>())
             };
 
             // SAFETY: ptr was allocated with this allocator
