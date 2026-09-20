@@ -130,8 +130,8 @@ impl<T, const N: usize, A: Allocator> RawSmallVec<T, N, A> {
         // SAFETY: the tag tells which member is active
         let ptr = unsafe { self.as_mut_ptr(was_on_heap) };
 
-        let new_layout = Layout::array::<T>(new_capacity)
-            .map_err(|_| SmallVecError::CapacityOverflow)?;
+        let new_layout =
+            Layout::array::<T>(new_capacity).map_err(|_| SmallVecError::CapacityOverflow)?;
         if new_layout.size() > isize::MAX as usize {
             return Err(SmallVecError::CapacityOverflow);
         }

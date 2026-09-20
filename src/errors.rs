@@ -1,4 +1,5 @@
 use {
+    alloc::alloc::handle_alloc_error,
     core::{
         alloc::Layout,
         error::Error,
@@ -8,8 +9,7 @@ use {
             Formatter,
             Result as Format
         }
-    },
-    alloc::alloc::handle_alloc_error
+    }
 };
 
 pub trait Handle {
@@ -33,6 +33,7 @@ impl Display for SmallVecError {
 
 impl<Type> Handle for Result<Type, SmallVecError> {
     type Handled = Type;
+
     #[inline]
     fn handle(self) -> Self::Handled {
         match self {
