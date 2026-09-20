@@ -4,8 +4,8 @@ on:
     branches: [v2]
   workflow_dispatch:
 jobs:
-  no:
-    name: bench no default features
+  none:
+    name: None
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -15,7 +15,7 @@ jobs:
       - name: bench
         run: cargo bench --no-default-features
   default:
-    name: bench default features
+    name: Default
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -25,7 +25,7 @@ jobs:
       - name: bench
         run: cargo bench
   all:
-    name: bench all features
+    name: All
     runs-on: ubuntu-latest
     steps:
       - name: checkout
