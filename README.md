@@ -46,8 +46,7 @@ v.sort();
 
 ## Feature List
 
-By default, SmallVec does not make use of any feature. SmallVec without any features enabled does not make use of the standard library.
-
+- `allocator-api2` (default enabled, nightly if disabled): uses the `allocator-api2` backend for the allocator API, otherwise it uses unstable alloc traits
 - `arbitrary`: implements `Arbitrary` for any `SmallVec` storing elements that implement `Arbitrary`
 - `borsh`: implements `BorshSerialize`, `BorshDeserialize` and `BorshSchema`
 - `bytes`: implements `BufMut` for SmallVec
@@ -61,4 +60,7 @@ By default, SmallVec does not make use of any feature. SmallVec without any feat
 - `specialization` (nightly): enables specialization, improving performance on some cases
 - `std`: implements the `std::io::Write` type for `SmallVec<u8, N>`
 
-> The `rayon` feature implicitly requires `std`.
+> [!NOTE]
+> - SmallVec without any features enabled does not make use of the standard library.
+> 
+> - The `rayon` feature implicitly requires `std`.
