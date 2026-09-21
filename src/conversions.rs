@@ -1,9 +1,9 @@
 use {
     crate::{
         Allocator,
-        SmallVec
+        SmallVec,
+        Vec
     },
-    alloc::vec::Vec,
     core::{
         mem::ManuallyDrop,
         ptr::copy_nonoverlapping

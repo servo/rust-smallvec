@@ -46,7 +46,8 @@ v.sort();
 
 ## Feature List
 
-- `allocator-api2` (default enabled, nightly if disabled): uses the `allocator-api2` backend for the allocator API, otherwise it uses unstable alloc traits
+- `allocator-api` (nightly): uses the `allocator-api` backend for the allocator API
+- `allocator-api2`: uses the `allocator-api2` backend for the allocator API
 - `arbitrary`: implements `Arbitrary` for any `SmallVec` storing elements that implement `Arbitrary`
 - `borsh`: implements `BorshSerialize`, `BorshDeserialize` and `BorshSchema`
 - `bytes`: implements `BufMut` for SmallVec
@@ -54,7 +55,6 @@ v.sort();
 - `encase`: implements encasing as a runtime-sized array
 - `internals`: exports through the public API `TaggedLen` and `RawSmallVec`
 - `malloc_size_of`: implements `MallocSizeOf` and `MallocShallowSizeOf`
-- `may_dangle` (nightly): enables the eyepatch optimization for dropping
 - `rayon`: implements parallel iteration
 - `serde`: implements serde's serialization and deserialization
 - `specialization` (nightly): enables specialization, improving performance on some cases
@@ -62,5 +62,4 @@ v.sort();
 
 > [!NOTE]
 > - SmallVec without any features enabled does not make use of the standard library.
-> 
 > - The `rayon` feature implicitly requires `std`.

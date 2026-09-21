@@ -14,11 +14,19 @@ use {
     smallvec::SmallVec,
     std::{
         borrow::ToOwned,
-        boxed::Box,
         hash::DefaultHasher,
-        rc::Rc,
-        vec::Vec
+        rc::Rc
     }
+};
+#[cfg(feature = "allocator-api2")]
+use allocator_api2::{
+    vec::Vec,
+    boxed::Box
+};
+#[cfg(not(feature = "allocator-api2"))]
+use std::{
+    vec::Vec,
+    boxed::Box
 };
 
 #[test]
