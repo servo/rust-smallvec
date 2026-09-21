@@ -28,7 +28,7 @@ impl Allocator for Global {
     }
 
     #[inline]
-    unsafe fn deallocate(&self, pointer: NonNull<u8>, layout: Layout) -> () {
+    unsafe fn deallocate(&self, pointer: NonNull<u8>, layout: Layout) {
         unsafe { dealloc(pointer.as_ptr(), layout) };
     }
 
