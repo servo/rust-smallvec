@@ -3,6 +3,8 @@
 > [!WARNING]
 > AI contributions are not allowed in any [**@servo**](https://github.com/servo) repository.
 > Please read the [AI contributions policy](https://book.servo.org/contributing/getting-started.html#ai-contributions) before contributing.
+> 
+> this includes vibe coding, AI modifying code, and LLM-generated speech for GitHub
 
 This branch contains the code for SmallVec v2, which is on pre-release.
 
