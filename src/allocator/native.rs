@@ -19,7 +19,7 @@ impl<Type: Native> Allocator for Type {
     }
 
     #[inline]
-    unsafe fn deallocate(&self, pointer: NonNull<u8>, layout: Layout) -> () {
+    unsafe fn deallocate(&self, pointer: NonNull<u8>, layout: Layout) {
         unsafe { Native::deallocate(&self, pointer, layout) }
     }
 
