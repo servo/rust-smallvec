@@ -62,3 +62,18 @@ By default, SmallVec does not make use of any feature. SmallVec without any feat
 - `std`: implements the `std::io::Write` type for `SmallVec<u8, N>`
 
 > The `rayon` feature implicitly requires `std`.
+
+## Related Crates
+
+### `fastvec`
+
+[`fastvec`](https://crates.io/crates/fastvec) is another implementation of a
+small-buffer optimized vector, with different goals from `smallvec`.
+
+`FastVec` caches a pointer to the current storage, avoiding a branch on hot paths
+and providing higher performance. The cost is a larger type size, and the type itself
+is `!Send`, so it is typically only used for temporary data processing.
+
+`SmallVec` is the more general-purpose implementation. It supports inline data while
+keeping the type as small as possible, is `Send + Sync` when `T: Send + Sync`, and works
+for both storing and processing data, though its operations may require an extra branch.
