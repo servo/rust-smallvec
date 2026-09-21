@@ -1,20 +1,38 @@
-use core::alloc::Layout;
+use {
+    alloc::alloc::handle_alloc_error,
+    core::{
+        alloc::Layout,
+        error::Error,
+        fmt::{
+            Debug,
+            Display,
+            Formatter,
+            Result as Format
+        }
+    }
+};
 
-/// Error type for APIs with fallible heap allocation
 #[derive(Debug)]
-pub enum CollectionAllocErr {
-    /// Overflow `usize::MAX` or other error during size computation
+pub enum SmallVecError {
     CapacityOverflow,
-    /// The allocator return an error
-    AllocErr {
-        /// The layout that was passed to the allocator
-        layout: Layout
-    }
+    AllocationError(Layout)
 }
-impl core::fmt::Display for CollectionAllocErr {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Allocation error: {:?}", self)
+
+impl Display for SmallVecError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Format {
+        write!(f, "Allocation error: {self:?}")
     }
 }
 
-impl core::error::Error for CollectionAllocErr {}
+impl Error for SmallVecError {}
+
+impl SmallVecError {
+    #[cold]
+    #[inline(never)]
+    pub fn handle<Type>(self) -> Type {
+        match self {
+            SmallVecError::CapacityOverflow => panic!("capacity overflow"),
+            SmallVecError::AllocationError(layout) => handle_alloc_error(layout)
+        }
+    }
+}
