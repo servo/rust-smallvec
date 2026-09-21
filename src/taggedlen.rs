@@ -67,9 +67,14 @@ impl<T> TaggedLen<T> {
             const fn assert_failed() {
                 panic!("smallvec length overflow")
             }
-            if self.len().saturating_add(n) > Self::MAX_LEN {
-                assert_failed();
-            }
+            match self.len().checked_add(n) {
+                Some(value) => {
+                    if value > Self::MAX_LEN {
+                        assert_failed()
+                    }
+                },
+                None => assert_failed()
+            }  
         }
         self.0 += n << Self::SHIFT;
     }

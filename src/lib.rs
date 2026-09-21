@@ -9,7 +9,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization, trusted_len))]
-#![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 #![cfg_attr(not(feature = "allocator-api2"), feature(allocator_api))]
 
 extern crate alloc;
@@ -56,7 +55,7 @@ use defmt::{
     Formatter as DeFormatter,
     write as dewrite
 };
-pub use errors::CollectionAllocErr;
+pub use errors::SmallVecError;
 #[cfg(feature = "std")]
 use std::io;
 use {
@@ -95,17 +94,6 @@ use {
     rawsmallvec::RawSmallVec,
     taggedlen::TaggedLen
 };
-
-#[inline]
-fn infallible<T>(result: Result<T, CollectionAllocErr>) -> T {
-    match result {
-        Ok(x) => x,
-        Err(CollectionAllocErr::CapacityOverflow) => panic!("capacity overflow"),
-        Err(CollectionAllocErr::AllocErr {
-            layout
-        }) => alloc::alloc::handle_alloc_error(layout)
-    }
-}
 
 #[inline]
 /// A local copy of [`core::slice::range`]. The latter function is unstable
@@ -154,7 +142,8 @@ where R: core::ops::RangeBounds<usize> {
 #[repr(C)]
 pub struct SmallVec<T, const N: usize, A: Allocator = Global> {
     len: TaggedLen<T>,
-    raw: RawSmallVec<T, N, A>
+    raw: RawSmallVec<T, N>,
+    allocator: A
 }
 
 unsafe impl<T: Send, const N: usize, A: Allocator + Send> Send for SmallVec<T, N, A> {}
@@ -258,13 +247,14 @@ impl<I: Iterator, const N: usize> Drop for Splice<'_, I, N> {
 /// Returned from [`SmallVec::into_iter`][1].
 ///
 /// [1]: struct.SmallVec.html#method.into_iter
-pub struct IntoIter<T, const N: usize, A: Allocator> {
+pub struct IntoIter<T, const N: usize, A: Allocator = Global> {
     // # Safety
     //
     // `end` decides whether the data lives on the heap or not
     //
     // The members from begin..end are initialized
-    raw: RawSmallVec<T, N, A>,
+    raw: RawSmallVec<T, N>,
+    allocator: A,
     begin: usize,
     end: TaggedLen<T>
 }
@@ -350,7 +340,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         Self::new_in(Global)
     }
 
-    pub fn try_with_capacity(capacity: usize) -> Result<Self, CollectionAllocErr> {
+    pub fn try_with_capacity(capacity: usize) -> Result<Self, SmallVecError> {
         Self::try_with_capacity_in(capacity, Global)
     }
 
@@ -383,7 +373,8 @@ impl<T, const N: usize> SmallVec<T, N> {
         // SAFETY: all the members in 0..S are initialized
         Self {
             len: TaggedLen::new(S, false),
-            raw: RawSmallVec::new_inline(buf, Global)
+            raw: RawSmallVec::new_inline(buf),
+            allocator: Global
         }
     }
 
@@ -393,7 +384,8 @@ impl<T, const N: usize> SmallVec<T, N> {
         // SAFETY: all the members in 0..len are initialized
         let mut vec = Self {
             len: TaggedLen::new(len, false),
-            raw: RawSmallVec::new_inline(MaybeUninit::new(buf), Global)
+            raw: RawSmallVec::new_inline(MaybeUninit::new(buf)),
+            allocator: Global
         };
         // Deallocate the remaining elements so no memory is leaked.
         unsafe {
@@ -439,7 +431,8 @@ impl<T, const N: usize> SmallVec<T, N> {
         debug_assert!(len <= N);
         Self {
             len: TaggedLen::new(len, false),
-            raw: RawSmallVec::new_inline(buf, Global)
+            raw: RawSmallVec::new_inline(buf),
+            allocator: Global
         }
     }
 
@@ -464,7 +457,8 @@ impl<T, const N: usize> SmallVec<T, N> {
             unsafe { vec.set_len(0) };
             Self {
                 len: TaggedLen::new(len, false),
-                raw: RawSmallVec::new(Global)
+                raw: RawSmallVec::new(),
+                allocator: Global
             }
         } else {
             let mut vec = ManuallyDrop::new(vec);
@@ -476,7 +470,8 @@ impl<T, const N: usize> SmallVec<T, N> {
 
             Self {
                 len: TaggedLen::new(len, true),
-                raw: RawSmallVec::new_heap(ptr, cap, Global)
+                raw: RawSmallVec::new_heap(ptr, cap),
+                allocator: Global
             }
         }
     }
@@ -568,7 +563,8 @@ impl<T, const N: usize> SmallVec<T, N> {
 
         SmallVec {
             len: TaggedLen::new(length, true),
-            raw: RawSmallVec::new_heap(ptr, capacity, Global)
+            raw: RawSmallVec::new_heap(ptr, capacity),
+            allocator: Global
         }
     }
 }
@@ -635,7 +631,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
 
     #[inline]
     pub const fn inline_size() -> usize {
-        RawSmallVec::<T, N, A>::INLINE_CAP
+        RawSmallVec::<T, N>::INLINE_CAP
     }
 
     #[inline]
@@ -771,7 +767,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// );
     /// assert_eq!(ones.len(), 3);
     /// ```
-    pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> ExtractIf<'_, T, N, A, F>
+    pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> ExtractIf<'_, T, N, F, A>
     where
         F: FnMut(&mut T) -> bool,
         R: core::ops::RangeBounds<usize>
@@ -882,11 +878,12 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
 
     #[inline]
     pub fn grow(&mut self, new_capacity: usize) {
-        infallible(self.try_grow(new_capacity));
+        self.try_grow(new_capacity)
+            .unwrap_or_else(SmallVecError::handle);
     }
 
     #[cold]
-    pub fn try_grow(&mut self, new_capacity: usize) -> Result<(), CollectionAllocErr> {
+    pub fn try_grow(&mut self, new_capacity: usize) -> Result<(), SmallVecError> {
         if Self::IS_ZST {
             return Ok(());
         }
@@ -896,7 +893,10 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
 
         if new_capacity > Self::inline_size() {
             // SAFETY: we checked all the preconditions
-            let result = unsafe { self.raw.try_grow_raw(self.len, new_capacity) };
+            let result = unsafe {
+                self.raw
+                    .try_grow_raw(self.len, new_capacity, &self.allocator)
+            };
 
             if result.is_ok() {
                 // SAFETY: the allocation succeeded, so self.raw.heap is now
@@ -909,7 +909,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             if on_heap {
                 unsafe {
                     // SAFETY: heap member is active
-                    let (ptr, old_cap) = self.raw.inner.heap;
+                    let (ptr, old_cap) = self.raw.heap;
                     // inline member is now active
 
                     // SAFETY: len <= new_capacity <= Self::inline_size()
@@ -919,7 +919,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                         ptr: ptr.cast(),
                         size_bytes: old_cap * size_of::<T>(),
                         align: align_of::<T>(),
-                        alloc: &self.raw.alloc
+                        alloc: &self.allocator
                     });
                     self.set_inline();
                 }
@@ -932,24 +932,24 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     pub fn reserve(&mut self, additional: usize) {
         // can't overflow since len <= capacity
         if additional > self.capacity() - self.len() {
-            let new_capacity = infallible(
-                self.len()
-                    .checked_add(additional)
-                    .and_then(usize::checked_next_power_of_two)
-                    .ok_or(CollectionAllocErr::CapacityOverflow)
-            );
+            let new_capacity = self
+                .len()
+                .checked_add(additional)
+                .and_then(usize::checked_next_power_of_two)
+                .ok_or(SmallVecError::CapacityOverflow)
+                .unwrap_or_else(SmallVecError::handle);
             self.grow(new_capacity);
         }
     }
 
     #[inline]
-    pub fn try_reserve(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
+    pub fn try_reserve(&mut self, additional: usize) -> Result<(), SmallVecError> {
         if additional > self.capacity() - self.len() {
             let new_capacity = self
                 .len()
                 .checked_add(additional)
                 .and_then(usize::checked_next_power_of_two)
-                .ok_or(CollectionAllocErr::CapacityOverflow)?;
+                .ok_or(SmallVecError::CapacityOverflow)?;
             self.try_grow(new_capacity)
         } else {
             Ok(())
@@ -960,22 +960,22 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     pub fn reserve_exact(&mut self, additional: usize) {
         // can't overflow since len <= capacity
         if additional > self.capacity() - self.len() {
-            let new_capacity = infallible(
-                self.len()
-                    .checked_add(additional)
-                    .ok_or(CollectionAllocErr::CapacityOverflow)
-            );
+            let new_capacity = self
+                .len()
+                .checked_add(additional)
+                .ok_or(SmallVecError::CapacityOverflow)
+                .unwrap_or_else(SmallVecError::handle);
             self.grow(new_capacity);
         }
     }
 
     #[inline]
-    pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), CollectionAllocErr> {
+    pub fn try_reserve_exact(&mut self, additional: usize) -> Result<(), SmallVecError> {
         if additional > self.capacity() - self.len() {
             let new_capacity = self
                 .len()
                 .checked_add(additional)
-                .ok_or(CollectionAllocErr::CapacityOverflow)?;
+                .ok_or(SmallVecError::CapacityOverflow)?;
             self.try_grow(new_capacity)
         } else {
             Ok(())
@@ -991,10 +991,10 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         if len <= Self::inline_size() {
             // SAFETY: on_heap is true, so we're on the heap
             unsafe {
-                let (ptr, capacity) = self.raw.inner.heap;
+                let (ptr, capacity) = self.raw.heap;
                 copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
                 self.set_inline();
-                self.raw.alloc.deallocate(
+                self.allocator.deallocate(
                     ptr.cast(),
                     Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>())
                 );
@@ -1003,7 +1003,11 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             // SAFETY: len > Self::inline_size() >= 0
             // so new capacity is non zero, it is equal to the length
             // T can't be a ZST because SmallVec<ZST, N> is never spilled.
-            unsafe { infallible(self.raw.try_grow_raw(self.len, len)) };
+            unsafe {
+                self.raw
+                    .try_grow_raw(self.len, len, &self.allocator)
+                    .unwrap_or_else(SmallVecError::handle)
+            };
         }
     }
 
@@ -1014,16 +1018,16 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             return;
         }
         // SAFETY: the vector is on the heap
-        let capacity = unsafe { self.raw.inner.heap.1 };
+        let capacity = unsafe { self.raw.heap.1 };
         if capacity > min_capacity {
             let target = core::cmp::max(len, min_capacity);
             if target <= Self::inline_size() {
                 // SAFETY: on_heap is true, so we're on the heap
                 unsafe {
-                    let (ptr, capacity) = self.raw.inner.heap;
+                    let (ptr, capacity) = self.raw.heap;
                     copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
                     self.set_inline();
-                    self.raw.alloc.deallocate(
+                    self.allocator.deallocate(
                         ptr.cast(),
                         Layout::from_size_align_unchecked(
                             capacity * size_of::<T>(),
@@ -1035,7 +1039,11 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 // SAFETY: len > Self::inline_size() >= 0
                 // so new capacity is non zero, it is equal to the length
                 // T can't be a ZST because SmallVec<ZST, N> is never spilled.
-                unsafe { infallible(self.raw.try_grow_raw(self.len, target)) };
+                unsafe {
+                    self.raw
+                        .try_grow_raw(self.len, target, &self.allocator)
+                        .unwrap_or_else(SmallVecError::handle)
+                };
             }
         }
     }
@@ -1229,7 +1237,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             // - the first `len` entries are proper `T`-values
             // - the allocation is not larger than `isize::MAX`
             unsafe {
-                let (ptr, cap) = this.raw.inner.heap;
+                let (ptr, cap) = this.raw.heap;
                 Vec::from_raw_parts(ptr.as_ptr(), len, cap)
             }
         }
@@ -1580,15 +1588,19 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     pub const fn new_in(alloc: A) -> SmallVec<T, N, A> {
         Self {
             len: TaggedLen::new(0, false),
-            raw: RawSmallVec::new(alloc)
+            raw: RawSmallVec::new(),
+            allocator: alloc
         }
     }
 
-    pub fn try_with_capacity_in(capacity: usize, alloc: A) -> Result<Self, CollectionAllocErr> {
+    pub fn try_with_capacity_in(capacity: usize, alloc: A) -> Result<Self, SmallVecError> {
         let mut this = Self::new_in(alloc);
         if capacity > Self::inline_size() && !Self::IS_ZST {
             // SAFETY: we checked all the preconditions
-            unsafe { this.raw.try_grow_raw(TaggedLen::new(0, false), capacity) }?;
+            unsafe {
+                this.raw
+                    .try_grow_raw(TaggedLen::new(0, false), capacity, &this.allocator)
+            }?;
 
             // SAFETY: the allocation succeeded, so self.raw.heap is now active
             unsafe { this.set_on_heap() };
@@ -1597,7 +1609,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     }
 
     pub fn with_capacity_in(capacity: usize, alloc: A) -> Self {
-        infallible(Self::try_with_capacity_in(capacity, alloc))
+        Self::try_with_capacity_in(capacity, alloc).unwrap_or_else(SmallVecError::handle)
     }
 }
 
@@ -1674,7 +1686,7 @@ impl<T, const N: usize, A: Allocator + Clone> SmallVec<T, N, A> {
         assert!(at <= len);
 
         let other_len = len - at;
-        let mut other = Self::with_capacity_in(other_len, self.raw.alloc.clone());
+        let mut other = Self::with_capacity_in(other_len, self.allocator.clone());
 
         // Unsafely `set_len` and copy items to `other`.
         unsafe {
@@ -1721,31 +1733,6 @@ impl<A: Allocator> Drop for DropDealloc<'_, A> {
     }
 }
 
-#[cfg(feature = "may_dangle")]
-unsafe impl<#[may_dangle] T, const N: usize, A: Allocator> Drop for SmallVec<T, N, A> {
-    fn drop(&mut self) {
-        let (len, on_heap) = self.len.parts();
-        let ptr = unsafe { self.raw.as_mut_ptr(on_heap) };
-        // SAFETY: we first drop the elements, then `_drop_dealloc` is dropped,
-        // releasing memory we used to own
-        unsafe {
-            let _drop_dealloc = if on_heap {
-                let capacity = self.raw.inner.heap.1;
-                Some(DropDealloc {
-                    ptr: NonNull::new_unchecked(ptr as *mut u8),
-                    size_bytes: capacity * size_of::<T>(),
-                    align: align_of::<T>(),
-                    alloc: &self.raw.alloc
-                })
-            } else {
-                None
-            };
-            core::ptr::slice_from_raw_parts_mut(ptr, len).drop_in_place();
-        }
-    }
-}
-
-#[cfg(not(feature = "may_dangle"))]
 impl<T, const N: usize, A: Allocator> Drop for SmallVec<T, N, A> {
     fn drop(&mut self) {
         let (len, on_heap) = self.len.parts();
@@ -1754,12 +1741,12 @@ impl<T, const N: usize, A: Allocator> Drop for SmallVec<T, N, A> {
         // SAFETY: see above
         unsafe {
             let _drop_dealloc = if on_heap {
-                let capacity = self.raw.inner.heap.1;
+                let capacity = self.raw.heap.1;
                 Some(DropDealloc {
                     ptr: NonNull::new_unchecked(ptr as *mut u8),
                     size_bytes: capacity * size_of::<T>(),
                     align: align_of::<T>(),
-                    alloc: &self.raw.alloc
+                    alloc: &self.allocator
                 })
             } else {
                 None
@@ -1777,12 +1764,12 @@ impl<T, const N: usize, A: Allocator> Drop for IntoIter<T, N, A> {
             let begin = self.begin;
             let ptr = self.raw.as_mut_ptr(on_heap);
             let _drop_dealloc = if on_heap {
-                let capacity = self.raw.inner.heap.1;
+                let capacity = self.raw.heap.1;
                 Some(DropDealloc {
                     ptr: NonNull::new_unchecked(ptr as *mut u8),
                     size_bytes: capacity * size_of::<T>(),
                     align: align_of::<T>(),
-                    alloc: &self.raw.alloc
+                    alloc: &self.allocator
                 })
             } else {
                 None
@@ -1990,7 +1977,8 @@ impl<T: Clone, const N: usize, A: Allocator + Clone> Clone for SmallVec<T, N, A>
     fn clone(&self) -> SmallVec<T, N, A> {
         let mut vec = SmallVec {
             len: TaggedLen::new(0, false),
-            raw: RawSmallVec::new(self.raw.alloc.clone())
+            raw: RawSmallVec::new(),
+            allocator: self.allocator.clone()
         };
 
         vec.extend(self);
@@ -2017,7 +2005,8 @@ impl<T: Clone, const N: usize, A: Allocator + Clone> Clone for IntoIter<T, N, A>
     fn clone(&self) -> IntoIter<T, N, A> {
         let mut vec = SmallVec {
             len: TaggedLen::new(0, false),
-            raw: RawSmallVec::new(self.raw.alloc.clone())
+            raw: RawSmallVec::new(),
+            allocator: self.allocator.clone()
         };
 
         vec.extend(self.as_slice());
@@ -2083,7 +2072,8 @@ impl<T, const N: usize, A: Allocator> IntoIterator for SmallVec<T, N, A> {
             // the elements
             let this = ManuallyDrop::new(self);
             IntoIter {
-                raw: (&this.raw as *const RawSmallVec<T, N, A>).read(),
+                raw: (&raw const this.raw).read(),
+                allocator: (&raw const this.allocator).read(),
                 begin: 0,
                 end: this.len
             }

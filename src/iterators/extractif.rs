@@ -1,5 +1,6 @@
 use crate::{
     Allocator,
+    Global,
     SmallVec
 };
 
@@ -9,7 +10,7 @@ use crate::{
 /// Returned from [`SmallVec::extract_if`][1].
 ///
 /// [1]: struct.SmallVec.html#method.extract_if
-pub struct ExtractIf<'a, T, const N: usize, A: Allocator, F>
+pub struct ExtractIf<'a, T, const N: usize, F, A: Allocator = Global>
 where F: FnMut(&mut T) -> bool
 {
     pub(crate) vec: &'a mut SmallVec<T, N, A>,
@@ -26,7 +27,7 @@ where F: FnMut(&mut T) -> bool
     pub(crate) pred: F
 }
 
-impl<T, const N: usize, A: Allocator, F> core::fmt::Debug for ExtractIf<'_, T, N, A, F>
+impl<T, const N: usize, A: Allocator, F> core::fmt::Debug for ExtractIf<'_, T, N, F, A>
 where
     F: FnMut(&mut T) -> bool,
     T: core::fmt::Debug
@@ -38,7 +39,7 @@ where
     }
 }
 
-impl<T, F, const N: usize, A: Allocator> Iterator for ExtractIf<'_, T, N, A, F>
+impl<T, F, const N: usize, A: Allocator> Iterator for ExtractIf<'_, T, N, F, A>
 where F: FnMut(&mut T) -> bool
 {
     type Item = T;
@@ -72,7 +73,7 @@ where F: FnMut(&mut T) -> bool
     }
 }
 
-impl<T, F, const N: usize, A: Allocator> Drop for ExtractIf<'_, T, N, A, F>
+impl<T, F, const N: usize, A: Allocator> Drop for ExtractIf<'_, T, N, F, A>
 where F: FnMut(&mut T) -> bool
 {
     fn drop(&mut self) {

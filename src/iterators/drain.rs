@@ -1,7 +1,8 @@
 use crate::{
     Allocator,
+    Global,
     SmallVec,
-    infallible
+    SmallVecError
 };
 
 /// An iterator that removes the items from a `SmallVec` and yields them by
@@ -10,7 +11,7 @@ use crate::{
 /// Returned from [`SmallVec::drain`][1].
 ///
 /// [1]: struct.SmallVec.html#method.drain
-pub struct Drain<'a, T: 'a, const N: usize, A: Allocator> {
+pub struct Drain<'a, T: 'a, const N: usize, A: Allocator = Global> {
     // `vec` points to a valid object within its lifetime.
     // This is ensured by the fact that we're holding an iterator to its items.
     //
@@ -180,7 +181,7 @@ impl<T, const N: usize, A: Allocator> Drain<'_, T, N, A> {
         let result = vec.try_reserve(additional);
         // Restore the prefix length before a reservation error can panic.
         unsafe { vec.set_len(old_len) };
-        infallible(result);
+        result.unwrap_or_else(SmallVecError::handle);
 
         let new_tail_start = self.tail_start + additional;
         unsafe {
