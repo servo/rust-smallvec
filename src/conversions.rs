@@ -1,6 +1,7 @@
 use {
     crate::{
         Allocator,
+        Box,
         SmallVec,
         Vec
     },
@@ -98,5 +99,17 @@ impl<T, const N: usize, const M: usize, A: Allocator> TryFrom<SmallVec<T, N, A>>
 impl<T, const N: usize> From<Vec<T>> for SmallVec<T, N> {
     fn from(array: Vec<T>) -> Self {
         Self::from_vec(array)
+    }
+}
+
+impl<T, const N: usize> From<SmallVec<T, N>> for Vec<T> {
+    fn from(this: SmallVec<T, N>) -> Self {
+        this.into_vec()
+    }
+}
+
+impl<T, const N: usize> From<SmallVec<T, N>> for Box<[T]> {
+    fn from(this: SmallVec<T, N>) -> Self {
+        this.into_boxed_slice()
     }
 }
