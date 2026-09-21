@@ -9,7 +9,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization, trusted_len))]
-#![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
 #![cfg_attr(not(feature = "allocator-api2"), feature(allocator_api))]
 
 extern crate alloc;
@@ -1719,31 +1718,6 @@ impl<A: Allocator> Drop for DropDealloc<'_, A> {
     }
 }
 
-#[cfg(feature = "may_dangle")]
-unsafe impl<#[may_dangle] T, const N: usize, A: Allocator> Drop for SmallVec<T, N, A> {
-    fn drop(&mut self) {
-        let (len, on_heap) = self.len.parts();
-        let ptr = unsafe { self.raw.as_mut_ptr(on_heap) };
-        // SAFETY: we first drop the elements, then `_drop_dealloc` is dropped,
-        // releasing memory we used to own
-        unsafe {
-            let _drop_dealloc = if on_heap {
-                let capacity = self.raw.inner.heap.1;
-                Some(DropDealloc {
-                    ptr: NonNull::new_unchecked(ptr as *mut u8),
-                    size_bytes: capacity * size_of::<T>(),
-                    align: align_of::<T>(),
-                    alloc: &self.raw.alloc
-                })
-            } else {
-                None
-            };
-            core::ptr::slice_from_raw_parts_mut(ptr, len).drop_in_place();
-        }
-    }
-}
-
-#[cfg(not(feature = "may_dangle"))]
 impl<T, const N: usize, A: Allocator> Drop for SmallVec<T, N, A> {
     fn drop(&mut self) {
         let (len, on_heap) = self.len.parts();
