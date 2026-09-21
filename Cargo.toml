@@ -21,7 +21,6 @@ strip = true
 [features]
 default = ["allocator-api2"]
 internals = []
-may_dangle = []
 rayon = ["std", "dep:rayon"]
 serde = ["dep:serde_core"]
 specialization = []
