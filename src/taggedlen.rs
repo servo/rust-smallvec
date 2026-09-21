@@ -72,9 +72,9 @@ impl<T> TaggedLen<T> {
                     if value > Self::MAX_LEN {
                         assert_failed()
                     }
-                },
+                }
                 None => assert_failed()
-            }  
+            }
         }
         self.0 += n << Self::SHIFT;
     }
