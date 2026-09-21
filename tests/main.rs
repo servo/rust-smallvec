@@ -1,3 +1,13 @@
+#[cfg(feature = "allocator-api2")]
+use allocator_api2::{
+    boxed::Box,
+    vec::Vec
+};
+#[cfg(not(feature = "allocator-api2"))]
+use std::{
+    boxed::Box,
+    vec::Vec
+};
 use {
     core::{
         borrow::{
@@ -17,16 +27,6 @@ use {
         hash::DefaultHasher,
         rc::Rc
     }
-};
-#[cfg(feature = "allocator-api2")]
-use allocator_api2::{
-    vec::Vec,
-    boxed::Box
-};
-#[cfg(not(feature = "allocator-api2"))]
-use std::{
-    vec::Vec,
-    boxed::Box
 };
 
 #[test]
