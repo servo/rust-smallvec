@@ -54,9 +54,9 @@ where T: Deserialize<'de>
     fn visit_seq<B>(self, mut seq: B) -> Result<Self::Value, B::Error>
     where B: SeqAccess<'de> {
         use serde_core::de::Error;
-        let len = seq.size_hint().unwrap_or(0);
+        let length = seq.size_hint().unwrap_or(0);
         let mut values = SmallVec::new();
-        values.try_reserve(len).map_err(B::Error::custom)?;
+        values.try_reserve(length).map_err(B::Error::custom)?;
 
         while let Some(value) = seq.next_element()? {
             values.push(value);

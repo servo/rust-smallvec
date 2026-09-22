@@ -106,13 +106,13 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     /// the allocator must be the same one the data was allocated with
     pub unsafe fn try_grow_raw<A: Allocator>(
         &mut self,
-        len: TaggedLen<T>,
+        length: TaggedLen<T>,
         new_capacity: usize,
         allocator: &A
     ) -> Result<(), SmallVecError> {
-        let (len, was_on_heap) = len.parts();
+        let (length, was_on_heap) = length.parts();
         debug_assert!(!Self::IS_ZST);
-        debug_assert!(new_capacity > 0 && new_capacity >= len);
+        debug_assert!(new_capacity > 0 && new_capacity >= length);
 
         // SAFETY: the tag tells which member is active
         let ptr = unsafe { self.as_mut_ptr(was_on_heap) };
@@ -130,7 +130,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
                 .allocate(new_layout)
                 .map_err(|_| SmallVecError::AllocationError(new_layout))?
                 .cast();
-            unsafe { copy_nonoverlapping(ptr, new_ptr.as_ptr(), len) };
+            unsafe { copy_nonoverlapping(ptr, new_ptr.as_ptr(), length) };
             new_ptr
         } else {
             // use grow
