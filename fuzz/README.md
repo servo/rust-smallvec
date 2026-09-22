@@ -1,12 +1,47 @@
-# Fuzzer for smallvec
+# SmallVec Differential Fuzzer
 
-Based on fuzzing in [rust-bitcoin](https://github.com/rust-bitcoin/rust-bitcoin/tree/c8ac25219a09bf9d017f1b05abe3e746e2136f73/fuzz)
+Differential fuzzer comparing `smallvec::SmallVec` invariants and operations directly against `std::vec::Vec`.
 
-## Running manually with afl
+It tests structural equivalence across multiple inline capacity configurations (`N = 0, 1, 2, 7, 8`) to stress inline-to-heap spilling boundaries, buffer alignment and iterator drop mechanics.
 
+## Quick start
+
+This fuzzer uses `libFuzzer` via `cargo-fuzz`.
+
+### Prerequisites
+
+Install `cargo-fuzz` (requires a nightly Rust toolchain):
+
+```sh
+cargo +nightly install cargo-fuzz
 ```
-cargo afl build --release --bin smallvec_ops --features afl   && cargo afl fuzz -i in -o out target/release/smallvec_ops
+
+### Running the fuzzer
+
+Run the target with standard `libFuzzer` options:
+
+```sh
+cargo +nightly fuzz run smallvec_ops
 ```
 
-# Useful links:
-* https://rust-fuzz.github.io/book/afl.html
+### Reproducing a Ccash
+
+If the fuzzer finds an invariant mismatch or panic, reproduce it against a saved crash artifact:
+
+```sh
+cargo +nightly fuzz run smallvec_ops artifacts/smallvec_ops/crash-<hash>
+```
+
+### Generating Coverage Reports
+
+Generating coverage requires the `llvm-tools-preview` component:
+
+```sh
+cargo +nightly rustup component add llvm-tools-preview
+```
+
+Then run coverage against the target:
+
+```sh
+cargo +nightly fuzz coverage smallvec_ops
+```

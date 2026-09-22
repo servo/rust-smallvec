@@ -1,237 +1,336 @@
 //! Simple fuzzer testing all available `SmallVec` operations
-use smallvec::SmallVec;
 
-// There's no point growing too much, so try not to grow
-// over this size.
-const CAP_GROWTH: usize = 256;
+#![no_main]
 
-macro_rules! next_usize {
-    ($b:ident) => {
-        $b.next().unwrap_or(0) as usize
-    };
-}
+use {
+    arbitrary::Arbitrary,
+    libfuzzer_sys::fuzz_target,
+    smallvec::SmallVec,
+    std::fmt::Debug
+};
 
-macro_rules! next_u8 {
-    ($b:ident) => {
-        $b.next().unwrap_or(0)
-    };
-}
+/// A generic wrapper that bounds data generated via `arbitrary`.
+/// Default cap is 255.
+#[derive(Debug, Clone)]
+pub struct Bounded<T, const CAP: usize = 255>(pub T);
 
-fn black_box_iter(i: impl Iterator<Item = u8>) {
-    // print to work as a black_box
-    print!("{}", i.fold(0u8, |acc, e| acc.wrapping_add(e)));
-}
-
-fn black_box_slice(s: &[u8]) {
-    black_box_iter(s.iter().copied())
-}
-
-fn black_box_mut_slice(s: &mut [u8]) {
-    s.iter_mut().map(|e| *e = e.wrapping_add(1)).count();
-    black_box_iter((s as &[u8]).iter().copied())
-}
-
-fn do_test<const N: usize>(data: &[u8]) -> SmallVec<u8, N> {
-    let mut v = SmallVec::<u8, N>::new();
-
-    let mut bytes = data.iter().copied();
-
-    while let Some(op) = bytes.next() {
-        match op % 27 {
-            0 => {
-                v = SmallVec::new();
-            }
-            1 => {
-                v = SmallVec::with_capacity(next_usize!(bytes));
-            }
-            2 => {
-                v = SmallVec::from_vec(v.to_vec());
-            }
-            3 => {
-                black_box_iter(v.drain(..));
-            }
-            4 => {
-                if v.len() < CAP_GROWTH {
-                    v.push(next_u8!(bytes))
-                }
-            }
-            5 => {
-                v.pop();
-            }
-            6 => v.grow(next_usize!(bytes) + v.len()),
-            7 => {
-                if v.len() < CAP_GROWTH {
-                    v.reserve(next_usize!(bytes))
-                }
-            }
-            8 => {
-                if v.len() < CAP_GROWTH {
-                    v.reserve_exact(next_usize!(bytes))
-                }
-            }
-            9 => v.shrink_to_fit(),
-            10 => v.truncate(next_usize!(bytes)),
-            11 => black_box_slice(v.as_slice()),
-            12 => black_box_mut_slice(v.as_mut_slice()),
-            13 => {
-                if !v.is_empty() {
-                    v.swap_remove(next_usize!(bytes) % v.len());
-                }
-            }
-            14 => {
-                v.clear();
-            }
-            15 => {
-                if !v.is_empty() {
-                    v.remove(next_usize!(bytes) % v.len());
-                }
-            }
-            16 => {
-                let insert_pos = next_usize!(bytes) % (v.len() + 1);
-                v.insert(insert_pos, next_u8!(bytes));
-            }
-            17 => {
-                let insert_pos = next_usize!(bytes) % (v.len() + 1);
-                let how_many = next_usize!(bytes);
-                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    v.splice(insert_pos..insert_pos, (0..how_many).map(|_| bytes.next().unwrap()));
-                }));
-
-                if result.is_err() {
-                    assert!(bytes.next().is_none());
-                }
-            }
-            18 => {
-                v = SmallVec::from_vec(v.into_vec());
-            }
-
-            19 => {
-                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    v.retain_mut(|e| {
-                        let alt_e = bytes.next().unwrap();
-                        let retain = *e >= alt_e;
-                        *e = e.wrapping_add(alt_e);
-                        retain
-                    });
-                }));
-
-                if result.is_err() {
-                    assert!(bytes.next().is_none());
-                }
-            }
-            20 => {
-                v.dedup();
-            }
-
-            21 => {
-                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    v.dedup_by(|a, b| {
-                        let substitute = bytes.next().unwrap();
-                        let dedup = a == b;
-                        *a = a.wrapping_add(substitute);
-                        *b = b.wrapping_add(substitute);
-                        dedup
-                    });
-                }));
-
-                if result.is_err() {
-                    assert!(bytes.next().is_none());
-                }
-            }
-            22 => {
-                v = SmallVec::from(data);
-            }
-
-            23 => {
-                if v.len() < CAP_GROWTH {
-                    v.extend_from_slice(data)
-                }
-            }
-
-            24 => {
-                let a = next_usize!(bytes) % (v.len() + 1);
-                let b = next_usize!(bytes) % (v.len() + 1);
-                let (start, end) = (a.min(b), a.max(b));
-                v.extend_from_within(start..end);
-            }
-
-            25 => {
-                if v.len() < CAP_GROWTH {
-                    v.resize(next_usize!(bytes), next_u8!(bytes));
-                }
-            }
-            26 => {
-                v = smallvec::from_elem(next_u8!(bytes), next_usize!(bytes));
-            }
-            _ => panic!("booo"),
-        }
-    }
-    v
-}
-
-fn do_test_all(data: &[u8]) {
-    do_test::<0>(data);
-    do_test::<1>(data);
-    do_test::<2>(data);
-    do_test::<7>(data);
-    do_test::<8>(data);
-}
-
-#[cfg(feature = "afl")]
-fn main() {
-    afl::fuzz!(|data| {
-        // Remove the panic hook so we can actually catch panic
-        // See https://github.com/rust-fuzz/afl.rs/issues/150
-        std::panic::set_hook(Box::new(|_| {}));
-        do_test_all(data);
-    });
-}
-
-#[cfg(feature = "honggfuzz")]
-fn main() {
-    loop {
-        honggfuzz::fuzz!(|data| {
-            // Remove the panic hook so we can actually catch panic
-            // See https://github.com/rust-fuzz/afl.rs/issues/150
-            std::panic::set_hook(Box::new(|_| {}));
-            do_test_all(data);
-        });
+// Bounded `usize` between `0..=CAP`
+impl<'a, const CAP: usize> Arbitrary<'a> for Bounded<usize, CAP> {
+    #[inline]
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Ok(Bounded(u.int_in_range(0..=CAP)?))
     }
 }
 
-#[cfg(test)]
-mod tests {
-    fn extend_vec_from_hex(hex: &str, out: &mut Vec<u8>) {
-        let mut b = 0;
-        for (idx, c) in hex.as_bytes().iter().enumerate() {
-            b <<= 4;
-            match *c {
-                b'A'..=b'F' => b |= c - b'A' + 10,
-                b'a'..=b'f' => b |= c - b'a' + 10,
-                b'0'..=b'9' => b |= c - b'0',
-                b'\n' => {}
-                b' ' => {}
-                _ => panic!("Bad hex"),
-            }
-            if (idx & 1) == 1 {
-                out.push(b);
-                b = 0;
-            }
-        }
+// Bounded `Vec<T>` whose length is between `0..=CAP`
+impl<'a, T, const CAP: usize> Arbitrary<'a> for Bounded<Vec<T>, CAP>
+where T: Arbitrary<'a>
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let len = u.int_in_range(0..=CAP)?;
+        let vec = u
+            .arbitrary_iter()?
+            .take(len)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Bounded(vec))
     }
+}
 
-    #[test]
-    fn duplicate_crash() {
-        let mut a = Vec::new();
-        // paste the output of `xxd -p <crash_dump>` here and run `cargo test`
-        extend_vec_from_hex(
-            r#"
-            646e21f9f910f90200f9d9f9c7030000def9000010646e2af9f910f90264
-            6e21f9f910f90200f9d9f9c7030000def90000106400f9f9d9f9c7030000
-            def90000106400f9d9f9e7f1000000d9f9e7f1000000f9
-            "#,
-            &mut a,
+#[inline]
+fn choose_range(
+    u: &mut arbitrary::Unstructured,
+    len: usize
+) -> arbitrary::Result<std::ops::Range<usize>> {
+    let start = u.int_in_range(0..=len)?;
+    let end = u.int_in_range(start..=len)?;
+    Ok(start..end)
+}
+
+#[derive(Arbitrary, Debug)]
+enum Op {
+    New,
+    WithCapacity(Bounded<usize>),
+    FromVec,
+    FromSlice(Bounded<Vec<usize>>),
+    Push(usize),
+    Pop,
+    Grow(Bounded<usize>),
+    Reserve(Bounded<usize>),
+    ReserveExact(Bounded<usize>),
+    ShrinkToFit,
+    Truncate,
+    SwapRemove,
+    Clear,
+    Remove,
+    Insert { val: usize },
+    Drain,
+    Splice { items: Bounded<Vec<usize>> },
+    RetainEven,
+    Dedup,
+    ExtendFromSlice(Bounded<Vec<usize>>),
+    ExtendFromWithin,
+    Resize { new_len: Bounded<usize>, val: usize }
+}
+
+/// Helper to assert equivalence of all structural invariants of `SmallVec`
+/// against `alloc::Vec`
+fn assert_invariants<T: Copy + PartialEq + Debug, const N: usize>(
+    small_vec: &mut SmallVec<T, N>,
+    std_vec: &mut Vec<T>
+) {
+    // Length and content equivalence
+    assert_eq!(small_vec.len(), std_vec.len(), "`len()` mismatch");
+    assert_eq!(
+        small_vec.is_empty(),
+        std_vec.is_empty(),
+        "`is_empty()` mismatch"
+    );
+    assert_eq!(
+        small_vec.as_slice(),
+        std_vec.as_slice(),
+        "`as_slice()` mismatch"
+    );
+    assert_eq!(
+        small_vec.as_mut_slice(),
+        std_vec.as_mut_slice(),
+        "`as_mut_slice()` mismatch"
+    );
+
+    // Capacity & spilling invariants
+    assert!(
+        small_vec.capacity() >= small_vec.len(),
+        "`capacity()` is smaller than `len()`"
+    );
+    assert!(
+        small_vec.capacity() >= N,
+        "`capacity()` is smaller than inline size `N`"
+    );
+    assert_eq!(
+        small_vec.spilled(),
+        small_vec.capacity() > N,
+        "`spilled()` doesn't equal to `capacity() > N`"
+    );
+
+    // Indexing and bounds invariants
+    for i in 0..small_vec.len() {
+        assert_eq!(
+            small_vec[i], std_vec[i],
+            "`small_vec[{i}]` doesn't match `std_vec[{i}]`"
         );
-        super::do_test_all(&a);
+        assert_eq!(
+            small_vec.get(i),
+            std_vec.get(i),
+            "`small_vec.get({i})` doesn't match `std_vec.get({i})`"
+        );
     }
+    assert_eq!(
+        small_vec.get(small_vec.len()),
+        None,
+        "out-of-bounds `get()` did not return `None`"
+    );
+
+    // Iterator invariants
+    assert!(
+        small_vec.iter().eq(std_vec.iter()),
+        "iterator yield mismatch"
+    );
+    assert!(
+        small_vec.iter().rev().eq(std_vec.iter().rev()),
+        "reverse iterator yield mismatch"
+    );
+    assert!(
+        small_vec
+            .clone()
+            .into_iter()
+            .eq(std_vec.clone().into_iter()),
+        "`into_iter()` yield mismatch"
+    );
+    assert_eq!(
+        small_vec.iter().size_hint(),
+        std_vec.iter().size_hint(),
+        "`size_hint()` mismatch"
+    );
+    assert_eq!(
+        small_vec.iter().len(),
+        std_vec.iter().len(),
+        "`ExactSizeIterator::len()` mismatch"
+    );
+
+    // Clone invariant
+    assert_eq!(small_vec.clone(), *std_vec, "clone mismatch");
 }
+
+fn test_with_inline_cap<const N: usize>(
+    u: &mut arbitrary::Unstructured,
+    ops: &[Op]
+) -> arbitrary::Result<()> {
+    // We let `T` be `usize` instead of `u8` because, albeit less efficient,
+    // this incurs potential memory misalignment which should be properly
+    // handled by the library.
+
+    let mut small_vec = SmallVec::<usize, N>::new();
+    let mut std_vec = Vec::<usize>::new();
+
+    for op in ops {
+        match op {
+            Op::New => {
+                small_vec = SmallVec::new();
+                std_vec = Vec::new();
+            }
+            Op::WithCapacity(cap) => {
+                small_vec = SmallVec::with_capacity(cap.0);
+                std_vec = Vec::with_capacity(cap.0);
+            }
+            Op::FromVec => {
+                small_vec = SmallVec::from_vec(small_vec.into_vec());
+                // No-op on `Vec`
+            }
+            Op::FromSlice(data) => {
+                small_vec = SmallVec::from(data.0.as_slice());
+                std_vec = data.0.clone();
+            }
+            Op::Push(val) => {
+                small_vec.push(*val);
+                std_vec.push(*val);
+            }
+            Op::Pop => {
+                assert_eq!(small_vec.pop(), std_vec.pop(), "`pop()` mismatch");
+            }
+            Op::Grow(target) => {
+                small_vec.grow(target.0);
+                // Mimic `SmallVec::grow` on `Vec`
+                if target.0 > std_vec.capacity() {
+                    let additional = target.0 - std_vec.len();
+                    std_vec.reserve(additional);
+                }
+            }
+            Op::Reserve(amount) => {
+                small_vec.reserve(amount.0);
+                std_vec.reserve(amount.0);
+            }
+            Op::ReserveExact(amount) => {
+                small_vec.reserve_exact(amount.0);
+                std_vec.reserve_exact(amount.0);
+            }
+            Op::ShrinkToFit => {
+                small_vec.shrink_to_fit();
+                std_vec.shrink_to_fit();
+            }
+            Op::Truncate => {
+                let len = u.int_in_range(0..=small_vec.len())?;
+                small_vec.truncate(len);
+                std_vec.truncate(len);
+            }
+            Op::SwapRemove => {
+                if !small_vec.is_empty() {
+                    let idx = u.choose_index(small_vec.len())?;
+                    assert_eq!(
+                        small_vec.swap_remove(idx),
+                        std_vec.swap_remove(idx),
+                        "`swap_remove()` mismatch"
+                    );
+                }
+            }
+            Op::Clear => {
+                small_vec.clear();
+                std_vec.clear();
+            }
+            Op::Remove => {
+                if !small_vec.is_empty() {
+                    let idx = u.choose_index(small_vec.len())?;
+                    assert_eq!(
+                        small_vec.remove(idx),
+                        std_vec.remove(idx),
+                        "`remove()` mismatch"
+                    );
+                }
+            }
+            Op::Insert {
+                val
+            } => {
+                let idx = u.int_in_range(0..=small_vec.len())?;
+                small_vec.insert(idx, *val);
+                std_vec.insert(idx, *val);
+            }
+            Op::Drain => {
+                let len = small_vec.len();
+                let range = choose_range(u, len)?;
+
+                let small_vec_drained = small_vec.drain(range.clone());
+                let std_vec_drained = std_vec.drain(range);
+
+                assert!(
+                    small_vec_drained.eq(std_vec_drained),
+                    "`drain()` yield mismatch"
+                );
+            }
+            Op::Splice {
+                items
+            } => {
+                let len = small_vec.len();
+                let range = choose_range(u, len)?;
+
+                let small_vec_spliced = small_vec.splice(range.clone(), items.0.clone());
+                let std_vec_spliced = std_vec.splice(range, items.0.clone());
+
+                assert!(
+                    small_vec_spliced.eq(std_vec_spliced),
+                    "`splice()` yield mismatch"
+                );
+            }
+            Op::RetainEven => {
+                small_vec.retain(|e| e % 2 == 0);
+                std_vec.retain(|e| e % 2 == 0);
+            }
+            Op::Dedup => {
+                small_vec.dedup();
+                std_vec.dedup();
+            }
+            Op::ExtendFromSlice(items) => {
+                small_vec.extend_from_slice(&items.0);
+                std_vec.extend_from_slice(&items.0);
+            }
+            Op::ExtendFromWithin => {
+                let len = small_vec.len();
+                let range = choose_range(u, len)?;
+
+                small_vec.extend_from_within(range.clone());
+                std_vec.extend_from_within(range);
+            }
+            Op::Resize {
+                new_len,
+                val
+            } => {
+                small_vec.resize(new_len.0, *val);
+                std_vec.resize(new_len.0, *val);
+            }
+        }
+
+        assert_invariants(&mut small_vec, &mut std_vec);
+    }
+
+    Ok(())
+}
+
+fn run_test(mut u: arbitrary::Unstructured) -> arbitrary::Result<()> {
+    let ops = Vec::<Op>::arbitrary(&mut u)?;
+    let dynamic_entropy = u.take_rest();
+
+    let run_test = |test_func: fn(&mut arbitrary::Unstructured, &[Op]) -> arbitrary::Result<()>| {
+        test_func(&mut arbitrary::Unstructured::new(dynamic_entropy), &ops)
+    };
+
+    run_test(test_with_inline_cap::<0>)?;
+    run_test(test_with_inline_cap::<1>)?;
+    run_test(test_with_inline_cap::<2>)?;
+    run_test(test_with_inline_cap::<7>)?;
+    run_test(test_with_inline_cap::<8>)?;
+
+    Ok(())
+}
+
+fuzz_target!(|data: &[u8]| {
+    let u = arbitrary::Unstructured::new(data);
+
+    let _ = run_test(u);
+});

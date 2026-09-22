@@ -20,13 +20,12 @@ jobs:
         include:
           - name: stable
             toolchain: stable
-            fuzz: true
           - name: beta
             toolchain: beta
-            fuzz: true
           - name: nightly
             toolchain: nightly
             nightly: true
+            fuzz: true
           - name: MSRV
             toolchain: "1.86.0"
           - name: no_std
@@ -35,10 +34,6 @@ jobs:
             no_std: true
     steps:
       - uses: actions/checkout@v7
-
-      - name: Install packages for fuzzing
-        if: matrix.fuzz
-        run: sudo apt-get update -y && sudo apt-get install -y binutils-dev libunwind8-dev libcurl4-openssl-dev libelf-dev libdw-dev cmake gcc libiberty-dev
 
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@master
@@ -85,10 +80,9 @@ jobs:
         if: matrix.nightly
         run: rustup component add miri && cargo miri test --verbose --all-features
 
-      - name: fuzz
+      - name: Run Fuzzer
         if: matrix.fuzz
-        working-directory: fuzz
-        run: ./travis-fuzz.sh
+        run: cargo install cargo-fuzz && cargo fuzz run smallvec_ops -- -max_total_time=60
 
   build_result:
     name: homu build finished
