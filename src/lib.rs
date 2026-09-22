@@ -930,16 +930,8 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
 
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
-        // can't overflow since len <= capacity
-        if additional > self.capacity() - self.len() {
-            let new_capacity = self
-                .len()
-                .checked_add(additional)
-                .and_then(usize::checked_next_power_of_two)
-                .ok_or(SmallVecError::CapacityOverflow)
-                .unwrap_or_else(SmallVecError::handle);
-            self.grow(new_capacity);
-        }
+        self.try_reserve(additional)
+            .unwrap_or_else(SmallVecError::handle);
     }
 
     #[inline]
@@ -958,15 +950,8 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
 
     #[inline]
     pub fn reserve_exact(&mut self, additional: usize) {
-        // can't overflow since len <= capacity
-        if additional > self.capacity() - self.len() {
-            let new_capacity = self
-                .len()
-                .checked_add(additional)
-                .ok_or(SmallVecError::CapacityOverflow)
-                .unwrap_or_else(SmallVecError::handle);
-            self.grow(new_capacity);
-        }
+        self.try_reserve_exact(additional)
+            .unwrap_or_else(SmallVecError::handle);
     }
 
     #[inline]
