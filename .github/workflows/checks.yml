@@ -32,7 +32,9 @@ jobs:
       - name: install
         uses: dtolnay/rust-toolchain@nightly
       - name: default features
-        run: cargo miri test
+        run: |
+          rustup component add miri
+          cargo miri test
       - name: all features
         run: cargo miri test --all-features
   stable:
