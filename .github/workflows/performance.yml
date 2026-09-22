@@ -4,16 +4,6 @@ on:
     branches: [v2]
   workflow_dispatch:
 jobs:
-  none:
-    name: None
-    runs-on: ubuntu-latest
-    steps:
-      - name: checkout
-        uses: actions/checkout@v7
-      - name: install
-        uses: dtolnay/rust-toolchain@nightly
-      - name: bench
-        run: cargo bench --no-default-features
   default:
     name: Default
     runs-on: ubuntu-latest

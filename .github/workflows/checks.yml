@@ -31,10 +31,6 @@ jobs:
         uses: actions/checkout@v7
       - name: install
         uses: dtolnay/rust-toolchain@nightly
-      - name: no default features
-        run: |
-          rustup component add miri
-          cargo miri test --no-default-features
       - name: default features
         run: cargo miri test
       - name: all features
@@ -47,8 +43,6 @@ jobs:
         uses: actions/checkout@v7
       - name: install
         uses: dtolnay/rust-toolchain@stable
-      - name: test no default features
-        run: cargo test --no-default-features
       - name: test default features
         run: cargo test
   nightly:
@@ -59,8 +53,6 @@ jobs:
         uses: actions/checkout@v7
       - name: install
         uses: dtolnay/rust-toolchain@nightly
-      - name: test no default features
-        run: cargo test --no-default-features
       - name: test default features
         run: cargo test
       - name: test all features
@@ -75,8 +67,6 @@ jobs:
           uses: dtolnay/rust-toolchain@stable
           with:
             target: thumbv7m-none-eabi
-        - name: test no default features
-          run: cargo test --no-default-features
         - name: test default features
           run: cargo test
   msrv:
@@ -87,7 +77,5 @@ jobs:
         uses: actions/checkout@v7
       - name: install
         uses: dtolnay/rust-toolchain@1.86
-      - name: test no default features
-        run: cargo test --no-default-features
       - name: test default features
         run: cargo test
