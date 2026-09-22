@@ -45,8 +45,7 @@ fn do_test<const N: usize>(data: &[u8]) -> SmallVec<u8, N> {
                 v = SmallVec::with_capacity(next_usize!(bytes));
             }
             2 => {
-                //v = SmallVec::from_vec(v.to_vec());
-                v = v
+                v = SmallVec::from_vec(v.to_vec());
             }
             3 => {
                 black_box_iter(v.drain(..));
