@@ -16,8 +16,8 @@ libfuzzer-sys = "0.4"
 path = ".."
 
 [[bin]]
-name = "smallvec_ops"
-path = "fuzz_targets/smallvec_ops.rs"
+name = "main"
+path = "fuzz_targets/main.rs"
 test = false
 doc = false
 bench = false
