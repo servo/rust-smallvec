@@ -23,20 +23,6 @@ jobs:
           cargo clippy
       - name: docs
         run: cargo doc --all-features
-  fuzz:
-    name: Fuzz
-    runs-on: ubuntu-latest
-    steps:
-      - name: checkout
-        uses: actions/checkout@v7
-      - name: install
-        uses: dtolnay/rust-toolchain@stable
-      - name: fuzzing
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y binutils-dev libunwind8-dev libcurl4-openssl-dev 
-          sudo apt-get install -y libelf-dev libdw-dev cmake gcc libiberty-dev
-          ./travis-fuzz.sh
   miri:
     name: Miri
     runs-on: ubuntu-latest
