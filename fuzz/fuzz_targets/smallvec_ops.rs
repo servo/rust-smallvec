@@ -62,9 +62,9 @@ enum Op {
     SwapRemove,
     Clear,
     Remove,
-    Insert { val: usize },
+    Insert(usize),
     Drain,
-    Splice { items: Bounded<Vec<usize>> },
+    Splice(Bounded<Vec<usize>>),
     RetainEven,
     Dedup,
     ExtendFromSlice(Bounded<Vec<usize>>),
@@ -245,9 +245,7 @@ fn test_with_inline_cap<const N: usize>(
                     );
                 }
             }
-            Op::Insert {
-                val
-            } => {
+            Op::Insert(val) => {
                 let idx = u.int_in_range(0..=small_vec.len())?;
                 small_vec.insert(idx, *val);
                 std_vec.insert(idx, *val);
@@ -264,9 +262,7 @@ fn test_with_inline_cap<const N: usize>(
                     "`drain()` yield mismatch"
                 );
             }
-            Op::Splice {
-                items
-            } => {
+            Op::Splice(items) => {
                 let len = small_vec.len();
                 let range = choose_range(u, len)?;
 

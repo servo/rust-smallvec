@@ -1,6 +1,6 @@
 [package]
 name = "smallvec-fuzz"
-version = "0.1.0"
+version = "0.0.0"
 authors = ["The Servo Project Developers"]
 publish = false
 edition = "2024"
@@ -9,7 +9,7 @@ edition = "2024"
 cargo-fuzz = true
 
 [dependencies]
-arbitrary = { version = "1.4.2", features = ["derive"] }
+arbitrary = { version = "1.4", features = ["derive"] }
 libfuzzer-sys = "0.4"
 
 [dependencies.smallvec]
