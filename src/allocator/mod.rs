@@ -1,31 +1,40 @@
 #[cfg(not(feature = "allocator-api"))]
 mod base;
-#[cfg(feature = "allocator-api2")]
-mod external;
 #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
 mod native;
+#[cfg(feature = "allocator-api2")]
+mod external;
 
-#[cfg(not(feature = "allocator-api"))]
-pub use base::{
-    Box,
-    Global,
-    Vec
-};
 use core::{
     alloc::Layout,
     ptr::NonNull
 };
-#[cfg(feature = "allocator-api2")]
-pub use external::{
-    Box,
-    Global,
-    Vec
+
+#[cfg(not(feature = "allocator-api"))]
+#[rustfmt::skip]
+pub use {
+    alloc::{
+        boxed::Box,
+        vec::Vec,
+        vec
+    },
+    base::Global
 };
 #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
-pub use native::{
-    Box,
-    Global,
-    Vec
+#[rustfmt::skip]
+pub use alloc::{
+    alloc::Global,
+    boxed::Box,
+    vec::Vec,
+    vec
+};
+#[cfg(feature = "allocator-api2")]
+#[rustfmt::skip]
+pub use allocator_api2::{
+    alloc::Global,
+    boxed::Box,
+    vec::Vec,
+    vec
 };
 
 pub trait Allocator {

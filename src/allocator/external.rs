@@ -1,8 +1,3 @@
-pub use allocator_api2::{
-    alloc::Global,
-    boxed::Box,
-    vec::Vec
-};
 use {
     super::Allocator,
     allocator_api2::alloc::Allocator as External,

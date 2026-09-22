@@ -1,7 +1,3 @@
-pub use alloc::{
-    boxed::Box,
-    vec::Vec
-};
 use {
     super::Allocator,
     alloc::alloc::{

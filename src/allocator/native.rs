@@ -1,8 +1,3 @@
-pub use alloc::{
-    alloc::Global,
-    boxed::Box,
-    vec::Vec
-};
 use {
     super::Allocator,
     alloc::alloc::Allocator as Native,
