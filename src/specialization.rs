@@ -86,20 +86,20 @@ where I: core::iter::TrustedLen<Item = T>
         // This ensures that the access operations inside the loop always
         // operate on valid memory.
         unsafe {
-            let len = self.len();
-            let ptr = self.as_mut_ptr().add(len);
+            let length = self.len();
+            let ptr = self.as_mut_ptr().add(length);
             let mut guard = DropGuard {
                 ptr,
-                len: 0
+                length: 0
             };
 
             for x in iter {
-                ptr.add(guard.len).write(x);
-                guard.len += 1;
+                ptr.add(guard.length).write(x);
+                guard.length += 1;
             }
 
             // The elements have been initialized in the loop above.
-            self.set_len(len + guard.len);
+            self.set_len(length + guard.length);
             core::mem::forget(guard);
         }
     }
@@ -110,22 +110,22 @@ impl<T, const N: usize, const M: usize, A: Allocator> SpecExtend<T, IntoIter<T, 
 {
     fn spec_extend(&mut self, mut iter: IntoIter<T, M, A>) {
         let slice = iter.as_slice();
-        let len = slice.len();
+        let length = slice.len();
         let old_len = self.len();
 
-        self.reserve(len);
+        self.reserve(length);
 
         // SAFETY: Additional memory has been reserved above.
         // Therefore, the copy operates on valid memory.
         unsafe {
             let dst = self.as_mut_ptr().add(old_len);
             let src = slice.as_ptr();
-            copy_nonoverlapping(src, dst, len);
+            copy_nonoverlapping(src, dst, length);
         }
 
         // SAFETY: The elements were initialized above.
         unsafe {
-            self.set_len(old_len + len);
+            self.set_len(old_len + length);
         }
 
         // Mark the iterator as fully consumed.
@@ -150,22 +150,22 @@ where T: Copy
 {
     fn spec_extend(&mut self, iter: core::slice::Iter<'a, T>) {
         let slice = iter.as_slice();
-        let len = slice.len();
+        let length = slice.len();
         let old_len = self.len();
 
-        self.reserve(len);
+        self.reserve(length);
 
         // SAFETY: Additional memory has been reserved above.
         // Therefore, the copy operates on valid memory.
         unsafe {
             let dst = self.as_mut_ptr().add(old_len);
             let src = slice.as_ptr();
-            copy_nonoverlapping(src, dst, len);
+            copy_nonoverlapping(src, dst, length);
         }
 
         // SAFETY: The elements were initialized above.
         unsafe {
-            self.set_len(old_len + len);
+            self.set_len(old_len + length);
         }
     }
 }
@@ -200,7 +200,7 @@ impl<T: Copy, const N: usize, A: Allocator> SpecExtendFromWithin<T> for SmallVec
         let old_len = self.len();
 
         let start = src.start;
-        let len = src.len();
+        let length = src.len();
 
         // SAFETY: The caller ensures that the vector has spare capacity
         // for at least `src.len()` elements. This is also the amount of
@@ -209,12 +209,12 @@ impl<T: Copy, const N: usize, A: Allocator> SpecExtendFromWithin<T> for SmallVec
             let ptr = self.as_mut_ptr();
             let dst = ptr.add(old_len);
             let src = ptr.add(start);
-            copy_nonoverlapping(src, dst, len);
+            copy_nonoverlapping(src, dst, length);
         }
 
         // SAFETY: The elements were initialized above.
         unsafe {
-            self.set_len(old_len + len);
+            self.set_len(old_len + length);
         }
     }
 }
@@ -298,18 +298,18 @@ impl<T: Copy, const N: usize> SpecFromSlice<T> for SmallVec<T, N> {
         let mut v = Self::new();
 
         let src = slice.as_ptr();
-        let len = slice.len();
+        let length = slice.len();
         let dst = v.as_mut_ptr();
 
         // SAFETY: The caller ensures that the slice length is smaller
         // than or equal to the inline length.
         unsafe {
-            copy_nonoverlapping(src, dst, len);
+            copy_nonoverlapping(src, dst, length);
         }
 
         // SAFETY: The elements were initialized above.
         unsafe {
-            v.set_len(len);
+            v.set_len(length);
         }
 
         v

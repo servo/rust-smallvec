@@ -462,7 +462,7 @@ fn append() {
 }
 
 #[test]
-#[should_panic(expected = "new_capacity >= len")]
+#[should_panic(expected = "new_capacity >= length")]
 fn invalid_grow() {
     let mut v: SmallVec<u8, 8> = SmallVec::new();
     v.extend(0..8);
