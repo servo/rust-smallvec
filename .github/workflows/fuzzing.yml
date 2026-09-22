@@ -6,6 +6,7 @@ on:
 jobs:
   fuzz:
     name: Fuzz
+    if: github.repository == 'servo/rust-smallvec'
     runs-on: ubuntu-latest
     steps:
       - name: checkout
