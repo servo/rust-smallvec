@@ -1,9 +1,9 @@
 #[cfg(not(feature = "allocator-api"))]
 mod base;
-#[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
-mod native;
 #[cfg(feature = "allocator-api2")]
 mod external;
+#[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
+mod native;
 
 use core::{
     alloc::Layout,
@@ -20,17 +20,17 @@ pub use {
     },
     base::Global
 };
-#[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
+#[cfg(feature = "allocator-api2")]
 #[rustfmt::skip]
-pub use alloc::{
+pub use allocator_api2::{
     alloc::Global,
     boxed::Box,
     vec::Vec,
     vec
 };
-#[cfg(feature = "allocator-api2")]
+#[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
 #[rustfmt::skip]
-pub use allocator_api2::{
+pub use alloc::{
     alloc::Global,
     boxed::Box,
     vec::Vec,
