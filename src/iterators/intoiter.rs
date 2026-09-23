@@ -62,6 +62,11 @@ impl<T, const N: usize, A: Allocator> IntoIter<T, N, A> {
             core::slice::from_raw_parts_mut(ptr.add(self.begin), end - self.begin)
         }
     }
+
+    #[cfg(feature = "specialization")]
+    pub(crate) fn mark_consumed(&mut self) {
+        self.begin = self.end.len();
+    }
 }
 
 impl<T, const N: usize, A: Allocator> Iterator for IntoIter<T, N, A> {

@@ -129,7 +129,7 @@ impl<T, const N: usize, const M: usize, A: Allocator> SpecExtend<T, IntoIter<T, 
         }
 
         // Mark the iterator as fully consumed.
-        iter.begin = iter.end.len();
+        iter.mark_consumed();
     }
 }
 
