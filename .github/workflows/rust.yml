@@ -82,7 +82,7 @@ jobs:
 
       - name: Run Fuzzer
         if: matrix.fuzz
-        run: cargo install cargo-fuzz && cargo fuzz run smallvec_ops -- -max_total_time=60
+        run: cargo install cargo-fuzz && cargo fuzz run main -- -max_total_time=60
 
   build_result:
     name: homu build finished

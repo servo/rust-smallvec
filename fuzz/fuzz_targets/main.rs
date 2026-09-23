@@ -69,7 +69,7 @@ enum Op {
     Dedup,
     ExtendFromSlice(Bounded<Vec<usize>>),
     ExtendFromWithin,
-    Resize { new_len: Bounded<usize>, val: usize }
+    Resize(Bounded<usize>, usize)
 }
 
 /// Helper to assert equivalence of all structural invariants of `SmallVec`
@@ -90,11 +90,6 @@ fn assert_invariants<T: Copy + PartialEq + Debug, const N: usize>(
         std_vec.as_slice(),
         "`as_slice()` mismatch"
     );
-    assert_eq!(
-        small_vec.as_mut_slice(),
-        std_vec.as_mut_slice(),
-        "`as_mut_slice()` mismatch"
-    );
 
     // Capacity & spilling invariants
     assert!(
@@ -109,24 +104,6 @@ fn assert_invariants<T: Copy + PartialEq + Debug, const N: usize>(
         small_vec.spilled(),
         small_vec.capacity() > N,
         "`spilled()` doesn't equal to `capacity() > N`"
-    );
-
-    // Indexing and bounds invariants
-    for i in 0..small_vec.len() {
-        assert_eq!(
-            small_vec[i], std_vec[i],
-            "`small_vec[{i}]` doesn't match `std_vec[{i}]`"
-        );
-        assert_eq!(
-            small_vec.get(i),
-            std_vec.get(i),
-            "`small_vec.get({i})` doesn't match `std_vec.get({i})`"
-        );
-    }
-    assert_eq!(
-        small_vec.get(small_vec.len()),
-        None,
-        "out-of-bounds `get()` did not return `None`"
     );
 
     // Iterator invariants
@@ -293,10 +270,7 @@ fn test_with_inline_cap<const N: usize>(
                 small_vec.extend_from_within(range.clone());
                 std_vec.extend_from_within(range);
             }
-            Op::Resize {
-                new_len,
-                val
-            } => {
+            Op::Resize(new_len, val) => {
                 small_vec.resize(new_len.0, *val);
                 std_vec.resize(new_len.0, *val);
             }

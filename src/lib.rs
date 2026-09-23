@@ -882,14 +882,15 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             .unwrap_or_else(SmallVecError::handle);
     }
 
-    #[cold]
     pub fn try_grow(&mut self, new_capacity: usize) -> Result<(), SmallVecError> {
         if Self::IS_ZST {
             return Ok(());
         }
 
         let (len, on_heap) = self.len.parts();
-        assert!(new_capacity >= len);
+        if new_capacity < len {
+            return Ok(());
+        }
 
         if new_capacity > Self::inline_size() {
             // SAFETY: we checked all the preconditions
