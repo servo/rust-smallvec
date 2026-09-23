@@ -5,6 +5,18 @@ on:
     types: [checks_requested]
   workflow_dispatch:
 jobs:
+  benchmarks:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+      - name: install
+        uses: dtolnay/rust-toolchain@nightly
+      - name: default features
+        run: cargo bench --no-run
+      - name: all features
+        run: cargo bench --all-features --no-run
   practices:
     name: Practices
     runs-on: ubuntu-latest
