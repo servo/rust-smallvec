@@ -76,10 +76,10 @@ impl<T: Send, const N: usize> ParallelIterator for SmallVec<T, N> {
     type Item = T;
 
     fn drive_unindexed<C: UnindexedConsumer<T>>(mut self, consumer: C) -> C::Result {
-        let len = self.len();
+        let length = self.len();
 
         bridge_producer_consumer(
-            len,
+            length,
             DrainProducer(unsafe {
                 // SAFETY: set_len(0) is always valid
                 // All items will either be passed out or dropped by
@@ -89,7 +89,7 @@ impl<T: Send, const N: usize> ParallelIterator for SmallVec<T, N> {
 
                 // SAFETY: set_len didn't deallocate/drop the elements, so they
                 // are still valid.
-                slice::from_raw_parts_mut(self.as_mut_ptr(), len)
+                slice::from_raw_parts_mut(self.as_mut_ptr(), length)
             }),
             consumer
         )
