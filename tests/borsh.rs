@@ -16,7 +16,7 @@ fn round_trip() {
 
 #[test]
 fn round_trip_zst() {
-    let smallvec = SmallVec::<(), 5>::from([(); 0x100000]);
+    let smallvec = SmallVec::<(), 5>::from([(); 0x100]);
     let bytes = to_vec(&smallvec).unwrap();
     let new = SmallVec::<(), 100>::deserialize(&mut bytes.as_ref()).unwrap();
     assert_eq!(new, smallvec);

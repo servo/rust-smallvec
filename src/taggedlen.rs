@@ -60,19 +60,21 @@ impl<T> TaggedLen<T> {
     /// current length+n must be smaller than MAX_LEN on 64-bit target
     #[inline(always)]
     pub const unsafe fn add(&mut self, n: usize) {
-        #[cold]
-        #[inline(never)]
-        const fn assert_failed() {
-            panic!("smallvec length overflow")
-        }
         #[cfg(any(debug_assertions, not(target_pointer_width = "64")))]
-        match self.len().checked_add(n) {
-            Some(value) => {
-                if value > Self::MAX_LEN {
-                    assert_failed()
-                }
+        {
+            #[cold]
+            #[inline(never)]
+            const fn assert_failed() {
+                panic!("smallvec length overflow")
             }
-            None => assert_failed()
+            match self.len().checked_add(n) {
+                Some(value) => {
+                    if value > Self::MAX_LEN {
+                        assert_failed()
+                    }
+                }
+                None => assert_failed()
+            }
         }
         self.0 += n << Self::SHIFT;
     }
