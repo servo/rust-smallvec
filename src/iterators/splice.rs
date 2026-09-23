@@ -9,6 +9,15 @@ pub struct Splice<'a, I: Iterator + 'a, const N: usize> {
     replace_with: I
 }
 
+impl<'a, I: Iterator + 'a, const N: usize> Splice<'a, I, N> {
+    pub(crate) fn new(drain: Drain<'a, I::Item, N, Global>, replace_with: I) -> Self {
+        Self {
+            drain,
+            replace_with
+        }
+    }
+}
+
 impl<'a, I, const N: usize> core::fmt::Debug for Splice<'a, I, N>
 where
     I: core::fmt::Debug + Iterator + 'a,
@@ -87,18 +96,5 @@ impl<I: Iterator, const N: usize> Drop for Splice<'_, I, N> {
         }
         // Let `Drain::drop` move the tail back if necessary and restore
         // `vec.length`.
-    }
-}
-
-impl<T, const N: usize> SmallVec<T, N> {
-    pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter, N>
-    where
-        R: core::ops::RangeBounds<usize>,
-        I: IntoIterator<Item = T>
-    {
-        Splice {
-            drain: self.drain(range),
-            replace_with: replace_with.into_iter()
-        }
     }
 }

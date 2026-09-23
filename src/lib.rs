@@ -392,6 +392,14 @@ impl<T, const N: usize> SmallVec<T, N> {
         }
     }
 
+    pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter, N>
+    where
+        R: core::ops::RangeBounds<usize>,
+        I: IntoIterator<Item = T>
+    {
+        Splice::new(self.drain(range), replace_with.into_iter())
+    }
+
     /// Creates a `SmallVec` directly from the raw components of another
     /// `SmallVec`.
     ///
