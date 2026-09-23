@@ -9,10 +9,14 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization, trusted_len))]
-#![cfg_attr(not(feature = "allocator-api2"), feature(allocator_api))]
+#![cfg_attr(
+    all(feature = "allocator-api", not(feature = "allocator-api2")),
+    feature(allocator_api)
+)]
 
 extern crate alloc;
 
+mod allocator;
 #[cfg(feature = "borsh")]
 mod borsh;
 mod comparisons;
@@ -34,16 +38,6 @@ mod serde;
 mod specialization;
 mod taggedlen;
 
-#[cfg(not(feature = "allocator-api2"))]
-use alloc::alloc::{
-    Allocator,
-    Global
-};
-#[cfg(feature = "allocator-api2")]
-use allocator_api2::alloc::{
-    Allocator,
-    Global
-};
 #[cfg(feature = "bytes")]
 use bytes::{
     BufMut,
@@ -59,9 +53,12 @@ pub use errors::SmallVecError;
 #[cfg(feature = "std")]
 use std::io;
 use {
-    alloc::{
-        boxed::Box,
-        vec::Vec
+    allocator::{
+        Allocator,
+        Box,
+        Global,
+        Vec,
+        vec
     },
     core::{
         alloc::Layout,
@@ -1777,7 +1774,7 @@ impl<T, const N: usize, A: Allocator> Drop for IntoIter<T, N, A> {
 pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N> {
     if n > SmallVec::<T, N>::inline_size() {
         // Standard Rust vectors are already specialized.
-        SmallVec::from_vec(alloc::vec![elem; n])
+        SmallVec::from_vec(vec![elem; n])
     } else {
         #[cfg(feature = "specialization")]
         {
