@@ -2,10 +2,10 @@ use {
     iai_callgrind::{
         library_benchmark,
         library_benchmark_group,
-        main,
+        main
     },
     smallvec::SmallVec,
-    std::hint::black_box,
+    std::hint::black_box
 };
 
 const INLINE_CAP: usize = 16;
@@ -266,11 +266,10 @@ library_benchmark_group!(
 );
 
 main!(
-    library_benchmark_groups =
-        push_group,
-        pop_group,
-        insert_remove_group,
-        slice_group,
-        array_group,
-        iteration_group,
+    library_benchmark_groups = push_group,
+    pop_group,
+    insert_remove_group,
+    slice_group,
+    array_group,
+    iteration_group
 );
