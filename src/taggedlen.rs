@@ -55,6 +55,13 @@ impl<T> TaggedLen<T> {
         (self.0 >> Self::SHIFT, (self.0 & Self::TAG) != 0)
     }
 
+    #[inline(always)]
+    pub const fn set_location<const ON: bool>(&mut self) {
+        if Self::TAG != 0 {
+            self.0 = (self.0 & !Self::TAG) | ON as usize;
+        }
+    }
+
     /// # Safety
     ///
     /// current length+n must be smaller than MAX_LEN on 64-bit target
