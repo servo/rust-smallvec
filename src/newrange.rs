@@ -9,6 +9,7 @@ pub trait NewRange {
 }
 
 impl NewRange for Range<usize> {
+    #[inline]
     fn new(rangebounds: impl RangeBounds<usize>, length: usize) -> Self {
         #[cold]
         #[inline(never)]
