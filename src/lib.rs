@@ -593,26 +593,6 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
 impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     const IS_ZST: bool = size_of::<T>() == 0;
 
-    /// Sets the tag to be on the heap
-    ///
-    /// # Safety
-    ///
-    /// The active union member must be the self.raw.heap
-    #[inline]
-    unsafe fn set_on_heap(&mut self) {
-        self.len = TaggedLen::new(self.len(), true);
-    }
-
-    /// Sets the tag to be inline
-    ///
-    /// # Safety
-    ///
-    /// The active union member must be the self.raw.inline
-    #[inline]
-    unsafe fn set_inline(&mut self) {
-        self.len = TaggedLen::new(self.len(), false);
-    }
-
     /// Sets the length of a vector.
     ///
     /// This will explicitly set the size of the vector, without actually
@@ -901,7 +881,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             if result.is_ok() {
                 // SAFETY: the allocation succeeded, so self.raw.heap is now
                 // active
-                unsafe { self.set_on_heap() };
+                self.len.set_location::<true>();
             }
             result
         } else {
@@ -921,7 +901,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                         align: align_of::<T>(),
                         alloc: &self.allocator
                     });
-                    self.set_inline();
+                    self.len.set_location::<false>();
                 }
             }
             Ok(())
@@ -993,7 +973,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             unsafe {
                 let (ptr, capacity) = self.raw.heap;
                 copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
-                self.set_inline();
+                self.len.set_location::<false>();
                 self.allocator.deallocate(
                     ptr.cast(),
                     Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>())
@@ -1026,7 +1006,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 unsafe {
                     let (ptr, capacity) = self.raw.heap;
                     copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), len);
-                    self.set_inline();
+                    self.len.set_location::<false>();
                     self.allocator.deallocate(
                         ptr.cast(),
                         Layout::from_size_align_unchecked(
@@ -1603,7 +1583,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             }?;
 
             // SAFETY: the allocation succeeded, so self.raw.heap is now active
-            unsafe { this.set_on_heap() };
+            this.len.set_location::<true>();
         }
         Ok(this)
     }
