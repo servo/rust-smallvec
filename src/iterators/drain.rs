@@ -81,7 +81,7 @@ impl<'a, T: 'a, const N: usize, A: Allocator> Drop for Drain<'a, T, N, A> {
                             let dst = ptr.add(start);
                             core::ptr::copy(src, dst, self.0.tail_len);
                         }
-                        source_vec.len.add(self.0.tail_len);
+                        source_vec.length.add(self.0.tail_len);
                     }
                 }
             }
@@ -100,7 +100,7 @@ impl<'a, T: 'a, const N: usize, A: Allocator> Drop for Drain<'a, T, N, A> {
             unsafe {
                 let vec = vec.as_mut();
                 let old_len = vec.len();
-                vec.len.add(drop_len + self.tail_len);
+                vec.length.add(drop_len + self.tail_len);
                 vec.truncate(old_len + self.tail_len);
             }
 
@@ -146,7 +146,7 @@ impl<T, const N: usize, A: Allocator> Drain<'_, T, N, A> {
         self.iter.as_slice()
     }
 
-    /// The range from `self.vec.len` to `self.tail_start` contains elements
+    /// The range from `self.vec.length` to `self.tail_start` contains elements
     /// that have been moved out.
     /// Fill that range as much as possible with new elements from the
     /// `replace_with` iterator. Returns `true` if we filled the entire
@@ -159,11 +159,11 @@ impl<T, const N: usize, A: Allocator> Drain<'_, T, N, A> {
             let Some(new_item) = replace_with.next() else {
                 return false;
             };
-            let len = vec.len();
-            // SAFETY: len < tail_start <= capacity
+            let length = vec.len();
+            // SAFETY: length < tail_start <= capacity
             unsafe {
-                vec.as_mut_ptr().add(len).write(new_item);
-                vec.len.add(1);
+                vec.as_mut_ptr().add(length).write(new_item);
+                vec.length.add(1);
             }
         }
         true
@@ -173,11 +173,11 @@ impl<T, const N: usize, A: Allocator> Drain<'_, T, N, A> {
     #[track_caller]
     pub(crate) unsafe fn move_tail(&mut self, additional: usize) {
         let vec = unsafe { self.vec.as_mut() };
-        let len = self.tail_start + self.tail_len;
+        let length = self.tail_start + self.tail_len;
 
         // Include the tail when reserving so it survives a reallocation.
         let old_len = vec.len();
-        unsafe { vec.set_len(len) }
+        unsafe { vec.set_len(length) }
         let result = vec.try_reserve(additional);
         // Restore the prefix length before a reservation error can panic.
         unsafe { vec.set_len(old_len) };

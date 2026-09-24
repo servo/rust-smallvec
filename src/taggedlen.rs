@@ -30,11 +30,11 @@ impl<T> TaggedLen<T> {
     const TAG: usize = Self::SHIFT as usize;
 
     #[inline(always)]
-    pub const fn new(len: usize, on_heap: bool) -> Self {
-        debug_assert!(len < Self::MAX_LEN);
+    pub const fn new(length: usize, on_heap: bool) -> Self {
+        debug_assert!(length < Self::MAX_LEN);
         debug_assert!(!on_heap || Self::TAG != 0);
         Self(
-            (len << Self::SHIFT) | ((on_heap as usize) & Self::TAG),
+            (length << Self::SHIFT) | ((on_heap as usize) & Self::TAG),
             PhantomData
         )
     }
@@ -64,29 +64,31 @@ impl<T> TaggedLen<T> {
 
     /// # Safety
     ///
-    /// current len+n must be smaller than MAX_LEN on 64-bit target
+    /// current length+n must be smaller than MAX_LEN on 64-bit target
     #[inline(always)]
     pub const unsafe fn add(&mut self, n: usize) {
-        #[cold]
-        #[inline(never)]
-        const fn assert_failed() {
-            panic!("smallvec length overflow")
-        }
         #[cfg(any(debug_assertions, not(target_pointer_width = "64")))]
-        match self.len().checked_add(n) {
-            Some(value) => {
-                if value > Self::MAX_LEN {
-                    assert_failed()
-                }
+        {
+            #[cold]
+            #[inline(never)]
+            const fn assert_failed() {
+                panic!("smallvec length overflow")
             }
-            None => assert_failed()
+            match self.len().checked_add(n) {
+                Some(value) => {
+                    if value > Self::MAX_LEN {
+                        assert_failed()
+                    }
+                }
+                None => assert_failed()
+            }
         }
         self.0 += n << Self::SHIFT;
     }
 
     /// # Safety
     ///
-    /// current len must be greater equal than n
+    /// current length must be greater equal than n
     #[inline(always)]
     pub const unsafe fn sub(&mut self, n: usize) {
         debug_assert!(self.len() >= n);

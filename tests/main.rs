@@ -1,3 +1,13 @@
+#[cfg(feature = "allocator-api2")]
+use allocator_api2::{
+    boxed::Box,
+    vec::Vec
+};
+#[cfg(not(feature = "allocator-api2"))]
+use std::{
+    boxed::Box,
+    vec::Vec
+};
 use {
     core::{
         borrow::{
@@ -14,10 +24,8 @@ use {
     smallvec::SmallVec,
     std::{
         borrow::ToOwned,
-        boxed::Box,
         hash::DefaultHasher,
-        rc::Rc,
-        vec::Vec
+        rc::Rc
     }
 };
 
@@ -462,7 +470,7 @@ fn append() {
 }
 
 #[test]
-#[should_panic(expected = "new_capacity >= len")]
+#[should_panic(expected = "new_capacity >= length")]
 fn invalid_grow() {
     let mut v: SmallVec<u8, 8> = SmallVec::new();
     v.extend(0..8);
