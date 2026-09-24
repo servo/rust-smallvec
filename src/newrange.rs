@@ -48,7 +48,7 @@ impl NewRange for Range<usize> {
     }
 }
 
-//pub trait ToRange: RangeBounds<usize> + Sized {
+// pub trait ToRange: RangeBounds<usize> + Sized {
 //    fn to_range(self, length: usize) -> Range<usize> {
 //        #[cold]
 //        #[inline(never)]
@@ -57,23 +57,23 @@ impl NewRange for Range<usize> {
 //            if start > end {
 //                panic!("slice index starts at {start} but ends at {end}");
 //            } else {
-//                panic!("range end index {end} out of range for slice of length {len}");
-//            }
+//                panic!("range end index {end} out of range for slice of length
+// {len}");            }
 //        }
 //
 //        let start = match self.start_bound() {
 //            Bound::Included(&start) => start,
 //            Bound::Excluded(start) => start
 //                .checked_add(1)
-//                .unwrap_or_else(|| panic!("attempted to index slice from after maximum usize")),
-//            Bound::Unbounded => 0
+//                .unwrap_or_else(|| panic!("attempted to index slice from after
+// maximum usize")),            Bound::Unbounded => 0
 //        };
 //
 //        let end = match self.end_bound() {
 //            Bound::Included(end) => end
 //                .checked_add(1)
-//                .unwrap_or_else(|| panic!("attempted to index slice up to maximum usize")),
-//            Bound::Excluded(&end) => end,
+//                .unwrap_or_else(|| panic!("attempted to index slice up to
+// maximum usize")),            Bound::Excluded(&end) => end,
 //            Bound::Unbounded => length
 //        };
 //
@@ -87,5 +87,4 @@ impl NewRange for Range<usize> {
 //        }
 //    }
 //}
-//
-//impl<Type: RangeBounds<usize>> ToRange for Type {}
+// impl<Type: RangeBounds<usize>> ToRange for Type {}
