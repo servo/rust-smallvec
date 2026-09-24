@@ -1,26 +1,23 @@
 [package]
 name = "smallvec-fuzz"
-version = "0.1.0"
-authors = ["Dawid Ciężarkiewicz <dpc@dpc.pw>"]
-edition = "2021"
+version = "0.0.0"
+authors = ["The Servo Project Developers"]
 publish = false
+edition = "2024"
 
 [package.metadata]
 cargo-fuzz = true
 
-[features]
-afl_fuzz = ["afl"]
-honggfuzz_fuzz = ["honggfuzz"]
-
-
 [dependencies]
-honggfuzz = { version = "0.5.47", optional = true }
-afl = { version = "0.4", optional = true }
-smallvec = { path = ".." }
+arbitrary = { version = "1.4", features = ["derive"] }
+libfuzzer-sys = "0.4"
 
-[workspace]
-members = ["."]
+[dependencies.smallvec]
+path = ".."
 
 [[bin]]
-name = "smallvec_ops"
-path = "fuzz_targets/smallvec_ops.rs"
+name = "main"
+path = "fuzz_targets/main.rs"
+test = false
+doc = false
+bench = false
