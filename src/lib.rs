@@ -32,6 +32,7 @@ pub use iterators::{
 mod macros;
 #[cfg(feature = "malloc_size_of")]
 mod mallocsizeof;
+mod newrange;
 mod rawsmallvec;
 mod references;
 #[cfg(feature = "serde")]
@@ -81,7 +82,8 @@ use {
             copy_nonoverlapping,
             drop_in_place
         }
-    }
+    },
+    newrange::NewRange
 };
 #[cfg(feature = "internals")]
 pub use {
@@ -93,50 +95,6 @@ use {
     rawsmallvec::RawSmallVec,
     taggedlen::TaggedLen
 };
-
-#[inline]
-/// A local copy of [`core::slice::range`]. The latter function is unstable
-/// and thus cannot be used yet.
-fn slice_range<R>(range: R, bounds: core::ops::RangeTo<usize>) -> core::ops::Range<usize>
-where R: core::ops::RangeBounds<usize> {
-    #[cold]
-    #[inline(never)]
-    #[track_caller]
-    fn assert_failed(start: usize, end: usize, length: usize) -> ! {
-        if start > end {
-            panic!("slice index starts at {start} but ends at {end}");
-        } else {
-            panic!("range end index {end} out of range for slice of length {length}");
-        }
-    }
-
-    let length = bounds.end;
-
-    let start = match range.start_bound() {
-        core::ops::Bound::Included(&start) => start,
-        core::ops::Bound::Excluded(start) => start
-            .checked_add(1)
-            .unwrap_or_else(|| panic!("attempted to index slice from after maximum usize")),
-        core::ops::Bound::Unbounded => 0
-    };
-
-    let end = match range.end_bound() {
-        core::ops::Bound::Included(end) => end
-            .checked_add(1)
-            .unwrap_or_else(|| panic!("attempted to index slice up to maximum usize")),
-        core::ops::Bound::Excluded(&end) => end,
-        core::ops::Bound::Unbounded => length
-    };
-
-    if start > end || end > length {
-        assert_failed(start, end, length);
-    }
-
-    core::ops::Range {
-        start,
-        end
-    }
-}
 
 #[repr(C)]
 pub struct SmallVec<T, const N: usize, A: Allocator = Global> {
@@ -464,7 +422,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         let core::ops::Range {
             start,
             end
-        } = slice_range(range, ..length);
+        } = core::ops::Range::new(range, length);
 
         unsafe {
             // SAFETY: `start <= length`
@@ -578,7 +536,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         let core::ops::Range {
             start,
             end
-        } = slice_range(range, ..old_len);
+        } = core::ops::Range::new(range, old_len);
 
         // Guard against us getting leaked (leak amplification)
         unsafe {
@@ -1333,7 +1291,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         R: core::ops::RangeBounds<usize>,
         T: Copy
     {
-        let src = slice_range(src, ..self.len());
+        let src = core::ops::Range::new(src, self.len());
         let core::ops::Range {
             start,
             end
@@ -1419,7 +1377,7 @@ impl<T: Clone, const N: usize, A: Allocator> SmallVec<T, N, A> {
 
     pub fn extend_from_within<R>(&mut self, src: R)
     where R: core::ops::RangeBounds<usize> {
-        let src = slice_range(src, ..self.len());
+        let src = core::ops::Range::new(src, self.len());
         self.reserve(src.len());
 
         // SAFETY: The call to `reserve` ensures that the capacity is large
