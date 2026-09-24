@@ -17,6 +17,26 @@ jobs:
         run: cargo bench --no-run
       - name: all features
         run: cargo bench --all-features --no-run
+  callgrind:
+    name: Callgrind
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+      - name: install
+        uses: dtolnay/rust-toolchain@nightly
+      - name: install valgrind
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y valgrind
+      - name: install iai-callgrind-runner
+        run: |
+          version=$(cargo metadata --format-version=1 | jq -r '.packages[] | select(.name == "iai-callgrind").version')
+          cargo install iai-callgrind-runner --version "$version"
+      - name: default features
+        run: cargo bench --bench callgrind
+      - name: all features
+        run: cargo bench --bench callgrind --all-features
   practices:
     name: Practices
     runs-on: ubuntu-latest
