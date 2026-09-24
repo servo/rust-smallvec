@@ -703,7 +703,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             if result.is_ok() {
                 // SAFETY: the allocation succeeded, so self.raw.heap is now
                 // active
-                self.len.set_location::<true>();
+                self.length.set_location::<true>();
             }
             result
         } else {
@@ -723,7 +723,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                         align: align_of::<T>(),
                         allocator: &self.allocator
                     });
-                    self.len.set_location::<false>();
+                    self.length.set_location::<false>();
                 }
             }
             Ok(())
@@ -780,7 +780,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             unsafe {
                 let (ptr, capacity) = self.raw.heap;
                 copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), length);
-                self.len.set_location::<false>();
+                self.length.set_location::<false>();
                 self.allocator.deallocate(
                     ptr.cast(),
                     Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>())
@@ -813,7 +813,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 unsafe {
                     let (ptr, capacity) = self.raw.heap;
                     copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), length);
-                    self.len.set_location::<false>();
+                    self.length.set_location::<false>();
                     self.allocator.deallocate(
                         ptr.cast(),
                         Layout::from_size_align_unchecked(
@@ -1391,7 +1391,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             }?;
 
             // SAFETY: the allocation succeeded, so self.raw.heap is now active
-            this.len.set_location::<true>();
+            this.length.set_location::<true>();
         }
         Ok(this)
     }
