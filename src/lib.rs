@@ -32,6 +32,7 @@ pub use iterators::{
 mod macros;
 #[cfg(feature = "malloc_size_of")]
 mod mallocsizeof;
+mod newrange;
 mod rawsmallvec;
 mod references;
 #[cfg(feature = "serde")]
@@ -39,7 +40,6 @@ mod serde;
 #[cfg(feature = "specialization")]
 mod specialization;
 mod taggedlen;
-mod torange;
 
 #[cfg(feature = "bytes")]
 use bytes::{
@@ -83,7 +83,7 @@ use {
             drop_in_place
         }
     },
-    torange::ToRange
+    newrange::NewRange
 };
 #[cfg(feature = "internals")]
 pub use {
@@ -442,7 +442,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         let core::ops::Range {
             start,
             end
-        } = range.to_range(length);
+        } = core::ops::Range::new(range, length);
 
         unsafe {
             // SAFETY: `start <= length`
@@ -556,7 +556,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         let core::ops::Range {
             start,
             end
-        } = range.to_range(old_len);
+        } = core::ops::Range::new(range, old_len);
 
         // Guard against us getting leaked (leak amplification)
         unsafe {
@@ -1311,7 +1311,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         R: core::ops::RangeBounds<usize>,
         T: Copy
     {
-        let src = src.to_range(self.len());
+        let src = core::ops::Range::new(src, self.len());
         let core::ops::Range {
             start,
             end
@@ -1397,7 +1397,7 @@ impl<T: Clone, const N: usize, A: Allocator> SmallVec<T, N, A> {
 
     pub fn extend_from_within<R>(&mut self, src: R)
     where R: core::ops::RangeBounds<usize> {
-        let src = src.to_range(self.len());
+        let src = core::ops::Range::new(src, self.len());
         self.reserve(src.len());
 
         // SAFETY: The call to `reserve` ensures that the capacity is large
