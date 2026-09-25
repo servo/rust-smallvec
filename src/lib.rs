@@ -467,6 +467,12 @@ impl<T, const N: usize> SmallVec<T, N> {
         } else {
             let mut vec = ManuallyDrop::new(vec);
             let length = vec.len();
+
+            // A heap-allocated `SmallVec` must always observe the invariant
+            // that `cap > N`.
+            if vec.capacity() <= N {
+                vec.reserve(N + 1 - length);
+            }
             let cap = vec.capacity();
             // SAFETY: vec.capacity is not `0` (checked above), so the pointer
             // can not dangle and thus specifically cannot be null.
@@ -886,14 +892,15 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             .unwrap_or_else(SmallVecError::handle);
     }
 
-    #[cold]
     pub fn try_grow(&mut self, new_capacity: usize) -> Result<(), SmallVecError> {
         if Self::IS_ZST {
             return Ok(());
         }
 
         let (length, on_heap) = self.length.parts();
-        assert!(new_capacity >= length);
+        if new_capacity <= length {
+            return Ok(());
+        }
 
         if new_capacity > Self::inline_size() {
             // SAFETY: we checked all the preconditions
@@ -941,11 +948,18 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     #[inline]
     pub fn try_reserve(&mut self, additional: usize) -> Result<(), SmallVecError> {
         if additional > self.capacity() - self.len() {
-            let new_capacity = self
+            let required = self
                 .len()
                 .checked_add(additional)
-                .and_then(usize::checked_next_power_of_two)
                 .ok_or(SmallVecError::CapacityOverflow)?;
+
+            let double_cap = self.capacity().saturating_mul(2);
+
+            let new_capacity = required
+                .max(double_cap)
+                .checked_next_power_of_two()
+                .ok_or(SmallVecError::CapacityOverflow)?;
+
             self.try_grow(new_capacity)
         } else {
             Ok(())
@@ -1894,6 +1908,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 self.reserve(lower.saturating_add(1));
             }
             unsafe {
+                // heap-buffer-overflow happening here
                 core::ptr::write(self.as_mut_ptr().add(length), element);
                 // Since next() executes user code which can panic we have to
                 // bump the length after each step.
