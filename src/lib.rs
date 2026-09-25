@@ -1641,7 +1641,6 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 self.reserve(lower.saturating_add(1));
             }
             unsafe {
-                // heap-buffer-overflow happening here
                 core::ptr::write(self.as_mut_ptr().add(length), element);
                 // Since next() executes user code which can panic we have to
                 // bump the length after each step.
