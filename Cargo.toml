@@ -18,6 +18,16 @@ opt-level = 3
 debug = false
 strip = true
 
+# Dedicated profile for the iai-callgrind benchmarks. Callgrind needs function
+# symbols to attribute event counts, so we keep debug info on and stripping off,
+# and disable LTO which would inline the benchmark functions. Without this the
+# runner collects zero events for every benchmark.
+[profile.callgrind]
+inherits = "bench"
+debug = 1
+strip = false
+lto = false
+
 [features]
 allocator-api = []
 allocator-api2 = ["dep:allocator-api2", "allocator-api"]

@@ -31,9 +31,9 @@ jobs:
           sudo apt-get install -y valgrind
           version=$(cargo metadata --format-version=1 | jq -r '.packages[] | select(.name == "iai-callgrind").version')
           cargo install iai-callgrind-runner --version "$version"
-          cargo bench --bench callgrind
+          cargo bench --bench callgrind --profile callgrind
       - name: all features
-        run: cargo bench --bench callgrind --all-features
+        run: cargo bench --bench callgrind --profile callgrind --all-features
   practices:
     name: Practices
     runs-on: ubuntu-latest
