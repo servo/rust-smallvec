@@ -18,6 +18,16 @@ opt-level = 3
 debug = false
 strip = true
 
+# Dedicated profile for the iai-callgrind benchmarks. Callgrind needs the
+# function symbols in the binary to attribute event counts, so we disable
+# stripping (and keep debug info for line-level detail). Without symbols the
+# runner collects zero events for every benchmark. LTO is left on (inherited)
+# since it does not affect collection and keeps the run representative.
+[profile.callgrind]
+inherits = "bench"
+debug = 1
+strip = false
+
 [features]
 allocator-api = []
 allocator-api2 = ["dep:allocator-api2", "allocator-api"]
@@ -41,6 +51,7 @@ malloc_size_of = { version = "0.1", optional = true, default-features = false }
 [dev-dependencies]
 serde_test = "1.0"
 criterion = "0.8"
+iai-callgrind = "0.14"
 
 [[test]]
 name = "arbitrary"
@@ -73,6 +84,11 @@ required-features = ["std"]
 [[bench]]
 name = "bench"
 path = "benches/bench.rs"
+harness = false
+
+[[bench]]
+name = "callgrind"
+path = "benches/callgrind.rs"
 harness = false
 
 [package.metadata.docs.rs]
