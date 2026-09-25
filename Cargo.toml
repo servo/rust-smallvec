@@ -19,7 +19,8 @@ debug = false
 strip = true
 
 [features]
-default = ["allocator-api2"]
+allocator-api = []
+allocator-api2 = ["dep:allocator-api2", "allocator-api"]
 internals = []
 rayon = ["std", "dep:rayon"]
 serde = ["dep:serde_core"]

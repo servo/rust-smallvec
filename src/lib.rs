@@ -9,10 +9,14 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization, trusted_len))]
-#![cfg_attr(not(feature = "allocator-api2"), feature(allocator_api))]
+#![cfg_attr(
+    all(feature = "allocator-api", not(feature = "allocator-api2")),
+    feature(allocator_api)
+)]
 
 extern crate alloc;
 
+mod allocator;
 #[cfg(feature = "borsh")]
 mod borsh;
 mod comparisons;
@@ -21,11 +25,14 @@ mod errors;
 mod iterators;
 pub use iterators::{
     drain::Drain,
-    extractif::ExtractIf
+    extractif::ExtractIf,
+    intoiter::IntoIter,
+    splice::Splice
 };
 mod macros;
 #[cfg(feature = "malloc_size_of")]
 mod mallocsizeof;
+mod newrange;
 mod rawsmallvec;
 mod references;
 #[cfg(feature = "serde")]
@@ -34,16 +41,6 @@ mod serde;
 mod specialization;
 mod taggedlen;
 
-#[cfg(not(feature = "allocator-api2"))]
-use alloc::alloc::{
-    Allocator,
-    Global
-};
-#[cfg(feature = "allocator-api2")]
-use allocator_api2::alloc::{
-    Allocator,
-    Global
-};
 #[cfg(feature = "bytes")]
 use bytes::{
     BufMut,
@@ -59,9 +56,12 @@ pub use errors::SmallVecError;
 #[cfg(feature = "std")]
 use std::io;
 use {
-    alloc::{
-        boxed::Box,
-        vec::Vec
+    allocator::{
+        Allocator,
+        Box,
+        Global,
+        Vec,
+        vec
     },
     core::{
         alloc::Layout,
@@ -82,7 +82,8 @@ use {
             copy_nonoverlapping,
             drop_in_place
         }
-    }
+    },
+    newrange::NewRange
 };
 #[cfg(feature = "internals")]
 pub use {
@@ -94,50 +95,6 @@ use {
     rawsmallvec::RawSmallVec,
     taggedlen::TaggedLen
 };
-
-#[inline]
-/// A local copy of [`core::slice::range`]. The latter function is unstable
-/// and thus cannot be used yet.
-fn slice_range<R>(range: R, bounds: core::ops::RangeTo<usize>) -> core::ops::Range<usize>
-where R: core::ops::RangeBounds<usize> {
-    #[cold]
-    #[inline(never)]
-    #[track_caller]
-    fn assert_failed(start: usize, end: usize, length: usize) -> ! {
-        if start > end {
-            panic!("slice index starts at {start} but ends at {end}");
-        } else {
-            panic!("range end index {end} out of range for slice of length {length}");
-        }
-    }
-
-    let length = bounds.end;
-
-    let start = match range.start_bound() {
-        core::ops::Bound::Included(&start) => start,
-        core::ops::Bound::Excluded(start) => start
-            .checked_add(1)
-            .unwrap_or_else(|| panic!("attempted to index slice from after maximum usize")),
-        core::ops::Bound::Unbounded => 0
-    };
-
-    let end = match range.end_bound() {
-        core::ops::Bound::Included(end) => end
-            .checked_add(1)
-            .unwrap_or_else(|| panic!("attempted to index slice up to maximum usize")),
-        core::ops::Bound::Excluded(&end) => end,
-        core::ops::Bound::Unbounded => length
-    };
-
-    if start > end || end > length {
-        assert_failed(start, end, length);
-    }
-
-    core::ops::Range {
-        start,
-        end
-    }
-}
 
 #[repr(C)]
 pub struct SmallVec<T, const N: usize, A: Allocator = Global> {
@@ -155,184 +112,6 @@ impl<T, const N: usize> Default for SmallVec<T, N> {
         Self::new()
     }
 }
-
-pub struct Splice<'a, I: Iterator + 'a, const N: usize> {
-    drain: Drain<'a, I::Item, N, Global>,
-    replace_with: I
-}
-
-impl<'a, I, const N: usize> core::fmt::Debug for Splice<'a, I, N>
-where
-    I: Debug + Iterator + 'a,
-    <I as Iterator>::Item: Debug
-{
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("Splice").field(&self.drain).finish()
-    }
-}
-
-impl<I: Iterator, const N: usize> Iterator for Splice<'_, I, N> {
-    type Item = I::Item;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.drain.next()
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.drain.size_hint()
-    }
-}
-
-impl<I: Iterator, const N: usize> DoubleEndedIterator for Splice<'_, I, N> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.drain.next_back()
-    }
-}
-
-impl<I: Iterator, const N: usize> ExactSizeIterator for Splice<'_, I, N> {}
-
-impl<I: Iterator, const N: usize> Drop for Splice<'_, I, N> {
-    fn drop(&mut self) {
-        self.drain.by_ref().for_each(drop);
-        // At this point draining is done and the only remaining tasks are
-        // splicing and moving things into the final place.
-        // Which means we can replace the slice::Iter with pointers that won't
-        // point to deallocated memory, so that Drain::drop is still
-        // allowed to call iter.len(), otherwise it would break the
-        // ptr.sub_ptr contract.
-        self.drain.iter = [].iter();
-
-        unsafe {
-            if self.drain.tail_len == 0 {
-                self.drain.vec.as_mut().extend(self.replace_with.by_ref());
-                return;
-            }
-
-            // First fill the range left by drain().
-            if !self.drain.fill(&mut self.replace_with) {
-                return;
-            }
-
-            // There may be more elements. Use the lower bound as an estimate.
-            // FIXME: Is the upper bound a better guess? Or something else?
-            let (lower_bound, _upper_bound) = self.replace_with.size_hint();
-            if lower_bound > 0 {
-                self.drain.move_tail(lower_bound);
-                if !self.drain.fill(&mut self.replace_with) {
-                    return;
-                }
-            }
-
-            // Collect any remaining elements.
-            let mut collected = self
-                .replace_with
-                .by_ref()
-                .collect::<SmallVec<I::Item, N>>()
-                .into_iter();
-            // Now we have an exact count.
-            if collected.len() > 0 {
-                self.drain.move_tail(collected.len());
-                let filled = self.drain.fill(&mut collected);
-                debug_assert!(filled);
-                debug_assert_eq!(collected.len(), 0);
-            }
-        }
-        // Let `Drain::drop` move the tail back if necessary and restore
-        // `vec.length`.
-    }
-}
-
-/// An iterator that consumes a `SmallVec` and yields its items by value.
-///
-/// Returned from [`SmallVec::into_iter`][1].
-///
-/// [1]: struct.SmallVec.html#method.into_iter
-pub struct IntoIter<T, const N: usize, A: Allocator = Global> {
-    // # Safety
-    //
-    // `end` decides whether the data lives on the heap or not
-    //
-    // The members from begin..end are initialized
-    raw: RawSmallVec<T, N>,
-    allocator: A,
-    begin: usize,
-    end: TaggedLen<T>
-}
-
-// SAFETY: IntoIter has unique ownership of its contents.  Sending (or sharing)
-// an `IntoIter<T, N>` is equivalent to sending (or sharing) a `SmallVec<T, N>`.
-unsafe impl<T: Send, const N: usize, A: Allocator + Send> Send for IntoIter<T, N, A> {}
-unsafe impl<T: Sync, const N: usize, A: Allocator + Sync> Sync for IntoIter<T, N, A> {}
-
-impl<T, const N: usize, A: Allocator> IntoIter<T, N, A> {
-    #[inline]
-    pub const fn as_slice(&self) -> &[T] {
-        let (end, on_heap) = self.end.parts();
-        // SAFETY: `end` tells which buffer is active, and the members in
-        // `self.begin..end` are all initialized. So the pointer arithmetic is
-        // valid, and so is the construction of the slice
-        unsafe {
-            let ptr = self.raw.as_ptr(on_heap);
-            core::slice::from_raw_parts(ptr.add(self.begin), end - self.begin)
-        }
-    }
-
-    #[inline]
-    pub const fn as_mut_slice(&mut self) -> &mut [T] {
-        let (end, on_heap) = self.end.parts();
-        // SAFETY: see above
-        unsafe {
-            let ptr = self.raw.as_mut_ptr(on_heap);
-            core::slice::from_raw_parts_mut(ptr.add(self.begin), end - self.begin)
-        }
-    }
-}
-
-impl<T, const N: usize, A: Allocator> Iterator for IntoIter<T, N, A> {
-    type Item = T;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        let (end, on_heap) = self.end.parts();
-        if self.begin == end {
-            None
-        } else {
-            // SAFETY: see above
-            unsafe {
-                let ptr = self.raw.as_mut_ptr(on_heap);
-                let value = ptr.add(self.begin).read();
-                self.begin += 1;
-                Some(value)
-            }
-        }
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let size = self.end.len() - self.begin;
-        (size, Some(size))
-    }
-}
-
-impl<T, const N: usize, A: Allocator> DoubleEndedIterator for IntoIter<T, N, A> {
-    #[inline]
-    fn next_back(&mut self) -> Option<Self::Item> {
-        let (end, on_heap) = self.end.parts();
-        if self.begin == end {
-            None
-        } else {
-            // SAFETY: see above
-            unsafe {
-                let ptr = self.raw.as_mut_ptr(on_heap);
-                self.end.sub(1);
-                let value = ptr.add(end - 1).read();
-                Some(value)
-            }
-        }
-    }
-}
-impl<T, const N: usize, A: Allocator> ExactSizeIterator for IntoIter<T, N, A> {}
-impl<T, const N: usize, A: Allocator> core::iter::FusedIterator for IntoIter<T, N, A> {}
 
 impl<T, const N: usize> SmallVec<T, N> {
     #[inline]
@@ -491,10 +270,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         R: core::ops::RangeBounds<usize>,
         I: IntoIterator<Item = T>
     {
-        Splice {
-            drain: self.drain(range),
-            replace_with: replace_with.into_iter()
-        }
+        Splice::new(self.drain(range), replace_with.into_iter())
     }
 
     /// Creates a `SmallVec` directly from the raw components of another
@@ -603,26 +379,6 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
 impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     const IS_ZST: bool = size_of::<T>() == 0;
 
-    /// Sets the tag to be on the heap
-    ///
-    /// # Safety
-    ///
-    /// The active union member must be the self.raw.heap
-    #[inline]
-    unsafe fn set_on_heap(&mut self) {
-        self.length = TaggedLen::new(self.len(), true);
-    }
-
-    /// Sets the tag to be inline
-    ///
-    /// # Safety
-    ///
-    /// The active union member must be the self.raw.inline
-    #[inline]
-    unsafe fn set_inline(&mut self) {
-        self.length = TaggedLen::new(self.len(), false);
-    }
-
     /// Sets the length of a vector.
     ///
     /// This will explicitly set the size of the vector, without actually
@@ -672,7 +428,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         let core::ops::Range {
             start,
             end
-        } = slice_range(range, ..length);
+        } = core::ops::Range::new(range, length);
 
         unsafe {
             // SAFETY: `start <= length`
@@ -786,7 +542,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         let core::ops::Range {
             start,
             end
-        } = slice_range(range, ..old_len);
+        } = core::ops::Range::new(range, old_len);
 
         // Guard against us getting leaked (leak amplification)
         unsafe {
@@ -912,7 +668,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             if result.is_ok() {
                 // SAFETY: the allocation succeeded, so self.raw.heap is now
                 // active
-                unsafe { self.set_on_heap() };
+                self.length.set_location::<true>();
             }
             result
         } else {
@@ -932,7 +688,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                         align: align_of::<T>(),
                         allocator: &self.allocator
                     });
-                    self.set_inline();
+                    self.length.set_location::<false>();
                 }
             }
             Ok(())
@@ -996,7 +752,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             unsafe {
                 let (ptr, capacity) = self.raw.heap;
                 copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), length);
-                self.set_inline();
+                self.length.set_location::<false>();
                 self.allocator.deallocate(
                     ptr.cast(),
                     Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>())
@@ -1029,7 +785,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 unsafe {
                     let (ptr, capacity) = self.raw.heap;
                     copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), length);
-                    self.set_inline();
+                    self.length.set_location::<false>();
                     self.allocator.deallocate(
                         ptr.cast(),
                         Layout::from_size_align_unchecked(
@@ -1549,7 +1305,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         R: core::ops::RangeBounds<usize>,
         T: Copy
     {
-        let src = slice_range(src, ..self.len());
+        let src = core::ops::Range::new(src, self.len());
         let core::ops::Range {
             start,
             end
@@ -1607,7 +1363,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             }?;
 
             // SAFETY: the allocation succeeded, so self.raw.heap is now active
-            unsafe { this.set_on_heap() };
+            this.length.set_location::<true>();
         }
         Ok(this)
     }
@@ -1635,7 +1391,7 @@ impl<T: Clone, const N: usize, A: Allocator> SmallVec<T, N, A> {
 
     pub fn extend_from_within<R>(&mut self, src: R)
     where R: core::ops::RangeBounds<usize> {
-        let src = slice_range(src, ..self.len());
+        let src = core::ops::Range::new(src, self.len());
         self.reserve(src.len());
 
         // SAFETY: The call to `reserve` ensures that the capacity is large
@@ -1761,29 +1517,6 @@ impl<T, const N: usize, A: Allocator> Drop for SmallVec<T, N, A> {
     }
 }
 
-impl<T, const N: usize, A: Allocator> Drop for IntoIter<T, N, A> {
-    fn drop(&mut self) {
-        // SAFETY: see above
-        unsafe {
-            let (end, on_heap) = self.end.parts();
-            let begin = self.begin;
-            let ptr = self.raw.as_mut_ptr(on_heap);
-            let _drop_dealloc = if on_heap {
-                let capacity = self.raw.heap.1;
-                Some(DropDealloc {
-                    ptr: NonNull::new_unchecked(ptr as *mut u8),
-                    size_bytes: capacity * size_of::<T>(),
-                    align: align_of::<T>(),
-                    allocator: &self.allocator
-                })
-            } else {
-                None
-            };
-            core::ptr::slice_from_raw_parts_mut(ptr.add(begin), end - begin).drop_in_place();
-        }
-    }
-}
-
 /// This function is used in the [`smallvec`] macro.
 /// It is recommended to use the macro instead of using this function.
 #[doc(hidden)]
@@ -1791,7 +1524,7 @@ impl<T, const N: usize, A: Allocator> Drop for IntoIter<T, N, A> {
 pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N> {
     if n > SmallVec::<T, N>::inline_size() {
         // Standard Rust vectors are already specialized.
-        SmallVec::from_vec(alloc::vec![elem; n])
+        SmallVec::from_vec(vec![elem; n])
     } else {
         #[cfg(feature = "specialization")]
         {
@@ -2006,21 +1739,6 @@ impl<T: Clone, const N: usize, A: Allocator + Clone> Clone for SmallVec<T, N, A>
     }
 }
 
-impl<T: Clone, const N: usize, A: Allocator + Clone> Clone for IntoIter<T, N, A> {
-    #[inline]
-    fn clone(&self) -> IntoIter<T, N, A> {
-        let mut vec = SmallVec {
-            length: TaggedLen::new(0, false),
-            raw: RawSmallVec::new(),
-            allocator: self.allocator.clone()
-        };
-
-        vec.extend(self.as_slice());
-
-        vec.into_iter()
-    }
-}
-
 impl<T, const N: usize, A: Allocator> Extend<T> for SmallVec<T, N, A> {
     #[inline]
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
@@ -2066,27 +1784,6 @@ impl<T, const N: usize> core::iter::FromIterator<T> for SmallVec<T, N> {
     }
 }
 
-impl<T, const N: usize, A: Allocator> IntoIterator for SmallVec<T, N, A> {
-    type IntoIter = IntoIter<T, N, A>;
-    type Item = T;
-
-    fn into_iter(self) -> Self::IntoIter {
-        // SAFETY: we move out of this.raw by reading the value at its address,
-        // which is fine since we don't drop it
-        unsafe {
-            // Set SmallVec length to zero as `IntoIter` drop handles dropping
-            // of the elements
-            let this = ManuallyDrop::new(self);
-            IntoIter {
-                raw: (&raw const this.raw).read(),
-                allocator: (&raw const this.allocator).read(),
-                begin: 0,
-                end: this.length
-            }
-        }
-    }
-}
-
 impl<'a, T, const N: usize, A: Allocator> IntoIterator for &'a SmallVec<T, N, A> {
     type IntoIter = core::slice::Iter<'a, T>;
     type Item = &'a T;
@@ -2114,12 +1811,6 @@ impl<T: Hash, const N: usize, A: Allocator> Hash for SmallVec<T, N, A> {
 impl<T: Debug, const N: usize, A: Allocator> Debug for SmallVec<T, N, A> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_list().entries(self.iter()).finish()
-    }
-}
-
-impl<T: Debug, const N: usize, A: Allocator> Debug for IntoIter<T, N, A> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("IntoIter").field(&self.as_slice()).finish()
     }
 }
 
