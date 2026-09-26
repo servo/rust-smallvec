@@ -1,21 +1,42 @@
 name: fuzzing
+
 on:
   workflow_dispatch:
   schedule:
     - cron: "0 0 * * *"
+
 jobs:
   fuzz:
     name: Fuzz
-    if: github.repository == 'servo/rust-smallvec'
     runs-on: ubuntu-latest
     steps:
-      - name: checkout
+      - name: Checkout
         uses: actions/checkout@v7
-      - name: install
-        uses: dtolnay/rust-toolchain@stable
-      - name: fuzzing
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y binutils-dev libunwind8-dev libcurl4-openssl-dev 
-          sudo apt-get install -y libelf-dev libdw-dev cmake gcc libiberty-dev
-          ./travis-fuzz.sh
+
+      - name: Install Rust Nightly
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+
+      - name: Restore fuzzing corpus
+        uses: actions/cache/restore@v6
+        with:
+          path: fuzz/corpus
+          key: fuzz-corpus-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus-
+
+      - name: Run fuzzing for 30 minutes
+        run: cargo fuzz run main -- -max_total_time=1800
+
+      - name: Minimize corpus
+        if: always()
+        run: cargo fuzz cmin main
+
+      - name: Save updated corpus
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: fuzz/corpus
+          key: fuzz-corpus-${{ github.run_id }}
