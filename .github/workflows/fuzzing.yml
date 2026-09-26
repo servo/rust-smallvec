@@ -20,7 +20,7 @@ jobs:
           key: fuzz-corpus-${{ github.run_id }}
           restore-keys: |
             fuzz-corpus-
-      - name: fuzz for 30 minutes
+      - name: fuzz
         run: |
           cargo install cargo-fuzz
           cargo fuzz run main -- -max_total_time=1800
