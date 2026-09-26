@@ -16,13 +16,8 @@ jobs:
       - name: Install Rust Nightly
         uses: dtolnay/rust-toolchain@nightly
 
-      - name: Cache cargo dependencies, binaries and target directory
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: "fuzz"
-
       - name: Install cargo-fuzz
-        run: which cargo-fuzz || cargo install cargo-fuzz
+        run: cargo install cargo-fuzz
 
       - name: Restore fuzzing corpus
         uses: actions/cache/restore@v6
