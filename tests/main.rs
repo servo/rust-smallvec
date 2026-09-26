@@ -630,6 +630,19 @@ fn borrow_mut() {
 }
 
 #[test]
+fn index() {
+    let a = SmallVec::<u32, 2>::from(&[1, 2, 3][..]);
+    assert_eq!(a[1], 2);
+}
+
+#[test]
+fn index_mut() {
+    let mut a = SmallVec::<u32, 2>::from(&[1, 2, 3][..]);
+    a[1] = 22;
+    assert_eq!(a[1], 22);
+}
+
+#[test]
 fn from() {
     assert_eq!(&SmallVec::<u32, 2>::from(&[1][..])[..], [1]);
     assert_eq!(&SmallVec::<u32, 2>::from(&[1, 2, 3][..])[..], [1, 2, 3]);
