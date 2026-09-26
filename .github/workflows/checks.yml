@@ -89,7 +89,7 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v7
-      - name: install rust 1.86 (MSRV)
+      - name: install rust MSRV
         uses: dtolnay/rust-toolchain@1.86
       - name: test default features
         run: cargo test
