@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v7
-      - name: install
+      - name: install rust nightly
         uses: dtolnay/rust-toolchain@nightly
       - name: default features
         run: cargo bench --no-run
@@ -40,7 +40,7 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v7
-      - name: install
+      - name: install rust nightly
         uses: dtolnay/rust-toolchain@nightly
       - name: style
         run: |
@@ -58,7 +58,7 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v7
-      - name: install
+      - name: install rust nightly
         uses: dtolnay/rust-toolchain@nightly
       - name: default features
         run: |
@@ -72,7 +72,7 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v7
-      - name: install
+      - name: install rust nightly
         uses: dtolnay/rust-toolchain@stable
       - name: test default features
         run: cargo test
@@ -82,7 +82,7 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v7
-      - name: install
+      - name: install rust nightly
         uses: dtolnay/rust-toolchain@nightly
       - name: test default features
         run: cargo test
@@ -94,7 +94,7 @@ jobs:
       steps:
         - name: checkout
           uses: actions/checkout@v7
-        - name: install
+        - name: install rust stable
           uses: dtolnay/rust-toolchain@stable
           with:
             target: thumbv7m-none-eabi
@@ -106,7 +106,7 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v7
-      - name: install
+      - name: install rust MSRV
         uses: dtolnay/rust-toolchain@1.86
       - name: test default features
         run: cargo test

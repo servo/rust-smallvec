@@ -11,11 +11,25 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v7
-      - name: install
-        uses: dtolnay/rust-toolchain@stable
-      - name: fuzzing
+      - name: install rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+      - name: restore corpus
+        uses: actions/cache/restore@v6
+        with:
+          path: fuzz/corpus
+          key: fuzz-corpus-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus-
+      - name: fuzz
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y binutils-dev libunwind8-dev libcurl4-openssl-dev 
-          sudo apt-get install -y libelf-dev libdw-dev cmake gcc libiberty-dev
-          ./travis-fuzz.sh
+          cargo install cargo-fuzz
+          cargo fuzz run main -- -max_total_time=1800
+      - name: minimize corpus
+        if: always()
+        run: cargo fuzz cmin main
+      - name: save corpus
+        if: always()
+        uses: actions/cache/save@v6
+        with:
+          path: fuzz/corpus
+          key: fuzz-corpus-${{ github.run_id }}
