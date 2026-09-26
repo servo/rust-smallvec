@@ -1,40 +1,32 @@
 name: fuzzing
-
 on:
   workflow_dispatch:
   schedule:
     - cron: "0 0 * * *"
-
 jobs:
   fuzz:
     name: Fuzz
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: checkout
         uses: actions/checkout@v7
-
-      - name: Install Rust Nightly
+      - name: install rust nightly
         uses: dtolnay/rust-toolchain@nightly
-
-      - name: Install cargo-fuzz
+      - name: install cargo-fuzz
         run: cargo install cargo-fuzz
-
-      - name: Restore fuzzing corpus
+      - name: restore corpus
         uses: actions/cache/restore@v6
         with:
           path: fuzz/corpus
           key: fuzz-corpus-${{ github.run_id }}
           restore-keys: |
             fuzz-corpus-
-
-      - name: Run fuzzing for 30 minutes
+      - name: fuzz for 30 minutes
         run: cargo fuzz run main -- -max_total_time=1800
-
-      - name: Minimize corpus
+      - name: minimize corpus
         if: always()
         run: cargo fuzz cmin main
-
-      - name: Save updated corpus
+      - name: save corpus
         if: always()
         uses: actions/cache/save@v6
         with:
