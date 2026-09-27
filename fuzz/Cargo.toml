@@ -2,8 +2,8 @@
 name = "smallvec-fuzz"
 version = "0.0.0"
 authors = ["The Servo Project Developers"]
+edition = "2018"
 publish = false
-edition = "2024"
 
 [package.metadata]
 cargo-fuzz = true
