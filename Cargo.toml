@@ -11,6 +11,16 @@ categories = ["data-structures"]
 documentation = "https://docs.rs/smallvec/"
 include = ["Cargo.toml", "LICENSE-MIT", "LICENSE-APACHE", "README.md", "src/**/*.rs"]
 
+# Dedicated profile for the iai-callgrind benchmarks. Callgrind needs the
+# function symbols in the binary to attribute event counts, so we disable
+# stripping (and keep debug info for line-level detail). Without symbols the
+# runner collects zero events for every benchmark. LTO is left on (inherited)
+# since it does not affect collection and keeps the run representative.
+[profile.callgrind]
+inherits = "bench"
+debug = 1
+strip = false
+
 [features]
 const_generics = []
 const_new = ["const_generics"]
