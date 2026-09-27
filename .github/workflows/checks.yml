@@ -107,6 +107,6 @@ jobs:
       - name: checkout
         uses: actions/checkout@v7
       - name: install rust MSRV
-        uses: dtolnay/rust-toolchain@1.86
+        uses: dtolnay/rust-toolchain@1.36
       - name: test default features
         run: cargo test
