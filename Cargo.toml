@@ -31,6 +31,7 @@ unty = { version = "0.0.4", optional = true, default-features = false }
 
 [dev-dependencies]
 bincode1 = { package = "bincode", version = "1.0.1" }
+iai-callgrind = "0.14"
 
 [package.metadata.docs.rs]
 all-features = true
