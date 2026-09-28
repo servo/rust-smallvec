@@ -973,40 +973,23 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     }
 
     #[inline]
+    #[deprecated(
+        since = "2.0.0",
+        note = "use `Into::<Vec<T>>::into` instead"
+    )]
     pub fn into_vec(self) -> Vec<T> {
-        let (length, on_heap) = self.length.parts();
-        if !on_heap {
-            let mut vec = Vec::with_capacity(length);
-            let this = ManuallyDrop::new(self);
-            // SAFETY: we create a new vector with sufficient capacity, copy our
-            // elements into it to transfer ownership and then set
-            // the length we don't drop the elements we previously
-            // held
-            unsafe {
-                copy_nonoverlapping(this.raw.as_ptr_inline(), vec.as_mut_ptr(), length);
-                vec.set_len(length);
-            }
-            vec
-        } else {
-            let this = ManuallyDrop::new(self);
-            // SAFETY:
-            // - `ptr` was created with the global allocator
-            // - `ptr` was created with the appropriate alignment for `T`
-            // - the allocation pointed to by ptr is exactly cap * sizeof(T)
-            // - `length` is less than or equal to `cap`
-            // - the first `length` entries are proper `T`-values
-            // - the allocation is not larger than `isize::MAX`
-            unsafe {
-                let (ptr, cap) = this.raw.heap;
-                Vec::from_raw_parts(ptr.as_ptr(), length, cap)
-            }
-        }
+        self.into()
     }
 
     #[inline]
+    #[deprecated(
+        since = "2.0.0",
+        note = "use `Into::<Box<[T]>>::into` instead"
+    )]
     pub fn into_boxed_slice(self) -> Box<[T]> {
-        self.into_vec().into_boxed_slice()
+        self.into()
     }
+
 
     #[inline]
     #[deprecated(
