@@ -35,3 +35,9 @@ bincode1 = { package = "bincode", version = "1.0.1" }
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs", "--generate-link-to-definition"]
+
+[workspace]
+members = [
+    ".",
+    "fuzz",		
+]
