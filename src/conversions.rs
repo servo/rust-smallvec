@@ -102,8 +102,8 @@ impl<T, const N: usize> From<Vec<T>> for SmallVec<T, N> {
     }
 }
 
-impl<T, const N: usize> From<SmallVec<T, N>> for Vec<T> {
-    fn from(this: SmallVec<T, N>) -> Self {
+impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for Vec<T> {
+    fn from(this: SmallVec<T, N, A>) -> Self {
         let (length, on_heap) = this.length.parts();
         if !on_heap {
             let mut vec = Vec::with_capacity(length);
@@ -117,7 +117,7 @@ impl<T, const N: usize> From<SmallVec<T, N>> for Vec<T> {
         } else {
             let this = ManuallyDrop::new(this);
             // SAFETY:
-            // - `ptr` was created with the global allocator
+            // - `ptr` was created with the SmallVec's allocator
             // - `ptr` was created with the appropriate alignment for `T`
             // - the allocation pointed to by ptr is exactly cap * sizeof(T)
             // - `length` is less than or equal to `cap`
@@ -131,8 +131,8 @@ impl<T, const N: usize> From<SmallVec<T, N>> for Vec<T> {
     }
 }
 
-impl<T, const N: usize> From<SmallVec<T, N>> for Box<[T]> {
-    fn from(this: SmallVec<T, N>) -> Self {
+impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for Box<[T]> {
+    fn from(this: SmallVec<T, N, A>) -> Self {
         Vec::from(this).into_boxed_slice()
     }
 }
