@@ -973,19 +973,15 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     }
 
     #[inline]
-    #[deprecated(
-        since = "2.0.0",
-        note = "use `Into::<Vec<T>>::into` instead"
-    )]
+    #[deprecated(since = "2.0.0", note = "use `Into::<Vec<T>>::into` instead")]
+
     pub fn into_vec(self) -> Vec<T> {
         self.into()
     }
 
     #[inline]
-    #[deprecated(
-        since = "2.0.0",
-        note = "use `Into::<Box<[T]>>::into` instead"
-    )]
+    #[deprecated(since = "2.0.0", note = "use `Into::<Box<[T]>>::into` instead")]
+
     pub fn into_boxed_slice(self) -> Box<[T]> {
         self.into()
     }
@@ -995,6 +991,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         since = "2.0.0-alpha.13",
         note = "use `TryInto::<[T; N]>::try_into` instead"
     )]
+
     pub fn into_inner(self) -> Result<[T; N], Self> {
         if self.len() != N {
             Err(self)
