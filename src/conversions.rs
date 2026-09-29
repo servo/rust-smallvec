@@ -108,7 +108,7 @@ impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for Vec<T> {
         if !on_heap {
             let mut vec = Vec::with_capacity(length);
             let this = ManuallyDrop::new(this);
-            // SAFETY: Copy elements into a sufficiently sized vector and set its length to preserve ownership.
+            // SAFETY: Copy elements into a big enough vector and set its length to keep ownership.
             unsafe {
                 copy_nonoverlapping(this.raw.as_ptr_inline(), vec.as_mut_ptr(), length);
                 vec.set_len(length);
