@@ -139,4 +139,3 @@ impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for Box<[T]> {
         Vec::from(this).into_boxed_slice()
     }
 }
-
