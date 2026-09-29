@@ -990,7 +990,6 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         self.into()
     }
 
-
     #[inline]
     #[deprecated(
         since = "2.0.0-alpha.13",
