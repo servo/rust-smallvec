@@ -102,14 +102,40 @@ impl<T, const N: usize> From<Vec<T>> for SmallVec<T, N> {
     }
 }
 
-impl<T, const N: usize> From<SmallVec<T, N>> for Vec<T> {
-    fn from(this: SmallVec<T, N>) -> Self {
-        this.into_vec()
+impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for Vec<T> {
+    fn from(this: SmallVec<T, N, A>) -> Self {
+        let (length, on_heap) = this.length.parts();
+        if !on_heap {
+            let mut vec = Vec::with_capacity(length);
+            let this = ManuallyDrop::new(this);
+            // SAFETY: we create a new vector with sufficient capacity, copy our
+            // elements into it to transfer ownership and then set
+            // the length we don't drop the elements we previously
+            // held
+            unsafe {
+                copy_nonoverlapping(this.raw.as_ptr_inline(), vec.as_mut_ptr(), length);
+                vec.set_len(length);
+            }
+            vec
+        } else {
+            let this = ManuallyDrop::new(this);
+            // SAFETY:
+            // - `ptr` was created with the SmallVec's allocator
+            // - `ptr` was created with the appropriate alignment for `T`
+            // - the allocation pointed to by ptr is exactly cap * sizeof(T)
+            // - `length` is less than or equal to `cap`
+            // - the first `length` entries are proper `T`-values
+            // - the allocation is not larger than `isize::MAX`
+            unsafe {
+                let (ptr, cap) = this.raw.heap;
+                Vec::from_raw_parts(ptr.as_ptr(), length, cap)
+            }
+        }
     }
 }
 
-impl<T, const N: usize> From<SmallVec<T, N>> for Box<[T]> {
-    fn from(this: SmallVec<T, N>) -> Self {
-        this.into_boxed_slice()
+impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for Box<[T]> {
+    fn from(this: SmallVec<T, N, A>) -> Self {
+        Vec::from(this).into_boxed_slice()
     }
 }
