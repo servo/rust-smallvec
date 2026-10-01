@@ -2,7 +2,7 @@ use {
     super::{
         Allocator,
         SmallVecError,
-        taggedlen::TaggedLen
+        locatedlength::LocatedLength
     },
     core::{
         alloc::Layout,
@@ -106,7 +106,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     /// the allocator must be the same one the data was allocated with
     pub unsafe fn try_grow_raw<A: Allocator>(
         &mut self,
-        length: TaggedLen<T>,
+        length: LocatedLength<T>,
         new_capacity: usize,
         allocator: &A
     ) -> Result<(), SmallVecError> {

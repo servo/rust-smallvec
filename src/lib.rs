@@ -39,7 +39,7 @@ mod references;
 mod serde;
 #[cfg(feature = "specialization")]
 mod specialization;
-mod taggedlen;
+mod locatedlength;
 
 #[cfg(feature = "bytes")]
 use bytes::{
@@ -88,17 +88,17 @@ use {
 #[cfg(feature = "internals")]
 pub use {
     rawsmallvec::RawSmallVec,
-    taggedlen::TaggedLen
+    locatedlength::LocatedLength
 };
 #[cfg(not(feature = "internals"))]
 use {
     rawsmallvec::RawSmallVec,
-    taggedlen::TaggedLen
+    locatedlength::LocatedLength
 };
 
 #[repr(C)]
 pub struct SmallVec<T, const N: usize, A: Allocator = Global> {
-    length: TaggedLen<T>,
+    length: LocatedLength<T>,
     raw: RawSmallVec<T, N>,
     allocator: A
 }
@@ -151,7 +151,7 @@ impl<T, const N: usize> SmallVec<T, N> {
 
         // SAFETY: all the members in 0..S are initialized
         Self {
-            length: TaggedLen::new(S, false),
+            length: LocatedLength::new(S, false),
             raw: RawSmallVec::new_inline(buf),
             allocator: Global
         }
@@ -162,7 +162,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         assert!(length <= N);
         // SAFETY: all the members in 0..length are initialized
         let mut vec = Self {
-            length: TaggedLen::new(length, false),
+            length: LocatedLength::new(length, false),
             raw: RawSmallVec::new_inline(MaybeUninit::new(buf)),
             allocator: Global
         };
@@ -213,7 +213,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     ) -> Self {
         debug_assert!(length <= N);
         Self {
-            length: TaggedLen::new(length, false),
+            length: LocatedLength::new(length, false),
             raw: RawSmallVec::new_inline(buf),
             allocator: Global
         }
@@ -239,7 +239,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             // elements
             unsafe { vec.set_len(0) };
             Self {
-                length: TaggedLen::new(length, false),
+                length: LocatedLength::new(length, false),
                 raw: RawSmallVec::new(),
                 allocator: Global
             }
@@ -258,7 +258,7 @@ impl<T, const N: usize> SmallVec<T, N> {
             let ptr = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
 
             Self {
-                length: TaggedLen::new(length, true),
+                length: LocatedLength::new(length, true),
                 raw: RawSmallVec::new_heap(ptr, cap),
                 allocator: Global
             }
@@ -348,7 +348,7 @@ impl<T, const N: usize> SmallVec<T, N> {
         };
 
         SmallVec {
-            length: TaggedLen::new(length, true),
+            length: LocatedLength::new(length, true),
             raw: RawSmallVec::new_heap(ptr, capacity),
             allocator: Global
         }
@@ -392,7 +392,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     #[inline]
     pub unsafe fn set_len(&mut self, new_len: usize) {
         debug_assert!(new_len <= self.capacity());
-        self.length = TaggedLen::new(new_len, self.length.on_heap());
+        self.length = LocatedLength::new(new_len, self.length.on_heap());
     }
 
     #[inline]
@@ -1323,7 +1323,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
 
     pub const fn new_in(allocator: A) -> SmallVec<T, N, A> {
         Self {
-            length: TaggedLen::new(0, false),
+            length: LocatedLength::new(0, false),
             raw: RawSmallVec::new(),
             allocator
         }
@@ -1335,7 +1335,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             // SAFETY: we checked all the preconditions
             unsafe {
                 this.raw
-                    .try_grow_raw(TaggedLen::new(0, false), capacity, &this.allocator)
+                    .try_grow_raw(LocatedLength::new(0, false), capacity, &this.allocator)
             }?;
 
             // SAFETY: the allocation succeeded, so self.raw.heap is now active
@@ -1690,7 +1690,7 @@ impl<T: Clone, const N: usize, A: Allocator + Clone> Clone for SmallVec<T, N, A>
     #[inline]
     fn clone(&self) -> SmallVec<T, N, A> {
         let mut vec = SmallVec {
-            length: TaggedLen::new(0, false),
+            length: LocatedLength::new(0, false),
             raw: RawSmallVec::new(),
             allocator: self.allocator.clone()
         };
