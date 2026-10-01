@@ -29,6 +29,7 @@ pub use iterators::{
     intoiter::IntoIter,
     splice::Splice
 };
+mod locatedlength;
 mod macros;
 #[cfg(feature = "malloc_size_of")]
 mod mallocsizeof;
@@ -39,7 +40,6 @@ mod references;
 mod serde;
 #[cfg(feature = "specialization")]
 mod specialization;
-mod locatedlength;
 
 #[cfg(feature = "bytes")]
 use bytes::{
@@ -87,13 +87,13 @@ use {
 };
 #[cfg(feature = "internals")]
 pub use {
-    rawsmallvec::RawSmallVec,
-    locatedlength::LocatedLength
+    locatedlength::LocatedLength,
+    rawsmallvec::RawSmallVec
 };
 #[cfg(not(feature = "internals"))]
 use {
-    rawsmallvec::RawSmallVec,
-    locatedlength::LocatedLength
+    locatedlength::LocatedLength,
+    rawsmallvec::RawSmallVec
 };
 
 #[repr(C)]

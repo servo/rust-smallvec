@@ -3,9 +3,9 @@ use {
         Allocator,
         DropDealloc,
         Global,
+        LocatedLength,
         RawSmallVec,
-        SmallVec,
-        LocatedLength
+        SmallVec
     },
     core::{
         fmt::Debug,
