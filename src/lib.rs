@@ -360,15 +360,15 @@ impl<T: Clone, const N: usize> SmallVec<T, N> {
     /// for types with the [`Copy`] trait.
     pub fn from_slice_copy(slice: &[T]) -> Self
     where T: Copy {
-        let src = slice.as_ptr();
+        let source = slice.as_ptr();
         let length = slice.len();
         let mut result = Self::with_capacity(length);
 
         // SAFETY: By using `with_capacity`, the pointer will point to valid
         // memory.
         unsafe {
-            let dst = result.as_mut_ptr();
-            copy_nonoverlapping(src, dst, length);
+            let destination = result.as_mut_ptr();
+            copy_nonoverlapping(source, destination, length);
             result.set_len(length);
         }
 
@@ -1262,7 +1262,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     pub fn extend_from_slice_copy(&mut self, other: &[T])
     where T: Copy {
         let length = other.len();
-        let src = other.as_ptr();
+        let source = other.as_ptr();
 
         let l = self.len();
         self.reserve(length);
@@ -1270,22 +1270,22 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         // SAFETY: Additional memory has been reserved,
         // therefore the pointer access is valid.
         unsafe {
-            let dst = self.as_mut_ptr().add(l);
-            copy_nonoverlapping(src, dst, length);
+            let destination = self.as_mut_ptr().add(l);
+            copy_nonoverlapping(source, destination, length);
             self.length.add(length);
         }
     }
 
-    pub fn extend_from_within_copy<R>(&mut self, src: R)
+    pub fn extend_from_within_copy<R>(&mut self, source: R)
     where
         R: core::ops::RangeBounds<usize>,
         T: Copy
     {
-        let src = core::ops::Range::new(src, self.len());
+        let source = core::ops::Range::new(source, self.len());
         let core::ops::Range {
             start,
             end
-        } = src;
+        } = source;
         let length = end - start;
         self.reserve(length);
 
@@ -1365,10 +1365,10 @@ impl<T: Clone, const N: usize, A: Allocator> SmallVec<T, N, A> {
         self.extend(other.iter())
     }
 
-    pub fn extend_from_within<R>(&mut self, src: R)
+    pub fn extend_from_within<R>(&mut self, source: R)
     where R: core::ops::RangeBounds<usize> {
-        let src = core::ops::Range::new(src, self.len());
-        self.reserve(src.len());
+        let source = core::ops::Range::new(source, self.len());
+        self.reserve(source.len());
 
         // SAFETY: The call to `reserve` ensures that the capacity is large
         // enough. The range is within bounds through the use of
@@ -1377,13 +1377,13 @@ impl<T: Clone, const N: usize, A: Allocator> SmallVec<T, N, A> {
             #[cfg(feature = "specialization")]
             {
                 <Self as specialization::SpecExtendFromWithin<T>>::spec_extend_from_within(
-                    self, src
+                    self, source
                 );
             }
 
             #[cfg(not(feature = "specialization"))]
             {
-                self.extend_from_within_fallback(src);
+                self.extend_from_within_fallback(source);
             }
         }
     }
@@ -1578,20 +1578,20 @@ impl<T, const N: usize> SmallVec<T, N> {
     where T: Clone {
         let mut v = Self::new();
 
-        let src = slice.as_ptr();
+        let source = slice.as_ptr();
         let length = slice.len();
-        let dst = v.as_mut_ptr();
+        let destination = v.as_mut_ptr();
 
         // SAFETY: The caller ensures that the slice length is smaller
         // than or equal to the inline length.
         unsafe {
             let mut guard = DropGuard {
-                ptr: dst,
+                ptr: destination,
                 length: 0
             };
             for i in 0..length {
-                let val = (*src.add(i)).clone();
-                dst.add(i).write(val);
+                let val = (*source.add(i)).clone();
+                destination.add(i).write(val);
                 guard.length += 1;
             }
             core::mem::forget(guard);
@@ -1631,33 +1631,33 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     ///
     /// # Safety
     ///
-    /// * The length of the vector is larger than or equal to `src.len()`.
+    /// * The length of the vector is larger than or equal to `source.len()`.
     /// * The spare capacity of the vector is larger than or equal to
-    ///   `src.len()`.
+    ///   `source.len()`.
     ///
     /// [`extend_from_within`]: SmallVec::extend_from_within
-    unsafe fn extend_from_within_fallback(&mut self, src: core::ops::Range<usize>)
+    unsafe fn extend_from_within_fallback(&mut self, source: core::ops::Range<usize>)
     where T: Clone {
         let old_len = self.len();
 
-        let start = src.start;
-        let length = src.len();
+        let start = source.start;
+        let length = source.len();
 
         // SAFETY: The caller ensures that the vector has spare capacity
-        // for at least `src.len()` elements. This implies that the loop
+        // for at least `source.len()` elements. This implies that the loop
         // operates on valid memory.
         unsafe {
             let ptr = self.as_mut_ptr();
-            let dst = ptr.add(old_len);
-            let src = ptr.add(start);
+            let destination = ptr.add(old_len);
+            let source = ptr.add(start);
 
             let mut guard = DropGuard {
-                ptr: dst,
+                ptr: destination,
                 length: 0
             };
             for i in 0..length {
-                let val = (*src.add(i)).clone();
-                dst.add(i).write(val);
+                let val = (*source.add(i)).clone();
+                destination.add(i).write(val);
                 guard.length += 1;
             }
             core::mem::forget(guard);
@@ -1868,22 +1868,22 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
     // Specialize these methods so they can skip checking `remaining_mut`
     // and `advance_mut`.
     #[inline]
-    fn put<T: bytes::Buf>(&mut self, mut src: T)
+    fn put<T: bytes::Buf>(&mut self, mut source: T)
     where Self: Sized {
-        // In case the src isn't contiguous, reserve upfront.
-        self.reserve(src.remaining());
+        // In case the source isn't contiguous, reserve upfront.
+        self.reserve(source.remaining());
 
-        while src.has_remaining() {
-            let s = src.chunk();
+        while source.has_remaining() {
+            let s = source.chunk();
             let l = s.len();
             self.extend_from_slice(s);
-            src.advance(l);
+            source.advance(l);
         }
     }
 
     #[inline]
-    fn put_slice(&mut self, src: &[u8]) {
-        self.extend_from_slice(src);
+    fn put_slice(&mut self, source: &[u8]) {
+        self.extend_from_slice(source);
     }
 
     #[inline]

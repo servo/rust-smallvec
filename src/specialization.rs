@@ -118,9 +118,9 @@ impl<T, const N: usize, const M: usize, A: Allocator> SpecExtend<T, IntoIter<T, 
         // SAFETY: Additional memory has been reserved above.
         // Therefore, the copy operates on valid memory.
         unsafe {
-            let dst = self.as_mut_ptr().add(old_len);
-            let src = slice.as_ptr();
-            copy_nonoverlapping(src, dst, length);
+            let destination = self.as_mut_ptr().add(old_len);
+            let source = slice.as_ptr();
+            copy_nonoverlapping(source, destination, length);
         }
 
         // SAFETY: The elements were initialized above.
@@ -158,9 +158,9 @@ where T: Copy
         // SAFETY: Additional memory has been reserved above.
         // Therefore, the copy operates on valid memory.
         unsafe {
-            let dst = self.as_mut_ptr().add(old_len);
-            let src = slice.as_ptr();
-            copy_nonoverlapping(src, dst, length);
+            let destination = self.as_mut_ptr().add(old_len);
+            let source = slice.as_ptr();
+            copy_nonoverlapping(source, destination, length);
         }
 
         // SAFETY: The elements were initialized above.
@@ -178,38 +178,38 @@ pub trait SpecExtendFromWithin<T> {
     ///
     /// # Safety
     ///
-    /// * The length of the vector is larger than or equal to `src.len()`.
+    /// * The length of the vector is larger than or equal to `source.len()`.
     /// * The spare capacity of the vector is larger than or equal to
-    ///   `src.len()`.
+    ///   `source.len()`.
     ///
     /// [`extend_from_within`]: SmallVec::extend_from_within
-    unsafe fn spec_extend_from_within(&mut self, src: core::ops::Range<usize>);
+    unsafe fn spec_extend_from_within(&mut self, source: core::ops::Range<usize>);
 }
 
 impl<T: Clone, const N: usize, A: Allocator> SpecExtendFromWithin<T> for SmallVec<T, N, A> {
-    default unsafe fn spec_extend_from_within(&mut self, src: core::ops::Range<usize>) {
+    default unsafe fn spec_extend_from_within(&mut self, source: core::ops::Range<usize>) {
         // SAFETY: Safety conditions are identical.
         unsafe {
-            self.extend_from_within_fallback(src);
+            self.extend_from_within_fallback(source);
         }
     }
 }
 
 impl<T: Copy, const N: usize, A: Allocator> SpecExtendFromWithin<T> for SmallVec<T, N, A> {
-    unsafe fn spec_extend_from_within(&mut self, src: core::ops::Range<usize>) {
+    unsafe fn spec_extend_from_within(&mut self, source: core::ops::Range<usize>) {
         let old_len = self.len();
 
-        let start = src.start;
-        let length = src.len();
+        let start = source.start;
+        let length = source.len();
 
         // SAFETY: The caller ensures that the vector has spare capacity
-        // for at least `src.len()` elements. This is also the amount of
+        // for at least `source.len()` elements. This is also the amount of
         // memory accessed when the data is copied.
         unsafe {
             let ptr = self.as_mut_ptr();
-            let dst = ptr.add(old_len);
-            let src = ptr.add(start);
-            copy_nonoverlapping(src, dst, length);
+            let destination = ptr.add(old_len);
+            let source = ptr.add(start);
+            copy_nonoverlapping(source, destination, length);
         }
 
         // SAFETY: The elements were initialized above.
@@ -297,14 +297,14 @@ impl<T: Copy, const N: usize> SpecFromSlice<T> for SmallVec<T, N> {
     unsafe fn spec_from(slice: &[T]) -> Self {
         let mut v = Self::new();
 
-        let src = slice.as_ptr();
+        let source = slice.as_ptr();
         let length = slice.len();
-        let dst = v.as_mut_ptr();
+        let destination = v.as_mut_ptr();
 
         // SAFETY: The caller ensures that the slice length is smaller
         // than or equal to the inline length.
         unsafe {
-            copy_nonoverlapping(src, dst, length);
+            copy_nonoverlapping(source, destination, length);
         }
 
         // SAFETY: The elements were initialized above.
