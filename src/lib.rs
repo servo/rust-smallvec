@@ -338,8 +338,8 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     /// ```
     #[inline]
     pub unsafe fn from_raw_parts(
-        ptr: *mut T, 
-        length: usize, 
+        ptr: *mut T,
+        length: usize,
         capacity: usize
     ) -> SmallVec<T, N, Global> {
         assert!(!Self::IS_ZST);
@@ -527,7 +527,8 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     ///
     /// ```
     /// # use smallvec::{Global, SmallVec};
-    /// let mut items: SmallVec<i32, 16, Global> = SmallVec::from(&[0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 2, 1, 2]);
+    /// let mut items: SmallVec<i32, 16, Global> =
+    ///     SmallVec::from(&[0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 2, 1, 2]);
     /// let ones = items
     ///     .extract_if(7.., |x| *x == 1)
     ///     .collect::<SmallVec<i32, 16, Global>>();
@@ -1534,8 +1535,8 @@ pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N, 
         {
             // SAFETY: The precondition is checked in the initial comparison
             // above.
-            unsafe { 
-                <SmallVec<T, N, Global> as specialization::SpecFromElem<T>>::spec_from_elem(elem, n) 
+            unsafe {
+                <SmallVec<T, N, Global> as specialization::SpecFromElem<T>>::spec_from_elem(elem, n)
             }
         }
 

@@ -32,7 +32,7 @@ traffic for workloads that fit within the inline buffer.
 use smallvec::{Global, SmallVec};
 
 // This SmallVec can hold up to 4 items on the stack:
-let mut v: SmallVec<i32, 4> = SmallVec::from([1, 2, 3, 4]);
+let mut v: SmallVec<i32, 4, Global> = SmallVec::from([1, 2, 3, 4]);
 
 // It will automatically move its contents to the heap if
 // contains more than four items:
@@ -58,7 +58,7 @@ v.sort();
 - `rayon`: implements parallel iteration
 - `serde`: implements serde's serialization and deserialization
 - `specialization` (nightly): enables specialization, improving performance on some cases
-- `std`: implements the `std::io::Write` type for `SmallVec<u8, N>`
+- `std`: implements the `std::io::Write` type for `SmallVec<u8, N, Global>`
 
 > [!NOTE]
 > - SmallVec without any features enabled does not make use of the standard library.
