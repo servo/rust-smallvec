@@ -22,7 +22,8 @@ use {
     core::iter::repeat_with
 };
 
-impl<Type: BorshSerialize, const INLINE: usize> BorshSerialize for SmallVec<Type, INLINE, Global> {
+impl<Type: BorshSerialize, const INLINE: usize> BorshSerialize 
+    for SmallVec<Type, INLINE, Global> {
     fn serialize<Writer: Write>(&self, writer: &mut Writer) -> Serial<()> {
         (self.len() as u64).serialize(writer)?;
         for element in self {
@@ -33,7 +34,8 @@ impl<Type: BorshSerialize, const INLINE: usize> BorshSerialize for SmallVec<Type
     }
 }
 
-impl<Type: BorshDeserialize, const INLINE: usize> BorshDeserialize for SmallVec<Type, INLINE, Global> {
+impl<Type: BorshDeserialize, const INLINE: usize> BorshDeserialize 
+    for SmallVec<Type, INLINE, Global> {
     fn deserialize_reader<R: borsh::io::Read>(reader: &mut R) -> Serial<Self> {
         let length = u64::deserialize_reader(reader)?;
         repeat_with(|| Type::deserialize_reader(reader))

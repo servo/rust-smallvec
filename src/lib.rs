@@ -337,7 +337,11 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     /// }
     /// ```
     #[inline]
-    pub unsafe fn from_raw_parts(ptr: *mut T, length: usize, capacity: usize) -> SmallVec<T, N, Global> {
+    pub unsafe fn from_raw_parts(
+        ptr: *mut T, 
+        length: usize, 
+        capacity: usize
+    ) -> SmallVec<T, N, Global> {
         assert!(!Self::IS_ZST);
 
         // SAFETY: We require caller to provide same ptr as we alloc
@@ -1530,7 +1534,9 @@ pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N, 
         {
             // SAFETY: The precondition is checked in the initial comparison
             // above.
-            unsafe { <SmallVec<T, N, Global> as specialization::SpecFromElem<T>>::spec_from_elem(elem, n) }
+            unsafe { 
+                <SmallVec<T, N, Global> as specialization::SpecFromElem<T>>::spec_from_elem(elem, n) 
+            }
         }
 
         #[cfg(not(feature = "specialization"))]
