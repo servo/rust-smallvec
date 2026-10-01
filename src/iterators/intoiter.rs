@@ -3,9 +3,9 @@ use {
         Allocator,
         DropDealloc,
         Global,
+        LocatedLength,
         RawSmallVec,
-        SmallVec,
-        TaggedLen
+        SmallVec
     },
     core::{
         fmt::Debug,
@@ -32,7 +32,7 @@ pub struct IntoIter<T, const N: usize, A: Allocator = Global> {
     raw: RawSmallVec<T, N>,
     allocator: A,
     begin: usize,
-    end: TaggedLen<T>
+    end: LocatedLength<T>
 }
 
 // SAFETY: IntoIter has unique ownership of its contents.  Sending (or sharing)
@@ -143,7 +143,7 @@ impl<T: Clone, const N: usize, A: Allocator + Clone> Clone for IntoIter<T, N, A>
     #[inline]
     fn clone(&self) -> IntoIter<T, N, A> {
         let mut vec = SmallVec {
-            length: TaggedLen::new(0, false),
+            length: LocatedLength::new(0, false),
             raw: RawSmallVec::new(),
             allocator: self.allocator.clone()
         };
