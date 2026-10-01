@@ -439,11 +439,13 @@ mod insert_many_panic {
 }
 
 #[test]
-#[should_panic]
 fn test_invalid_grow() {
     let mut v: SmallVec<[u8; 8]> = SmallVec::new();
     v.extend(0..8);
+    let cap = v.capacity();
     v.grow(5);
+    assert_eq!(v.capacity(), cap);
+    assert_eq!(v.len(), 8);
 }
 
 #[test]
