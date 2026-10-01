@@ -793,10 +793,10 @@ fn into_raw_parts_heap() {
 #[test]
 fn into_vec() {
     let vec = SmallVec::<u8, 2>::from_iter(0..2);
-    assert_eq!(vec.into_vec(), Vec::from([0, 1]));
+    assert_eq!(Vec::from(vec), Vec::from([0, 1]));
 
     let vec = SmallVec::<u8, 2>::from_iter(0..3);
-    assert_eq!(vec.into_vec(), Vec::from([0, 1, 2]));
+    assert_eq!(Vec::from(vec), Vec::from([0, 1, 2]));
 }
 
 #[test]
