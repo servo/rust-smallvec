@@ -5,7 +5,7 @@
 use {
     arbitrary::Arbitrary,
     libfuzzer_sys::fuzz_target,
-    smallvec::SmallVec,
+    smallvec::{Global, SmallVec},
     std::fmt::Debug
 };
 
@@ -75,7 +75,7 @@ enum Op {
 /// Helper to assert equivalence of all structural invariants of `SmallVec`
 /// against `alloc::Vec`
 fn assert_invariants<T: Copy + PartialEq + Debug, const N: usize>(
-    small_vec: &mut SmallVec<T, N>,
+    small_vec: &mut SmallVec<T, N, Global>,
     std_vec: &mut Vec<T>
 ) {
     // Length and content equivalence

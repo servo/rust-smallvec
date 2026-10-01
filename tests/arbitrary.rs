@@ -3,7 +3,7 @@ use {
         Arbitrary,
         Unstructured
     },
-    smallvec::SmallVec
+    smallvec::{Global, SmallVec}
 };
 
 #[test]

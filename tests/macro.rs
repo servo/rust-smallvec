@@ -1,11 +1,11 @@
 #[test]
 #[allow(deprecated)]
 fn smallvec() {
-    let mut vec: smallvec::SmallVec<i32, 2>;
+    let mut vec: smallvec::SmallVec<i32, 2, smallvec::Global>;
 
     macro_rules! check {
         ($init:tt) => {
-            vec = smallvec::smallvec! $init;
+            vec = smallvec::{Global, SmallVec}! $init;
             assert_eq!(*vec, *vec! $init);
         }
     }

@@ -2,6 +2,7 @@ use {
     crate::{
         Allocator,
         Box,
+        Global,
         SmallVec,
         Vec
     },
@@ -11,7 +12,7 @@ use {
     }
 };
 
-impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N> {
+impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N, Global> {
     #[inline]
     fn from(slice: &[T]) -> Self {
         if slice.len() > Self::inline_size() {
@@ -35,28 +36,28 @@ impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N> {
     }
 }
 
-impl<T: Clone, const N: usize> From<&mut [T]> for SmallVec<T, N> {
+impl<T: Clone, const N: usize> From<&mut [T]> for SmallVec<T, N, Global> {
     #[inline]
     fn from(slice: &mut [T]) -> Self {
         Self::from(slice as &[T])
     }
 }
 
-impl<T: Clone, const M: usize, const N: usize> From<&[T; M]> for SmallVec<T, N> {
+impl<T: Clone, const M: usize, const N: usize> From<&[T; M]> for SmallVec<T, N, Global> {
     #[inline]
     fn from(slice: &[T; M]) -> Self {
         Self::from(slice as &[T])
     }
 }
 
-impl<T: Clone, const M: usize, const N: usize> From<&mut [T; M]> for SmallVec<T, N> {
+impl<T: Clone, const M: usize, const N: usize> From<&mut [T; M]> for SmallVec<T, N, Global> {
     #[inline]
     fn from(slice: &mut [T; M]) -> Self {
         Self::from(slice as &[T])
     }
 }
 
-impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N> {
+impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N, Global> {
     fn from(array: [T; M]) -> Self {
         if M > N {
             // If M > N, we'd have to heap allocate anyway,
@@ -96,20 +97,20 @@ impl<T, const N: usize, const M: usize, A: Allocator> TryFrom<SmallVec<T, N, A>>
     }
 }
 
-impl<T, const N: usize> From<Vec<T>> for SmallVec<T, N> {
+impl<T, const N: usize> From<Vec<T>> for SmallVec<T, N, Global> {
     fn from(array: Vec<T>) -> Self {
         Self::from_vec(array)
     }
 }
 
-impl<T, const N: usize> From<SmallVec<T, N>> for Vec<T> {
-    fn from(this: SmallVec<T, N>) -> Self {
+impl<T, const N: usize> From<SmallVec<T, N, Global>> for Vec<T> {
+    fn from(this: SmallVec<T, N, Global>) -> Self {
         this.into_vec()
     }
 }
 
-impl<T, const N: usize> From<SmallVec<T, N>> for Box<[T]> {
-    fn from(this: SmallVec<T, N>) -> Self {
+impl<T, const N: usize> From<SmallVec<T, N, Global>> for Box<[T]> {
+    fn from(this: SmallVec<T, N, Global>) -> Self {
         this.into_boxed_slice()
     }
 }

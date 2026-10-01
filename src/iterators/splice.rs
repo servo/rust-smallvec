@@ -84,7 +84,7 @@ impl<I: Iterator, const N: usize> Drop for Splice<'_, I, N> {
             let mut collected = self
                 .replace_with
                 .by_ref()
-                .collect::<SmallVec<I::Item, N>>()
+                .collect::<SmallVec<I::Item, N, Global>>()
                 .into_iter();
             // Now we have an exact count.
             if collected.len() > 0 {

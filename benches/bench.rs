@@ -5,7 +5,7 @@ use {
         criterion_group,
         criterion_main
     },
-    smallvec::SmallVec,
+    smallvec::{Global, SmallVec},
     std::{
         hint::black_box,
         time::Duration
@@ -67,7 +67,7 @@ impl<T: Copy> Vector<T> for Vec<T> {
     }
 }
 
-impl<T: Copy> Vector<T> for SmallVec<T, VEC_SIZE> {
+impl<T: Copy> Vector<T> for SmallVec<T, VEC_SIZE, Global> {
     fn new() -> Self {
         Self::new()
     }
@@ -123,7 +123,7 @@ macro_rules! make_benches {
 // ----------  Bench generation (same list, just using the new macro)
 // ----------
 make_benches! {
-    bench_smallvec => SmallVec<u64, VEC_SIZE> {
+    bench_smallvec => SmallVec<u64, VEC_SIZE, Global> {
         bench_push => gen_push(SPILLED_SIZE as _),
         bench_push_small => gen_push(VEC_SIZE as _),
         bench_insert_push => gen_insert_push(SPILLED_SIZE as _),
@@ -356,7 +356,7 @@ fn gen_retain_mut_none<V: Vector<u64>>(n: usize, b: &mut Bencher) {
 fn bench_macro_from_list(c: &mut Criterion) {
     c.bench_function("bench_macro_from_list", |b| {
         b.iter(|| {
-            let vec: SmallVec<u64, 16> = SmallVec::from([
+            let vec: SmallVec<u64, 16, Global> = SmallVec::from([
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 20, 24, 32, 36, 0x40,
                 0x80, 0x100, 0x200, 0x400, 0x800, 0x1000, 0x2000, 0x4000, 0x8000, 0x10000, 0x20000,
                 0x40000, 0x80000, 0x100000

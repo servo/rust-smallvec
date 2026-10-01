@@ -2,7 +2,7 @@
 
 use bytes::BufMut as _;
 
-type SmallVec = smallvec::SmallVec<u8, 8>;
+type SmallVec = smallvec::SmallVec<u8, 8, smallvec::Global>;
 
 #[test]
 fn smallvec_as_mut_buf() {

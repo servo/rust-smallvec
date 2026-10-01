@@ -29,7 +29,7 @@ traffic for workloads that fit within the inline buffer.
 ## Example
 
 ```rust
-use smallvec::SmallVec;
+use smallvec::{Global, SmallVec};
 
 // This SmallVec can hold up to 4 items on the stack:
 let mut v: SmallVec<i32, 4> = SmallVec::from([1, 2, 3, 4]);

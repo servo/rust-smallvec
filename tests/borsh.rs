@@ -3,7 +3,7 @@ use {
         BorshDeserialize,
         to_vec
     },
-    smallvec::SmallVec
+    smallvec::{Global, SmallVec}
 };
 
 #[test]

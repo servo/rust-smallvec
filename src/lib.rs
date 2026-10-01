@@ -106,16 +106,16 @@ pub struct SmallVec<T, const N: usize, A: Allocator = Global> {
 unsafe impl<T: Send, const N: usize, A: Allocator + Send> Send for SmallVec<T, N, A> {}
 unsafe impl<T: Sync, const N: usize, A: Allocator + Sync> Sync for SmallVec<T, N, A> {}
 
-impl<T, const N: usize> Default for SmallVec<T, N> {
+impl<T, const N: usize> Default for SmallVec<T, N, Global> {
     #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T, const N: usize> SmallVec<T, N> {
+impl<T, const N: usize> SmallVec<T, N, Global> {
     #[inline]
-    pub const fn new() -> SmallVec<T, N> {
+    pub const fn new() -> SmallVec<T, N, Global> {
         Self::new_in(Global)
     }
 
@@ -192,7 +192,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     ///
     /// ```
     /// use {
-    ///     smallvec::SmallVec,
+    ///     smallvec::{Global, SmallVec},
     ///     std::mem::MaybeUninit
     /// };
     ///
@@ -305,9 +305,9 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// # Examples
     ///
     /// ```
-    /// use smallvec::SmallVec;
+    /// use smallvec::{Global, SmallVec};
     ///
-    /// let mut v: SmallVec<_, 1> = SmallVec::from([1, 2, 3]);
+    /// let mut v: SmallVec<_, 1, Global> = SmallVec::from([1, 2, 3]);
     ///
     /// // Pull out the important parts of `v`.
     /// let p = v.as_mut_ptr();
@@ -337,7 +337,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     /// }
     /// ```
     #[inline]
-    pub unsafe fn from_raw_parts(ptr: *mut T, length: usize, capacity: usize) -> SmallVec<T, N> {
+    pub unsafe fn from_raw_parts(ptr: *mut T, length: usize, capacity: usize) -> SmallVec<T, N, Global> {
         assert!(!Self::IS_ZST);
 
         // SAFETY: We require caller to provide same ptr as we alloc
@@ -355,7 +355,7 @@ impl<T, const N: usize> SmallVec<T, N> {
     }
 }
 
-impl<T: Clone, const N: usize> SmallVec<T, N> {
+impl<T: Clone, const N: usize> SmallVec<T, N, Global> {
     /// A function for creating [`SmallVec`] values out of slices
     /// for types with the [`Copy`] trait.
     pub fn from_slice_copy(slice: &[T]) -> Self
@@ -469,10 +469,10 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     ///
     /// Using this method is equivalent to the following code:
     /// ```
-    /// # use smallvec::SmallVec;
+    /// # use smallvec::{Global, SmallVec};
     /// # use std::cmp::min;
     /// # let some_predicate = |x: &mut i32| { *x == 2 || *x == 3 || *x == 6 };
-    /// # let mut vec: SmallVec<i32, 8> = SmallVec::from(&[1i32, 2, 3, 4, 5, 6]);
+    /// # let mut vec: SmallVec<i32, 8, Global> = SmallVec::from(&[1i32, 2, 3, 4, 5, 6]);
     /// # let range = 1..4;
     /// let mut i = 0;
     /// while i < min(vec.len(), range.end) {
@@ -503,13 +503,13 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// Splitting an array into evens and odds, reusing the original allocation:
     ///
     /// ```
-    /// # use smallvec::SmallVec;
-    /// let mut numbers: SmallVec<i32, 16> =
+    /// # use smallvec::{Global, SmallVec};
+    /// let mut numbers: SmallVec<i32, 16, Global> =
     ///     SmallVec::from(&[1i32, 2, 3, 4, 5, 6, 8, 9, 11, 13, 14, 15]);
     ///
     /// let evens = numbers
     ///     .extract_if(.., |x| *x % 2 == 0)
-    ///     .collect::<SmallVec<i32, 16>>();
+    ///     .collect::<SmallVec<i32, 16, Global>>();
     /// let odds = numbers;
     ///
     /// assert_eq!(evens, SmallVec::<i32, 16>::from(&[2i32, 4, 6, 8, 14]));
@@ -522,11 +522,11 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// Using the range argument to only process a part of the vector:
     ///
     /// ```
-    /// # use smallvec::SmallVec;
-    /// let mut items: SmallVec<i32, 16> = SmallVec::from(&[0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 2, 1, 2]);
+    /// # use smallvec::{Global, SmallVec};
+    /// let mut items: SmallVec<i32, 16, Global> = SmallVec::from(&[0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 2, 1, 2]);
     /// let ones = items
     ///     .extract_if(7.., |x| *x == 1)
-    ///     .collect::<SmallVec<i32, 16>>();
+    ///     .collect::<SmallVec<i32, 16, Global>>();
     /// assert_eq!(
     ///     items,
     ///     SmallVec::<i32, 16>::from(&[0, 0, 0, 0, 0, 0, 0, 2, 2, 2])
@@ -761,7 +761,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         } else if length < self.capacity() {
             // SAFETY: length > Self::inline_size() >= 0
             // so new capacity is non zero, it is equal to the length
-            // T can't be a ZST because SmallVec<ZST, N> is never spilled.
+            // T can't be a ZST because SmallVec<ZST, N, Global> is never spilled.
             unsafe {
                 self.raw
                     .try_grow_raw(self.length, length, &self.allocator)
@@ -797,7 +797,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             } else if target < capacity {
                 // SAFETY: length > Self::inline_size() >= 0
                 // so new capacity is non zero, it is equal to the length
-                // T can't be a ZST because SmallVec<ZST, N> is never spilled.
+                // T can't be a ZST because SmallVec<ZST, N, Global> is never spilled.
                 unsafe {
                     self.raw
                         .try_grow_raw(self.length, target, &self.allocator)
@@ -1221,7 +1221,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         }
     }
 
-    /// Decomposes a `SmallVec<T, N>` into its raw components: `(pointer,
+    /// Decomposes a `SmallVec<T, N, Global>` into its raw components: `(pointer,
     /// length, capacity)`.
     ///
     /// Returns the raw pointer to the underlying data, the length of
@@ -1248,9 +1248,9 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// # Examples
     ///
     /// ```
-    /// # use smallvec::SmallVec;
+    /// # use smallvec::{Global, SmallVec};
     ///
-    /// let v: SmallVec<i32, 1> = SmallVec::from([-1, 0, 1]);
+    /// let v: SmallVec<i32, 1, Global> = SmallVec::from([-1, 0, 1]);
     ///
     /// let (ptr, length, cap) = v.into_raw_parts();
     ///
@@ -1521,7 +1521,7 @@ impl<T, const N: usize, A: Allocator> Drop for SmallVec<T, N, A> {
 /// It is recommended to use the macro instead of using this function.
 #[doc(hidden)]
 #[track_caller]
-pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N> {
+pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N, Global> {
     if n > SmallVec::<T, N>::inline_size() {
         // Standard Rust vectors are already specialized.
         SmallVec::from_vec(vec![elem; n])
@@ -1530,7 +1530,7 @@ pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N> 
         {
             // SAFETY: The precondition is checked in the initial comparison
             // above.
-            unsafe { <SmallVec<T, N> as specialization::SpecFromElem<T>>::spec_from_elem(elem, n) }
+            unsafe { <SmallVec<T, N, Global> as specialization::SpecFromElem<T>>::spec_from_elem(elem, n) }
         }
 
         #[cfg(not(feature = "specialization"))]
@@ -1545,7 +1545,7 @@ pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N> 
 /// Fallback functions for various specialized methods. These are kept in
 /// a separate implementation block for easy access whenever specialization is
 /// disabled.
-impl<T, const N: usize> SmallVec<T, N> {
+impl<T, const N: usize> SmallVec<T, N, Global> {
     /// Creates a `Smallvec` value where `elem` is repeated `n` times.
     /// This will use the inline storage, not the heap.
     ///
@@ -1768,7 +1768,7 @@ impl<'a, T: Clone + 'a, const N: usize, A: Allocator> Extend<&'a T> for SmallVec
     }
 }
 
-impl<T, const N: usize> core::iter::FromIterator<T> for SmallVec<T, N> {
+impl<T, const N: usize> core::iter::FromIterator<T> for SmallVec<T, N, Global> {
     #[inline]
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         #[cfg(feature = "specialization")]
@@ -1815,7 +1815,7 @@ impl<T: Debug, const N: usize, A: Allocator> Debug for SmallVec<T, N, A> {
 
 #[cfg(feature = "arbitrary")]
 #[cfg_attr(docsrs, doc(cfg(feature = "arbitrary")))]
-impl<'a, T, const N: usize> arbitrary::Arbitrary<'a> for SmallVec<T, N>
+impl<'a, T, const N: usize> arbitrary::Arbitrary<'a> for SmallVec<T, N, Global>
 where T: arbitrary::Arbitrary<'a>
 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
@@ -1833,7 +1833,7 @@ where T: arbitrary::Arbitrary<'a>
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl<const N: usize> io::Write for SmallVec<u8, N> {
+impl<const N: usize> io::Write for SmallVec<u8, N, Global> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.extend_from_slice(buf);
@@ -1853,7 +1853,7 @@ impl<const N: usize> io::Write for SmallVec<u8, N> {
 }
 
 #[cfg(feature = "bytes")]
-unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
+unsafe impl<const N: usize> BufMut for SmallVec<u8, N, Global> {
     #[inline]
     fn remaining_mut(&self) -> usize {
         // A vector can never have more than isize::MAX bytes
@@ -1919,11 +1919,11 @@ unsafe impl<const N: usize> BufMut for SmallVec<u8, N> {
 }
 
 #[cfg(feature = "defmt")]
-impl<T: Format, const N: usize> Format for SmallVec<T, N> {
+impl<T: Format, const N: usize> Format for SmallVec<T, N, Global> {
     fn format(&self, fmt: DeFormatter) {
         dewrite!(fmt, "{=[?]}", self.as_ref());
     }
 }
 
 #[cfg(feature = "encase")]
-encase::rts_array::impl_rts_array!(SmallVec<T, N>; (T, const N: usize); using len truncate);
+encase::rts_array::impl_rts_array!(SmallVec<T, N, Global>; (T, const N: usize); using len truncate);

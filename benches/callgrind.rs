@@ -4,7 +4,7 @@ use {
         library_benchmark_group,
         main
     },
-    smallvec::SmallVec,
+    smallvec::{Global, SmallVec},
     std::hint::black_box
 };
 
@@ -16,7 +16,7 @@ const SPILLED_COUNT: usize = 100;
 // =========================================================================
 
 #[library_benchmark]
-fn bench_smallvec_push_inline() -> SmallVec<u64, INLINE_CAP> {
+fn bench_smallvec_push_inline() -> SmallVec<u64, INLINE_CAP, Global> {
     let mut v = SmallVec::<u64, INLINE_CAP>::new();
     for i in 0..(INLINE_CAP as u64) {
         v.push(black_box(i));
@@ -25,7 +25,7 @@ fn bench_smallvec_push_inline() -> SmallVec<u64, INLINE_CAP> {
 }
 
 #[library_benchmark]
-fn bench_smallvec_push_spilled() -> SmallVec<u64, INLINE_CAP> {
+fn bench_smallvec_push_spilled() -> SmallVec<u64, INLINE_CAP, Global> {
     let mut v = SmallVec::<u64, INLINE_CAP>::new();
     for i in 0..(SPILLED_COUNT as u64) {
         v.push(black_box(i));
@@ -77,7 +77,7 @@ fn bench_smallvec_pop_spilled() -> u64 {
 // =========================================================================
 
 #[library_benchmark]
-fn bench_smallvec_insert_remove_inline() -> SmallVec<u64, INLINE_CAP> {
+fn bench_smallvec_insert_remove_inline() -> SmallVec<u64, INLINE_CAP, Global> {
     let mut v = SmallVec::<u64, INLINE_CAP>::new();
     for i in 0..((INLINE_CAP - 1) as u64) {
         v.push(black_box(i));
@@ -88,7 +88,7 @@ fn bench_smallvec_insert_remove_inline() -> SmallVec<u64, INLINE_CAP> {
 }
 
 #[library_benchmark]
-fn bench_smallvec_insert_remove_spilled() -> SmallVec<u64, INLINE_CAP> {
+fn bench_smallvec_insert_remove_spilled() -> SmallVec<u64, INLINE_CAP, Global> {
     let mut v = SmallVec::<u64, INLINE_CAP>::new();
     for i in 0..(SPILLED_COUNT as u64) {
         v.push(black_box(i));
@@ -103,19 +103,19 @@ fn bench_smallvec_insert_remove_spilled() -> SmallVec<u64, INLINE_CAP> {
 // =========================================================================
 
 #[library_benchmark]
-fn bench_smallvec_from_slice_inline() -> SmallVec<u64, INLINE_CAP> {
+fn bench_smallvec_from_slice_inline() -> SmallVec<u64, INLINE_CAP, Global> {
     let data = [42u64; INLINE_CAP];
     SmallVec::<u64, INLINE_CAP>::from(black_box(data.as_slice()))
 }
 
 #[library_benchmark]
-fn bench_smallvec_from_slice_spilled() -> SmallVec<u64, INLINE_CAP> {
+fn bench_smallvec_from_slice_spilled() -> SmallVec<u64, INLINE_CAP, Global> {
     let data = [42u64; SPILLED_COUNT];
     SmallVec::<u64, INLINE_CAP>::from(black_box(data.as_slice()))
 }
 
 #[library_benchmark]
-fn bench_smallvec_extend_from_slice_inline() -> SmallVec<u64, INLINE_CAP> {
+fn bench_smallvec_extend_from_slice_inline() -> SmallVec<u64, INLINE_CAP, Global> {
     let mut v = SmallVec::<u64, INLINE_CAP>::new();
     let data = [42u64; INLINE_CAP];
     v.extend_from_slice(black_box(&data));
@@ -123,7 +123,7 @@ fn bench_smallvec_extend_from_slice_inline() -> SmallVec<u64, INLINE_CAP> {
 }
 
 #[library_benchmark]
-fn bench_smallvec_extend_from_slice_spilled() -> SmallVec<u64, INLINE_CAP> {
+fn bench_smallvec_extend_from_slice_spilled() -> SmallVec<u64, INLINE_CAP, Global> {
     let mut v = SmallVec::<u64, INLINE_CAP>::new();
     let data = [42u64; SPILLED_COUNT];
     v.extend_from_slice(black_box(&data));
@@ -135,12 +135,12 @@ fn bench_smallvec_extend_from_slice_spilled() -> SmallVec<u64, INLINE_CAP> {
 // =========================================================================
 
 #[library_benchmark]
-fn bench_smallvec_from_array_inline() -> SmallVec<u64, INLINE_CAP> {
+fn bench_smallvec_from_array_inline() -> SmallVec<u64, INLINE_CAP, Global> {
     SmallVec::<u64, INLINE_CAP>::from(black_box([1u64; INLINE_CAP]))
 }
 
 #[library_benchmark]
-fn bench_smallvec_from_elem_spilled() -> SmallVec<u64, INLINE_CAP> {
+fn bench_smallvec_from_elem_spilled() -> SmallVec<u64, INLINE_CAP, Global> {
     smallvec::from_elem(black_box(1u64), black_box(SPILLED_COUNT))
 }
 
@@ -193,7 +193,7 @@ fn bench_smallvec_drain_spilled() -> u64 {
 // =========================================================================
 
 #[library_benchmark]
-fn bench_smallvec_retain_mut_inline() -> SmallVec<u64, INLINE_CAP> {
+fn bench_smallvec_retain_mut_inline() -> SmallVec<u64, INLINE_CAP, Global> {
     let mut v = SmallVec::<u64, INLINE_CAP>::new();
     for i in 0..(INLINE_CAP as u64) {
         v.push(black_box(i));
@@ -203,7 +203,7 @@ fn bench_smallvec_retain_mut_inline() -> SmallVec<u64, INLINE_CAP> {
 }
 
 #[library_benchmark]
-fn bench_smallvec_retain_mut_spilled() -> SmallVec<u64, INLINE_CAP> {
+fn bench_smallvec_retain_mut_spilled() -> SmallVec<u64, INLINE_CAP, Global> {
     let mut v = SmallVec::<u64, INLINE_CAP>::new();
     for i in 0..(SPILLED_COUNT as u64) {
         v.push(black_box(i));
