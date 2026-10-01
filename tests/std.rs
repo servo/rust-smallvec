@@ -1,5 +1,8 @@
 use {
-    smallvec::{Global, SmallVec}
+    smallvec::{
+        Global,
+        SmallVec
+    },
     std::io::Write
 };
 

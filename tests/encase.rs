@@ -1,4 +1,7 @@
-use smallvec::{Global, SmallVec};
+use smallvec::{
+    Global,
+    SmallVec
+};
 
 #[test]
 fn test_encase() {

@@ -3,7 +3,10 @@ use {
         Token,
         assert_tokens
     },
-    smallvec::{Global, SmallVec}
+    smallvec::{
+        Global,
+        SmallVec
+    }
 };
 
 #[test]

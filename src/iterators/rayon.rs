@@ -2,7 +2,10 @@
 //! need, except it's all private
 
 use {
-    crate::{Global, SmallVec},
+    crate::{
+        Global,
+        SmallVec
+    },
     core::{
         mem::take,
         ptr::{

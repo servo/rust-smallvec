@@ -5,7 +5,7 @@ fn smallvec() {
 
     macro_rules! check {
         ($init:tt) => {
-            vec = smallvec::{Global, SmallVec}! $init;
+            vec = smallvec::smallvec! $init;
             assert_eq!(*vec, *vec! $init);
         }
     }

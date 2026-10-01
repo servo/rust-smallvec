@@ -5,7 +5,10 @@
 use {
     arbitrary::Arbitrary,
     libfuzzer_sys::fuzz_target,
-    smallvec::{Global, SmallVec},
+    smallvec::{
+        Global,
+        SmallVec
+    },
     std::fmt::Debug
 };
 

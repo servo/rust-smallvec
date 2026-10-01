@@ -1,5 +1,8 @@
 use {
-    super::SmallVec,
+    super::{
+        Global,
+        SmallVec
+    },
     malloc_size_of::{
         MallocShallowSizeOf,
         MallocSizeOf,

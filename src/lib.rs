@@ -52,14 +52,16 @@ use defmt::{
     Formatter as DeFormatter,
     write as dewrite
 };
-pub use errors::SmallVecError;
 #[cfg(feature = "std")]
 use std::io;
+pub use {
+    allocator::Global,
+    errors::SmallVecError
+};
 use {
     allocator::{
         Allocator,
         Box,
-        Global,
         Vec,
         vec
     },
@@ -192,7 +194,10 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     ///
     /// ```
     /// use {
-    ///     smallvec::{Global, SmallVec},
+    ///     smallvec::{
+    ///         Global,
+    ///         SmallVec
+    ///     },
     ///     std::mem::MaybeUninit
     /// };
     ///
@@ -305,7 +310,10 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     /// # Examples
     ///
     /// ```
-    /// use smallvec::{Global, SmallVec};
+    /// use smallvec::{
+    ///     Global,
+    ///     SmallVec
+    /// };
     ///
     /// let mut v: SmallVec<_, 1, Global> = SmallVec::from([1, 2, 3]);
     ///
@@ -766,7 +774,8 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         } else if length < self.capacity() {
             // SAFETY: length > Self::inline_size() >= 0
             // so new capacity is non zero, it is equal to the length
-            // T can't be a ZST because SmallVec<ZST, N, Global> is never spilled.
+            // T can't be a ZST because SmallVec<ZST, N, Global> is never
+            // spilled.
             unsafe {
                 self.raw
                     .try_grow_raw(self.length, length, &self.allocator)
@@ -802,7 +811,8 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             } else if target < capacity {
                 // SAFETY: length > Self::inline_size() >= 0
                 // so new capacity is non zero, it is equal to the length
-                // T can't be a ZST because SmallVec<ZST, N, Global> is never spilled.
+                // T can't be a ZST because SmallVec<ZST, N, Global> is never
+                // spilled.
                 unsafe {
                     self.raw
                         .try_grow_raw(self.length, target, &self.allocator)
@@ -1202,8 +1212,8 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         }
     }
 
-    /// Decomposes a `SmallVec<T, N, Global>` into its raw components: `(pointer,
-    /// length, capacity)`.
+    /// Decomposes a `SmallVec<T, N, Global>` into its raw components:
+    /// `(pointer, length, capacity)`.
     ///
     /// Returns the raw pointer to the underlying data, the length of
     /// the vector (in elements), and the allocated capacity of the

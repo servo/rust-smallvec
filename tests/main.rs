@@ -21,7 +21,10 @@ use {
         },
         iter::FromIterator
     },
-    smallvec::{Global, SmallVec},
+    smallvec::{
+        Global,
+        SmallVec
+    },
     std::{
         borrow::ToOwned,
         hash::DefaultHasher,
@@ -805,10 +808,16 @@ fn into_inner() {
     assert_eq!(vec.try_into(), Ok([0, 1]));
 
     let vec = SmallVec::<u8, 2>::from_iter(0..1);
-    assert_eq!(vec.clone().try_into(), Err::<[u8; 7], SmallVec<u8, 2, Global>>(vec));
+    assert_eq!(
+        vec.clone().try_into(),
+        Err::<[u8; 7], SmallVec<u8, 2, Global>>(vec)
+    );
 
     let vec = SmallVec::<u8, 2>::from_iter(0..3);
-    assert_eq!(vec.clone().try_into(), Err::<[u8; 1], SmallVec<u8, 2, Global>>(vec));
+    assert_eq!(
+        vec.clone().try_into(),
+        Err::<[u8; 1], SmallVec<u8, 2, Global>>(vec)
+    );
 }
 
 #[test]

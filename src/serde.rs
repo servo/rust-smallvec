@@ -1,5 +1,8 @@
 use {
-    super::{Global, SmallVec},
+    super::{
+        Global,
+        SmallVec
+    },
     core::marker::PhantomData,
     serde_core::{
         de::{

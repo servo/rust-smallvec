@@ -5,7 +5,10 @@ use {
         criterion_group,
         criterion_main
     },
-    smallvec::{Global, SmallVec},
+    smallvec::{
+        Global,
+        SmallVec
+    },
     std::{
         hint::black_box,
         time::Duration

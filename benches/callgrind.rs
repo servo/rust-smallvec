@@ -4,7 +4,10 @@ use {
         library_benchmark_group,
         main
     },
-    smallvec::{Global, SmallVec},
+    smallvec::{
+        Global,
+        SmallVec
+    },
     std::hint::black_box
 };
 
