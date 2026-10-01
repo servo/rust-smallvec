@@ -87,10 +87,10 @@ where F: FnMut(&mut T) -> bool
                 // double-drop of the last successfully
                 // drained item prior to a panic in the predicate.
                 let ptr = self.vec.as_mut_ptr();
-                let src = ptr.add(self.idx);
-                let dst = src.sub(self.del);
+                let source = ptr.add(self.idx);
+                let destination = source.sub(self.del);
                 let tail_len = self.old_len - self.idx;
-                src.copy_to(dst, tail_len);
+                source.copy_to(destination, tail_len);
             }
             self.vec.set_len(self.old_len - self.del);
         }
