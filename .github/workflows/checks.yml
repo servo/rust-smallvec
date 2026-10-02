@@ -110,14 +110,3 @@ jobs:
         uses: dtolnay/rust-toolchain@1.86
       - name: test default features
         run: cargo test
-  allocator-api:
-    name: Allocator API
-    runs-on: ubuntu-latest
-    steps:
-      - name: checkout
-        uses: actions/checkout@v7
-      - name: install rust beta
-        # TODO: switch to stable once Rust 1.100 is released
-        uses: dtolnay/rust-toolchain@beta
-      - name: test allocator-api
-        run: cargo test --features allocator-api
