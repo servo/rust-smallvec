@@ -7,14 +7,15 @@
 > for detailed breakdowns
 >
 > changes include, but are not limited to:
+>
 > - breaking API changes
 > - deprecation of items
 > - adding, removing or modifying features
-> 
+>
 > beware that this is a pre-release and we can't ensure that there are no vulnerabilities
 > or corner cases. if this feels like a substantial risk to you, please downgrade to the
 > latest v1 version
-> 
+>
 > we are looking for people to test this v2 version, so feel free to play around with
 > smallvec and use it for your purposes if this warning is not a concern, and please file
 > an issue on the repo if you find some unexpected behavior or have a request for a feature
@@ -61,6 +62,7 @@ v.sort();
 - `std`: implements the `std::io::Write` type for `SmallVec<u8, N>`
 
 > [!NOTE]
+>
 > - SmallVec without any features enabled does not make use of the standard library.
 > - The `rayon` feature implicitly requires `std`.
 > - The `allocator-api2` feature requires `allocator-api`
