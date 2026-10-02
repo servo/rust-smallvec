@@ -52,6 +52,16 @@ jobs:
           cargo clippy
       - name: docs
         run: cargo doc --all-features
+  markdownlint:
+    name: Markdown Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+      - name: markdownlint
+        uses: docker://ghcr.io/igorshubovych/markdownlint-cli:v0.41.0
+        with:
+          args: .
   miri:
     name: Miri
     runs-on: ubuntu-latest
