@@ -3,15 +3,12 @@ use {
         Token,
         assert_tokens
     },
-    smallvec::{
-        Global,
-        SmallVec
-    }
+    smallvec::SmallVec
 };
 
 #[test]
 fn serde() {
-    let mut small_vec: SmallVec<i32, 2, Global> = SmallVec::new();
+    let mut small_vec: SmallVec<i32, 2> = SmallVec::new();
     assert_tokens(
         &small_vec,
         &[

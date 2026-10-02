@@ -52,16 +52,14 @@ use defmt::{
     Formatter as DeFormatter,
     write as dewrite
 };
+pub use errors::SmallVecError;
 #[cfg(feature = "std")]
 use std::io;
-pub use {
-    allocator::Global,
-    errors::SmallVecError
-};
 use {
     allocator::{
         Allocator,
         Box,
+        Global,
         Vec,
         vec
     },
@@ -194,10 +192,7 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     ///
     /// ```
     /// use {
-    ///     smallvec::{
-    ///         Global,
-    ///         SmallVec
-    ///     },
+    ///     smallvec::SmallVec,
     ///     std::mem::MaybeUninit
     /// };
     ///
@@ -310,12 +305,9 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     /// # Examples
     ///
     /// ```
-    /// use smallvec::{
-    ///     Global,
-    ///     SmallVec
-    /// };
+    /// use smallvec::SmallVec;
     ///
-    /// let mut v: SmallVec<_, 1, Global> = SmallVec::from([1, 2, 3]);
+    /// let mut v: SmallVec<_, 1> = SmallVec::from([1, 2, 3]);
     ///
     /// // Pull out the important parts of `v`.
     /// let p = v.as_mut_ptr();
@@ -481,10 +473,10 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     ///
     /// Using this method is equivalent to the following code:
     /// ```
-    /// # use smallvec::{Global, SmallVec};
+    /// # use smallvec::SmallVec;
     /// # use std::cmp::min;
     /// # let some_predicate = |x: &mut i32| { *x == 2 || *x == 3 || *x == 6 };
-    /// # let mut vec: SmallVec<i32, 8, Global> = SmallVec::from(&[1i32, 2, 3, 4, 5, 6]);
+    /// # let mut vec: SmallVec<i32, 8> = SmallVec::from(&[1i32, 2, 3, 4, 5, 6]);
     /// # let range = 1..4;
     /// let mut i = 0;
     /// while i < min(vec.len(), range.end) {
@@ -515,13 +507,13 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// Splitting an array into evens and odds, reusing the original allocation:
     ///
     /// ```
-    /// # use smallvec::{Global, SmallVec};
-    /// let mut numbers: SmallVec<i32, 16, Global> =
+    /// # use smallvec::SmallVec;
+    /// let mut numbers: SmallVec<i32, 16> =
     ///     SmallVec::from(&[1i32, 2, 3, 4, 5, 6, 8, 9, 11, 13, 14, 15]);
     ///
     /// let evens = numbers
     ///     .extract_if(.., |x| *x % 2 == 0)
-    ///     .collect::<SmallVec<i32, 16, Global>>();
+    ///     .collect::<SmallVec<i32, 16>>();
     /// let odds = numbers;
     ///
     /// assert_eq!(evens, SmallVec::<i32, 16>::from(&[2i32, 4, 6, 8, 14]));
@@ -534,12 +526,11 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// Using the range argument to only process a part of the vector:
     ///
     /// ```
-    /// # use smallvec::{Global, SmallVec};
-    /// let mut items: SmallVec<i32, 16, Global> =
-    ///     SmallVec::from(&[0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 2, 1, 2]);
+    /// # use smallvec::SmallVec;
+    /// let mut items: SmallVec<i32, 16> = SmallVec::from(&[0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 2, 1, 2]);
     /// let ones = items
     ///     .extract_if(7.., |x| *x == 1)
-    ///     .collect::<SmallVec<i32, 16, Global>>();
+    ///     .collect::<SmallVec<i32, 16>>();
     /// assert_eq!(
     ///     items,
     ///     SmallVec::<i32, 16>::from(&[0, 0, 0, 0, 0, 0, 0, 2, 2, 2])
@@ -1239,9 +1230,8 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// # Examples
     ///
     /// ```
-    /// # use smallvec::{Global, SmallVec};
-    ///
-    /// let v: SmallVec<i32, 1, Global> = SmallVec::from([-1, 0, 1]);
+    /// # use smallvec::SmallVec;
+    /// let v: SmallVec<i32, 1> = SmallVec::from([-1, 0, 1]);
     ///
     /// let (ptr, length, cap) = v.into_raw_parts();
     ///

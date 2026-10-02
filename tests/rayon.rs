@@ -5,10 +5,7 @@ use {
         iter::ParallelIterator,
         prelude::ParallelSlice
     },
-    smallvec::{
-        Global,
-        SmallVec
-    }
+    smallvec::SmallVec
 };
 
 #[test]

@@ -1,7 +1,7 @@
 #[test]
 #[allow(deprecated)]
 fn smallvec() {
-    let mut vec: smallvec::SmallVec<i32, 2, smallvec::Global>;
+    let mut vec: smallvec::SmallVec<i32, 2>;
 
     macro_rules! check {
         ($init:tt) => {
