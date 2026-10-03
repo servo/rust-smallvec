@@ -53,9 +53,11 @@ jobs:
       - name: docs
         run: cargo doc --all-features
       - name: markdownlint
-        uses: docker://ghcr.io/igorshubovych/markdownlint-cli:v0.41.0
-        with:
-          args: .
+        run: |
+          git ls-files '*.md' -z | xargs -0 docker run --rm \
+            -v "$PWD:/work" \
+            -w /work \
+            ghcr.io/igorshubovych/markdownlint-cli:v0.41.0
   miri:
     name: Miri
     runs-on: ubuntu-latest
