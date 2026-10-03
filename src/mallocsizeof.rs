@@ -1,5 +1,8 @@
 use {
-    super::SmallVec,
+    super::{
+        Global,
+        SmallVec
+    },
     malloc_size_of::{
         MallocShallowSizeOf,
         MallocSizeOf,
@@ -7,7 +10,7 @@ use {
     }
 };
 
-impl<T, const N: usize> MallocShallowSizeOf for SmallVec<T, N> {
+impl<T, const N: usize> MallocShallowSizeOf for SmallVec<T, N, Global> {
     fn shallow_size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         if self.spilled() {
             unsafe { ops.malloc_size_of(self.as_ptr()) }
@@ -17,7 +20,7 @@ impl<T, const N: usize> MallocShallowSizeOf for SmallVec<T, N> {
     }
 }
 
-impl<T: MallocSizeOf, const N: usize> MallocSizeOf for SmallVec<T, N> {
+impl<T: MallocSizeOf, const N: usize> MallocSizeOf for SmallVec<T, N, Global> {
     fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         let mut n = self.shallow_size_of(ops);
         for elem in self.iter() {

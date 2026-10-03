@@ -1,5 +1,8 @@
 use {
-    super::SmallVec,
+    super::{
+        Global,
+        SmallVec
+    },
     core::marker::PhantomData,
     serde_core::{
         de::{
@@ -16,7 +19,7 @@ use {
     }
 };
 
-impl<T, const N: usize> Serialize for SmallVec<T, N>
+impl<T, const N: usize> Serialize for SmallVec<T, N, Global>
 where T: Serialize
 {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -28,7 +31,7 @@ where T: Serialize
     }
 }
 
-impl<'de, T, const N: usize> Deserialize<'de> for SmallVec<T, N>
+impl<'de, T, const N: usize> Deserialize<'de> for SmallVec<T, N, Global>
 where T: Deserialize<'de>
 {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -45,7 +48,7 @@ struct SmallVecVisitor<T, const N: usize> {
 impl<'de, T, const N: usize> Visitor<'de> for SmallVecVisitor<T, N>
 where T: Deserialize<'de>
 {
-    type Value = SmallVec<T, N>;
+    type Value = SmallVec<T, N, Global>;
 
     fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         formatter.write_str("a sequence")

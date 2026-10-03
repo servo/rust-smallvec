@@ -36,7 +36,8 @@ pub struct IntoIter<T, const N: usize, A: Allocator = Global> {
 }
 
 // SAFETY: IntoIter has unique ownership of its contents.  Sending (or sharing)
-// an `IntoIter<T, N>` is equivalent to sending (or sharing) a `SmallVec<T, N>`.
+// an `IntoIter<T, N>` is equivalent to sending (or sharing) a `SmallVec<T, N,
+// Global>`.
 unsafe impl<T: Send, const N: usize, A: Allocator + Send> Send for IntoIter<T, N, A> {}
 unsafe impl<T: Sync, const N: usize, A: Allocator + Sync> Sync for IntoIter<T, N, A> {}
 

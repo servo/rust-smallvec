@@ -2,7 +2,10 @@
 //! need, except it's all private
 
 use {
-    crate::SmallVec,
+    crate::{
+        Global,
+        SmallVec
+    },
     core::{
         mem::take,
         ptr::{
@@ -72,7 +75,7 @@ impl<T> Drop for DrainProducer<'_, T> {
     }
 }
 
-impl<T: Send, const N: usize> ParallelIterator for SmallVec<T, N> {
+impl<T: Send, const N: usize> ParallelIterator for SmallVec<T, N, Global> {
     type Item = T;
 
     fn drive_unindexed<C: UnindexedConsumer<T>>(mut self, consumer: C) -> C::Result {

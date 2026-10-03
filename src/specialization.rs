@@ -2,6 +2,7 @@ use {
     crate::{
         Allocator,
         DropGuard,
+        Global,
         IntoIter,
         SmallVec
     },
@@ -21,7 +22,7 @@ pub trait SpecFromElem<T> {
     unsafe fn spec_from_elem(elem: T, n: usize) -> Self;
 }
 
-impl<T: Clone, const N: usize> SpecFromElem<T> for SmallVec<T, N> {
+impl<T: Clone, const N: usize> SpecFromElem<T> for SmallVec<T, N, Global> {
     #[inline]
     default unsafe fn spec_from_elem(elem: T, n: usize) -> Self {
         // SAFETY: Safety conditions are identical.
@@ -29,7 +30,7 @@ impl<T: Clone, const N: usize> SpecFromElem<T> for SmallVec<T, N> {
     }
 }
 
-impl<T: Copy, const N: usize> SpecFromElem<T> for SmallVec<T, N> {
+impl<T: Copy, const N: usize> SpecFromElem<T> for SmallVec<T, N, Global> {
     unsafe fn spec_from_elem(elem: T, n: usize) -> Self {
         let mut result = Self::new();
 
@@ -226,7 +227,7 @@ pub trait SpecFromIterator<T, I> {
     fn spec_from_iter(iter: I) -> Self;
 }
 
-impl<T, I, const N: usize> SpecFromIterator<T, I> for SmallVec<T, N>
+impl<T, I, const N: usize> SpecFromIterator<T, I> for SmallVec<T, N, Global>
 where I: Iterator<Item = T>
 {
     #[inline]
@@ -235,7 +236,7 @@ where I: Iterator<Item = T>
     }
 }
 
-impl<T, I, const N: usize> SpecFromIterator<T, I> for SmallVec<T, N>
+impl<T, I, const N: usize> SpecFromIterator<T, I> for SmallVec<T, N, Global>
 where I: core::iter::TrustedLen<Item = T>
 {
     fn spec_from_iter(iter: I) -> Self {
@@ -286,14 +287,14 @@ pub trait SpecFromSlice<T> {
     unsafe fn spec_from(slice: &[T]) -> Self;
 }
 
-impl<T: Clone, const N: usize> SpecFromSlice<T> for SmallVec<T, N> {
+impl<T: Clone, const N: usize> SpecFromSlice<T> for SmallVec<T, N, Global> {
     default unsafe fn spec_from(slice: &[T]) -> Self {
         // SAFETY: Safety conditions are identical.
         unsafe { Self::from_slice_fallback(slice) }
     }
 }
 
-impl<T: Copy, const N: usize> SpecFromSlice<T> for SmallVec<T, N> {
+impl<T: Copy, const N: usize> SpecFromSlice<T> for SmallVec<T, N, Global> {
     unsafe fn spec_from(slice: &[T]) -> Self {
         let mut v = Self::new();
 
