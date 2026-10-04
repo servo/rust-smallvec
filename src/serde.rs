@@ -1,7 +1,8 @@
 use {
     super::{
         Global,
-        SmallVec
+        SmallVec,
+        Allocator
     },
     core::marker::PhantomData,
     serde_core::{
@@ -19,9 +20,7 @@ use {
     }
 };
 
-impl<T, const N: usize> Serialize for SmallVec<T, N, Global>
-where T: Serialize
-{
+impl<T: Serialize, const N: usize, A: Allocator> Serialize for SmallVec<T, N, A> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut state = serializer.serialize_seq(Some(self.len()))?;
         for item in self {
@@ -31,9 +30,7 @@ where T: Serialize
     }
 }
 
-impl<'de, T, const N: usize> Deserialize<'de> for SmallVec<T, N, Global>
-where T: Deserialize<'de>
-{
+impl<'de, T: Deserialize<'de>, const N: usize> Deserialize<'de> for SmallVec<T, N, Global> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_seq(SmallVecVisitor {
             phantom: PhantomData
@@ -45,17 +42,14 @@ struct SmallVecVisitor<T, const N: usize> {
     phantom: PhantomData<T>
 }
 
-impl<'de, T, const N: usize> Visitor<'de> for SmallVecVisitor<T, N>
-where T: Deserialize<'de>
-{
+impl<'de, T: Deserialize<'de>, const N: usize> Visitor<'de> for SmallVecVisitor<T, N> {
     type Value = SmallVec<T, N, Global>;
 
     fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         formatter.write_str("a sequence")
     }
 
-    fn visit_seq<B>(self, mut seq: B) -> Result<Self::Value, B::Error>
-    where B: SeqAccess<'de> {
+    fn visit_seq<B: SeqAccess<'de>>(self, mut seq: B) -> Result<Self::Value, B::Error> {
         use serde_core::de::Error;
         let length = seq.size_hint().unwrap_or(0);
         let mut values = SmallVec::new();
