@@ -36,27 +36,6 @@ impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N, Global> {
     }
 }
 
-impl<T: Clone, const N: usize> From<&mut [T]> for SmallVec<T, N, Global> {
-    #[inline]
-    fn from(slice: &mut [T]) -> Self {
-        Self::from(slice as &[T])
-    }
-}
-
-impl<T: Clone, const M: usize, const N: usize> From<&[T; M]> for SmallVec<T, N, Global> {
-    #[inline]
-    fn from(slice: &[T; M]) -> Self {
-        Self::from(slice as &[T])
-    }
-}
-
-impl<T: Clone, const M: usize, const N: usize> From<&mut [T; M]> for SmallVec<T, N, Global> {
-    #[inline]
-    fn from(slice: &mut [T; M]) -> Self {
-        Self::from(slice as &[T])
-    }
-}
-
 impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N, Global> {
     fn from(array: [T; M]) -> Self {
         if M > N {
