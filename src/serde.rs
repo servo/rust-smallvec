@@ -1,8 +1,8 @@
 use {
     super::{
+        Allocator,
         Global,
-        SmallVec,
-        Allocator
+        SmallVec
     },
     core::marker::PhantomData,
     serde_core::{
