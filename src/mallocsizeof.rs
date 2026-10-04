@@ -13,7 +13,7 @@ use {
 impl<T, const N: usize, A: Allocator> MallocShallowSizeOf for SmallVec<T, N, A> {
     fn shallow_size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         self.spilled()
-            .then_some(unsafe { ops.malloc_size_of(self.as_ptr()) })
+            .then(|| unsafe { ops.malloc_size_of(self.as_ptr()) })
             .unwrap_or_default()
             + unsafe { ops.malloc_size_of(&raw const self.allocator) }
     }
