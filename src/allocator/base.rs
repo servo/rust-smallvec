@@ -49,30 +49,3 @@ impl Allocator for Global {
         ))
     }
 }
-
-impl<A: Allocator> Allocator for &A {
-    #[inline]
-    fn allocate(&self, layout: Layout) -> Option<NonNull<[u8]>> {
-        (**self).allocate(layout)
-    }
-
-    #[inline]
-    unsafe fn deallocate(&self, pointer: NonNull<u8>, layout: Layout) {
-        unsafe { (**self).deallocate(pointer, layout) }
-    }
-
-    #[inline]
-    unsafe fn grow(&self, pointer: NonNull<u8>, old: Layout, new: Layout) -> Option<NonNull<[u8]>> {
-        unsafe { (**self).grow(pointer, old, new) }
-    }
-
-    #[inline]
-    unsafe fn shrink(
-        &self,
-        pointer: NonNull<u8>,
-        old: Layout,
-        new: Layout
-    ) -> Option<NonNull<[u8]>> {
-        unsafe { (**self).shrink(pointer, old, new) }
-    }
-}
