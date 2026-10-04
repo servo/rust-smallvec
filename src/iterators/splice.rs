@@ -82,11 +82,11 @@ impl<I: Iterator, const N: usize, A: Allocator> Drop for Splice<'_, I, N, A> {
             }
 
             // Collect any remaining elements.
-            let mut collected = self
-                .replace_with
-                .by_ref()
-                .collect::<SmallVec<I::Item, N, Global>>()
-                .into_iter();
+            let mut collected =
+                SmallVec::<I::Item, N, &A>::new_in(&self.drain.vec.as_ref().allocator);
+            collected.extend(self.replace_with.by_ref());
+            let mut collected = collected.into_iter();
+
             // Now we have an exact count.
             if collected.len() > 0 {
                 self.drain.move_tail(collected.len());
