@@ -57,9 +57,7 @@ pub use errors::SmallVecError;
 use std::io;
 use {
     allocator::{
-        Allocator,
         Box,
-        Global,
         Vec,
         vec
     },
@@ -88,12 +86,20 @@ use {
 #[cfg(feature = "internals")]
 pub use {
     locatedlength::LocatedLength,
-    rawsmallvec::RawSmallVec
+    rawsmallvec::RawSmallVec,
+    allocator::{
+        Allocator,
+        Global
+    }
 };
 #[cfg(not(feature = "internals"))]
 use {
     locatedlength::LocatedLength,
-    rawsmallvec::RawSmallVec
+    rawsmallvec::RawSmallVec,
+    allocator::{
+        Allocator,
+        Global
+    }
 };
 
 #[repr(C)]
