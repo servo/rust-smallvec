@@ -13,7 +13,6 @@ use core::{
 #[cfg(not(feature = "allocator-api"))]
 #[rustfmt::skip]
 pub use {
-    Allocator as BaseAllocator,
     alloc::{
         boxed::Box,
         vec::Vec,
@@ -24,10 +23,7 @@ pub use {
 #[cfg(feature = "allocator-api2")]
 #[rustfmt::skip]
 pub use allocator_api2::{
-    alloc::{
-        Allocator as BaseAllocator,
-        Global
-    },
+    alloc::Global,
     boxed::Box,
     vec::Vec,
     vec
@@ -35,10 +31,7 @@ pub use allocator_api2::{
 #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
 #[rustfmt::skip]
 pub use alloc::{
-    alloc::{
-        Allocator as BaseAllocator,
-        Global
-    },
+    alloc::Global,
     boxed::Box,
     vec::Vec,
     vec

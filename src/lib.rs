@@ -58,7 +58,6 @@ use std::io;
 use {
     allocator::{
         Allocator,
-        BaseAllocator,
         Box,
         Global,
         Vec,
@@ -559,8 +558,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter, N, A>
     where
         R: core::ops::RangeBounds<usize>,
-        I: IntoIterator<Item = T>,
-        A: BaseAllocator
+        I: IntoIterator<Item = T>
     {
         Splice::new(self.drain(range), replace_with.into_iter())
     }
