@@ -265,14 +265,6 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
         }
     }
 
-    pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter, N>
-    where
-        R: core::ops::RangeBounds<usize>,
-        I: IntoIterator<Item = T>
-    {
-        Splice::new(self.drain(range), replace_with.into_iter())
-    }
-
     /// Creates a `SmallVec` directly from the raw components of another
     /// `SmallVec`.
     ///
@@ -561,6 +553,14 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
             old_len,
             pred: filter
         }
+    }
+
+    pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter, N, A>
+    where
+        R: core::ops::RangeBounds<usize>,
+        I: IntoIterator<Item = T>
+    {
+        Splice::new(self.drain(range), replace_with.into_iter())
     }
 
     #[inline]
@@ -1816,7 +1816,7 @@ where T: arbitrary::Arbitrary<'a>
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl<const N: usize> io::Write for SmallVec<u8, N, Global> {
+impl<const N: usize, A: Allocator> io::Write for SmallVec<u8, N, A> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.extend_from_slice(buf);
@@ -1836,7 +1836,7 @@ impl<const N: usize> io::Write for SmallVec<u8, N, Global> {
 }
 
 #[cfg(feature = "bytes")]
-unsafe impl<const N: usize> BufMut for SmallVec<u8, N, Global> {
+unsafe impl<const N: usize, A: Allocator> BufMut for SmallVec<u8, N, A> {
     #[inline]
     fn remaining_mut(&self) -> usize {
         // A vector can never have more than isize::MAX bytes
@@ -1909,4 +1909,4 @@ impl<T: Format, const N: usize> Format for SmallVec<T, N, Global> {
 }
 
 #[cfg(feature = "encase")]
-encase::rts_array::impl_rts_array!(SmallVec<T, N, Global>; (T, const N: usize); using len truncate);
+encase::rts_array::impl_rts_array!(SmallVec<T, N, A>; (T, const N: usize, A: Allocator); using len truncate);

@@ -3,7 +3,7 @@
 
 use {
     crate::{
-        Global,
+        Allocator,
         SmallVec
     },
     core::{
@@ -75,7 +75,7 @@ impl<T> Drop for DrainProducer<'_, T> {
     }
 }
 
-impl<T: Send, const N: usize> ParallelIterator for SmallVec<T, N, Global> {
+impl<T: Send, const N: usize, A: Allocator + Send> ParallelIterator for SmallVec<T, N, A> {
     type Item = T;
 
     fn drive_unindexed<C: UnindexedConsumer<T>>(mut self, consumer: C) -> C::Result {
