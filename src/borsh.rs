@@ -1,5 +1,6 @@
 use {
     super::{
+        Allocator,
         Global,
         SmallVec
     },
@@ -25,7 +26,9 @@ use {
     core::iter::repeat_with
 };
 
-impl<Type: BorshSerialize, const INLINE: usize> BorshSerialize for SmallVec<Type, INLINE, Global> {
+impl<Type: BorshSerialize, const INLINE: usize, A: Allocator> BorshSerialize
+    for SmallVec<Type, INLINE, A>
+{
     fn serialize<Writer: Write>(&self, writer: &mut Writer) -> Serial<()> {
         (self.len() as u64).serialize(writer)?;
         for element in self {
@@ -50,7 +53,9 @@ impl<Type: BorshDeserialize, const INLINE: usize> BorshDeserialize
     }
 }
 
-impl<Type: BorshSchema, const INLINE: usize> BorshSchema for SmallVec<Type, INLINE, Global> {
+impl<Type: BorshSchema, const INLINE: usize, A: Allocator> BorshSchema
+    for SmallVec<Type, INLINE, A>
+{
     fn declaration() -> Declaration {
         format!("Vec<{}>", Type::declaration())
     }
