@@ -135,8 +135,89 @@ impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for Vec<T> {
     }
 }
 
+// Without the allocator API, `Box` is always `Global`. The conversion still
+// has to move elements out of inline storage; heap storage is rebuilt by
+// `Vec`, which is also `Global`.
+#[cfg(not(feature = "allocator-api"))]
 impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for Box<[T]> {
     fn from(this: SmallVec<T, N, A>) -> Self {
         Vec::from(this).into_boxed_slice()
     }
+}
+
+// Preserve `A` instead of rebuilding through `Vec` (which is `Global`).
+// Elements are copied into a new allocation owned by `A`. Spilled storage is
+// then released with that same allocator, so the original buffer is not left
+// to `Vec`'s global deallocator.
+#[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
+impl<T, const N: usize, A> From<SmallVec<T, N, A>> for Box<[T], A>
+where A: Allocator + core::alloc::Allocator
+{
+    fn from(this: SmallVec<T, N, A>) -> Self {
+        into_boxed_with_allocator(this)
+    }
+}
+
+#[cfg(feature = "allocator-api2")]
+impl<T, const N: usize, A> From<SmallVec<T, N, A>> for Box<[T], A>
+where A: Allocator + allocator_api2::alloc::Allocator
+{
+    fn from(this: SmallVec<T, N, A>) -> Self {
+        into_boxed_with_allocator(this)
+    }
+}
+
+#[cfg(feature = "allocator-api2")]
+use allocator_api2::alloc::Allocator as BoxAlloc;
+#[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
+use core::alloc::Allocator as BoxAlloc;
+
+#[cfg(feature = "allocator-api")]
+fn into_boxed_with_allocator<T, const N: usize, A>(this: SmallVec<T, N, A>) -> Box<[T], A>
+where A: Allocator + BoxAlloc {
+    use core::{
+        alloc::Layout,
+        mem::{
+            MaybeUninit,
+            size_of
+        },
+        ptr::{
+            NonNull,
+            read
+        }
+    };
+
+    let this = ManuallyDrop::new(this);
+    let (length, on_heap) = this.length.parts();
+    let source = unsafe { this.raw.as_ptr(on_heap) };
+    let allocator = unsafe { read(&this.allocator) };
+
+    let mut boxed = Box::<[MaybeUninit<T>], A>::new_uninit_slice_in(length, allocator);
+    unsafe {
+        copy_nonoverlapping(source, boxed.as_mut_ptr().cast(), length);
+    }
+
+    if on_heap && size_of::<T>() != 0 {
+        let (ptr, capacity) = unsafe { this.raw.heap };
+        if capacity != 0 {
+            let layout = unsafe {
+                Layout::from_size_align_unchecked(
+                    capacity * size_of::<T>(),
+                    core::mem::align_of::<T>()
+                )
+            };
+            unsafe {
+                Allocator::deallocate(
+                    &this.allocator,
+                    NonNull::new_unchecked(ptr.as_ptr().cast()),
+                    layout
+                );
+            }
+        }
+    }
+
+    let (ptr, allocator) = Box::into_raw_with_allocator(boxed);
+    let slice = core::ptr::slice_from_raw_parts_mut(ptr.cast(), length);
+    // SAFETY: every element was copied from an initialized `SmallVec`.
+    unsafe { Box::from_raw_in(slice, allocator) }
 }
