@@ -20,6 +20,6 @@ impl<T, const N: usize, A: Allocator> MallocShallowSizeOf for SmallVec<T, N, A> 
 
 impl<T: MallocSizeOf, const N: usize, A: Allocator> MallocSizeOf for SmallVec<T, N, A> {
     fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
-        self.iter().map(|item| item.size_of(ops)).sum::<usize>() + self.shallow_size_of(ops)
+        self.shallow_size_of(ops) + self.iter().map(|item| item.size_of(ops)).sum::<usize>()
     }
 }
