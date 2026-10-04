@@ -55,6 +55,24 @@ use defmt::{
 pub use errors::SmallVecError;
 #[cfg(feature = "std")]
 use std::io;
+#[cfg(feature = "internals")]
+pub use {
+    allocator::{
+        Allocator,
+        Global
+    },
+    locatedlength::LocatedLength,
+    rawsmallvec::RawSmallVec
+};
+#[cfg(not(feature = "internals"))]
+use {
+    allocator::{
+        Allocator,
+        Global
+    },
+    locatedlength::LocatedLength,
+    rawsmallvec::RawSmallVec
+};
 use {
     allocator::{
         Box,
@@ -82,24 +100,6 @@ use {
         }
     },
     newrange::NewRange
-};
-#[cfg(feature = "internals")]
-pub use {
-    locatedlength::LocatedLength,
-    rawsmallvec::RawSmallVec,
-    allocator::{
-        Allocator,
-        Global
-    }
-};
-#[cfg(not(feature = "internals"))]
-use {
-    locatedlength::LocatedLength,
-    rawsmallvec::RawSmallVec,
-    allocator::{
-        Allocator,
-        Global
-    }
 };
 
 #[repr(C)]
