@@ -1,7 +1,6 @@
 mod allocref;
 
 use {
-    allocref::Allocref,
     super::{
         super::{
             Allocator,
@@ -9,7 +8,8 @@ use {
             SmallVec
         },
         drain::Drain
-    }
+    },
+    allocref::Allocref
 };
 
 pub struct Splice<'a, I: Iterator + 'a, const N: usize, A: Allocator = Global> {
@@ -88,7 +88,8 @@ impl<I: Iterator, const N: usize, A: Allocator> Drop for Splice<'_, I, N, A> {
                 }
             }
 
-            let mut smallvec = SmallVec::<_, N, _>::new_in(Allocref(&self.drain.vec.as_ref().allocator));
+            let mut smallvec =
+                SmallVec::<_, N, _>::new_in(Allocref(&self.drain.vec.as_ref().allocator));
             smallvec.extend(self.replace_with.by_ref());
             let mut collected = smallvec.into_iter();
 
