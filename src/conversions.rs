@@ -151,6 +151,10 @@ impl<T, const N: usize, A: BaseAllocator> SmallVec<T, N, A> {
     fn from_vec_helper(vec: impl Parts<T, A>) -> Self {
         let (ptr, length, cap, allocator) = vec.into_parts();
 
+        if cap == 0 {
+            return Self::new_in(allocator);
+        }
+
         // SAFETY: A `Vec` always has a non-null pointer.
         let ptr = unsafe { NonNull::new_unchecked(ptr) };
 
