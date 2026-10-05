@@ -158,13 +158,16 @@ impl<T, const N: usize> From<alloc::vec::Vec<T>> for SmallVec<T, N, Global> {
         use core::mem::MaybeUninit;
 
         if N < vec.capacity() {
-            let (ptr, length, cap) = vec.into_raw_parts();
+            let mut vec = ManuallyDrop::new(vec);
 
             Self {
-                length: LocatedLength::new(length, !Self::IS_ZST),
+                length: LocatedLength::new(vec.len(), !Self::IS_ZST),
                 raw: RawSmallVec {
-                    // SAFETY: A `Vec` always has a non-null pointer.
-                    heap: (unsafe { NonNull::new_unchecked(ptr) }, cap)
+                    heap: (
+                        // SAFETY: A `Vec` always has a non-null pointer.
+                        unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) },
+                        vec.capacity()
+                    )
                 },
                 allocator: Global
             }
