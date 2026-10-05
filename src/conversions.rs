@@ -6,8 +6,13 @@ use {
         RawSmallVec,
         SmallVec
     },
+    alloc::alloc::handle_alloc_error,
     core::{
-        mem::ManuallyDrop,
+        alloc::Layout,
+        mem::{
+            ManuallyDrop,
+            MaybeUninit
+        },
         ptr::{
             NonNull,
             copy_nonoverlapping
@@ -100,23 +105,51 @@ impl<T, const N: usize, const M: usize, A: Allocator> TryFrom<SmallVec<T, N, A>>
     }
 }
 
+#[cfg(not(feature = "allocator-api"))]
+use Allocator as BaseAllocator;
 #[cfg(feature = "allocator-api2")]
 use allocator_api2::alloc::Allocator as BaseAllocator;
 #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
 use core::alloc::Allocator as BaseAllocator;
 
-#[cfg(feature = "allocator-api")]
-impl<T, const N: usize, A: BaseAllocator> From<crate::Vec<T, A>> for SmallVec<T, N, A> {
-    fn from(vec: crate::Vec<T, A>) -> Self {
-        use core::{
-            alloc::Layout,
-            mem::MaybeUninit
-        };
+trait Parts<T, A> {
+    fn into_parts(self) -> (*mut T, usize, usize, A);
+    unsafe fn from_parts(ptr: *mut T, length: usize, cap: usize, allocator: A) -> Self;
+}
 
+#[cfg(feature = "allocator-api")]
+impl<T, A: BaseAllocator> Parts<T, A> for crate::Vec<T, A> {
+    fn into_parts(self) -> (*mut T, usize, usize, A) {
         #[cfg(feature = "allocator-api2")]
-        let (ptr, length, cap, allocator) = vec.into_raw_parts_with_alloc();
+        {
+            self.into_raw_parts_with_alloc()
+        }
         #[cfg(not(feature = "allocator-api2"))]
-        let (ptr, length, cap, allocator) = vec.into_raw_parts_with_allocator();
+        {
+            self.into_raw_parts_with_allocator()
+        }
+    }
+
+    unsafe fn from_parts(ptr: *mut T, length: usize, cap: usize, allocator: A) -> Self {
+        unsafe { crate::Vec::from_raw_parts_in(ptr, length, cap, allocator) }
+    }
+}
+
+#[cfg(any(not(feature = "allocator-api"), feature = "allocator-api2"))]
+impl<T> Parts<T, Global> for alloc::vec::Vec<T> {
+    fn into_parts(self) -> (*mut T, usize, usize, Global) {
+        let (ptr, length, cap) = self.into_raw_parts();
+        (ptr, length, cap, Global)
+    }
+
+    unsafe fn from_parts(ptr: *mut T, length: usize, cap: usize, _: Global) -> Self {
+        unsafe { alloc::vec::Vec::from_raw_parts(ptr, length, cap) }
+    }
+}
+
+impl<T, const N: usize, A: BaseAllocator> SmallVec<T, N, A> {
+    fn from_vec_helper(vec: impl Parts<T, A>) -> Self {
+        let (ptr, length, cap, allocator) = vec.into_parts();
 
         // SAFETY: A `Vec` always has a non-null pointer.
         let ptr = unsafe { NonNull::new_unchecked(ptr) };
@@ -150,114 +183,64 @@ impl<T, const N: usize, A: BaseAllocator> From<crate::Vec<T, A>> for SmallVec<T,
             }
         }
     }
-}
 
-#[cfg(any(not(feature = "allocator-api"), feature = "allocator-api2"))]
-impl<T, const N: usize> From<alloc::vec::Vec<T>> for SmallVec<T, N, Global> {
-    fn from(mut vec: alloc::vec::Vec<T>) -> Self {
-        use core::mem::MaybeUninit;
+    fn into_vec_helper<P: Parts<T, A>>(self) -> P {
+        let (length, on_heap) = self.length.parts();
+        let this = ManuallyDrop::new(self);
+        unsafe {
+            // SAFETY: we don't call any allocator-using methods on `this`, so
+            // it's         fine to copy it out
+            let allocator = core::ptr::read(&this.allocator);
+            if !on_heap {
+                let layout =
+                    Layout::from_size_align_unchecked(length * size_of::<T>(), align_of::<T>());
+                let ptr = Allocator::allocate(&allocator, layout)
+                    .unwrap_or_else(|| handle_alloc_error(layout))
+                    .as_ptr() as *mut T;
 
-        if N < vec.capacity() {
-            let mut vec = ManuallyDrop::new(vec);
+                copy_nonoverlapping(this.raw.as_ptr_inline(), ptr, length);
 
-            Self {
-                length: LocatedLength::new(vec.len(), !Self::IS_ZST),
-                raw: RawSmallVec {
-                    heap: (
-                        // SAFETY: A `Vec` always has a non-null pointer.
-                        unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) },
-                        vec.capacity()
-                    )
-                },
-                allocator: Global
-            }
-        } else {
-            let length = vec.len();
-            let mut inline = MaybeUninit::uninit();
-            // SAFETY: vec.capacity() <= N
-            unsafe {
-                copy_nonoverlapping(vec.as_ptr(), &raw mut inline as *mut T, length);
-                vec.set_len(0);
-            }
-            Self {
-                length: LocatedLength::new(length, false),
-                raw: RawSmallVec {
-                    inline: ManuallyDrop::new(inline)
-                },
-                allocator: Global
+                P::from_parts(ptr, length, length, allocator)
+            } else {
+                // SAFETY:
+                // - `ptr` was created with the SmallVec's allocator
+                // - `ptr` was created with the appropriate alignment for `T`
+                // - the allocation pointed to by ptr is exactly cap * sizeof(T)
+                // - `length` is less than or equal to `cap`
+                // - the first `length` entries are proper `T`-values
+                // - the allocation is not larger than `isize::MAX`
+                let (ptr, cap) = this.raw.heap;
+                P::from_parts(ptr.as_ptr(), length, cap, allocator)
             }
         }
     }
 }
 
 #[cfg(feature = "allocator-api")]
+impl<T, const N: usize, A: BaseAllocator> From<crate::Vec<T, A>> for SmallVec<T, N, A> {
+    fn from(vec: crate::Vec<T, A>) -> Self {
+        Self::from_vec_helper(vec)
+    }
+}
+
+#[cfg(any(not(feature = "allocator-api"), feature = "allocator-api2"))]
+impl<T, const N: usize> From<alloc::vec::Vec<T>> for SmallVec<T, N, Global> {
+    fn from(vec: alloc::vec::Vec<T>) -> Self {
+        Self::from_vec_helper(vec)
+    }
+}
+
+#[cfg(feature = "allocator-api")]
 impl<T, const N: usize, A: BaseAllocator> From<SmallVec<T, N, A>> for crate::Vec<T, A> {
     fn from(this: SmallVec<T, N, A>) -> Self {
-        let (length, on_heap) = this.length.parts();
-        let this = ManuallyDrop::new(this);
-        if !on_heap {
-            unsafe {
-                let mut vec =
-                    crate::Vec::with_capacity_in(length, core::ptr::read(&this.allocator));
-                // SAFETY: we create a new vector with sufficient capacity, copy
-                // our elements into it to transfer ownership
-                // and then set the length we don't drop the
-                // elements we previously held
-                copy_nonoverlapping(this.raw.as_ptr_inline(), vec.as_mut_ptr(), length);
-                vec.set_len(length);
-
-                vec
-            }
-        } else {
-            // SAFETY:
-            // - `ptr` was created with the SmallVec's allocator
-            // - `ptr` was created with the appropriate alignment for `T`
-            // - the allocation pointed to by ptr is exactly cap * sizeof(T)
-            // - `length` is less than or equal to `cap`
-            // - the first `length` entries are proper `T`-values
-            // - the allocation is not larger than `isize::MAX`
-            unsafe {
-                let (ptr, cap) = this.raw.heap;
-                crate::Vec::from_raw_parts_in(
-                    ptr.as_ptr(),
-                    length,
-                    cap,
-                    core::ptr::read(&this.allocator)
-                )
-            }
-        }
+        this.into_vec_helper()
     }
 }
 
 #[cfg(any(not(feature = "allocator-api"), feature = "allocator-api2"))]
 impl<T, const N: usize> From<SmallVec<T, N, Global>> for alloc::vec::Vec<T> {
     fn from(this: SmallVec<T, N, Global>) -> Self {
-        let (length, on_heap) = this.length.parts();
-        let this = ManuallyDrop::new(this);
-        if !on_heap {
-            let mut vec = alloc::vec::Vec::with_capacity(length);
-            // SAFETY: we create a new vector with sufficient capacity, copy our
-            // elements into it to transfer ownership and then set
-            // the length we don't drop the elements we previously
-            // held
-            unsafe {
-                copy_nonoverlapping(this.raw.as_ptr_inline(), vec.as_mut_ptr(), length);
-                vec.set_len(length);
-            }
-            vec
-        } else {
-            // SAFETY:
-            // - `ptr` was created with the SmallVec's allocator
-            // - `ptr` was created with the appropriate alignment for `T`
-            // - the allocation pointed to by ptr is exactly cap * sizeof(T)
-            // - `length` is less than or equal to `cap`
-            // - the first `length` entries are proper `T`-values
-            // - the allocation is not larger than `isize::MAX`
-            unsafe {
-                let (ptr, cap) = this.raw.heap;
-                alloc::vec::Vec::from_raw_parts(ptr.as_ptr(), length, cap)
-            }
-        }
+        this.into_vec_helper()
     }
 }
 
