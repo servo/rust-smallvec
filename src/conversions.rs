@@ -108,26 +108,39 @@ use core::alloc::Allocator as BaseAllocator;
 #[cfg(feature = "allocator-api")]
 impl<T, const N: usize, A: BaseAllocator> From<crate::Vec<T, A>> for SmallVec<T, N, A> {
     fn from(vec: crate::Vec<T, A>) -> Self {
-        use core::mem::MaybeUninit;
+        use core::{
+            alloc::Layout,
+            mem::MaybeUninit
+        };
 
         #[cfg(feature = "allocator-api2")]
         let (ptr, length, cap, allocator) = vec.into_raw_parts_with_alloc();
         #[cfg(not(feature = "allocator-api2"))]
         let (ptr, length, cap, allocator) = vec.into_raw_parts_with_allocator();
 
+        // SAFETY: A `Vec` always has a non-null pointer.
+        let ptr = unsafe { NonNull::new_unchecked(ptr) };
+
         if N < cap {
             Self {
-                length: LocatedLength::new(length, true),
+                length: LocatedLength::new(length, !Self::IS_ZST),
                 raw: RawSmallVec {
-                    // SAFETY: A `Vec` always has a non-null pointer.
-                    heap: (unsafe { NonNull::new_unchecked(ptr) }, cap)
+                    heap: (ptr, cap)
                 },
                 allocator
             }
         } else {
             let mut inline = MaybeUninit::uninit();
             // SAFETY: vec.capacity() <= N
-            unsafe { copy_nonoverlapping(ptr, &raw mut inline as *mut T, length) };
+            unsafe {
+                copy_nonoverlapping(ptr.as_ptr(), &raw mut inline as *mut T, length);
+                // We have to manually deallocate vec's memory, since we need to
+                // move its allocator out, meaning we can't drop it
+                allocator.deallocate(
+                    ptr.cast(),
+                    Layout::from_size_align_unchecked(cap * size_of::<T>(), align_of::<T>())
+                );
+            }
             Self {
                 length: LocatedLength::new(length, false),
                 raw: RawSmallVec {
@@ -141,14 +154,14 @@ impl<T, const N: usize, A: BaseAllocator> From<crate::Vec<T, A>> for SmallVec<T,
 
 #[cfg(any(not(feature = "allocator-api"), feature = "allocator-api2"))]
 impl<T, const N: usize> From<alloc::vec::Vec<T>> for SmallVec<T, N, Global> {
-    fn from(vec: alloc::vec::Vec<T>) -> Self {
+    fn from(mut vec: alloc::vec::Vec<T>) -> Self {
         use core::mem::MaybeUninit;
 
-        let (ptr, length, cap) = vec.into_raw_parts();
+        if N < vec.capacity() {
+            let (ptr, length, cap) = vec.into_raw_parts();
 
-        if N < cap {
             Self {
-                length: LocatedLength::new(length, true),
+                length: LocatedLength::new(length, !Self::IS_ZST),
                 raw: RawSmallVec {
                     // SAFETY: A `Vec` always has a non-null pointer.
                     heap: (unsafe { NonNull::new_unchecked(ptr) }, cap)
@@ -156,9 +169,13 @@ impl<T, const N: usize> From<alloc::vec::Vec<T>> for SmallVec<T, N, Global> {
                 allocator: Global
             }
         } else {
+            let length = vec.len();
             let mut inline = MaybeUninit::uninit();
             // SAFETY: vec.capacity() <= N
-            unsafe { copy_nonoverlapping(ptr, &raw mut inline as *mut T, length) };
+            unsafe {
+                copy_nonoverlapping(vec.as_ptr(), &raw mut inline as *mut T, length);
+                vec.set_len(0);
+            }
             Self {
                 length: LocatedLength::new(length, false),
                 raw: RawSmallVec {
