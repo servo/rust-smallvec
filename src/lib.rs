@@ -58,7 +58,6 @@ use std::io;
 use {
     allocator::{
         Allocator,
-        Box,
         Global,
         Vec,
         vec
@@ -220,49 +219,9 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     }
 
     #[inline]
+    #[deprecated(since = "2.0.0", note = "use `From::<Vec<T>>::from` instead")]
     pub fn from_vec(vec: Vec<T>) -> Self {
-        if vec.capacity() == 0 {
-            return Self::new();
-        }
-
-        if Self::IS_ZST {
-            // "Move" elements to stack buffer. They're ZST so we don't actually
-            // have to do anything. Just make sure they're not
-            // dropped. We don't wrap the vector in ManuallyDrop so
-            // that when it's dropped, the memory is deallocated, if
-            // it needs to be.
-            let mut vec = vec;
-            let length = vec.len();
-
-            // SAFETY: `0` is less than the vector's capacity.
-            // old_len..new_len is an empty range. So there are no uninitialized
-            // elements
-            unsafe { vec.set_len(0) };
-            Self {
-                length: LocatedLength::new(length, false),
-                raw: RawSmallVec::new(),
-                allocator: Global
-            }
-        } else {
-            let mut vec = ManuallyDrop::new(vec);
-            let length = vec.len();
-
-            // A heap-allocated `SmallVec` must always observe the invariant
-            // that `cap > N`.
-            if vec.capacity() <= N {
-                vec.reserve(N + 1 - length);
-            }
-            let cap = vec.capacity();
-            // SAFETY: vec.capacity is not `0` (checked above), so the pointer
-            // can not dangle and thus specifically cannot be null.
-            let ptr = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
-
-            Self {
-                length: LocatedLength::new(length, true),
-                raw: RawSmallVec::new_heap(ptr, cap),
-                allocator: Global
-            }
-        }
+        vec.into()
     }
 
     /// Creates a `SmallVec` directly from the raw components of another
@@ -979,18 +938,6 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     }
 
     #[inline]
-    #[deprecated(since = "2.0.0", note = "use `Into::<Vec<T>>::into` instead")]
-    pub fn into_vec(self) -> Vec<T> {
-        self.into()
-    }
-
-    #[inline]
-    #[deprecated(since = "2.0.0", note = "use `Into::<Box<[T]>>::into` instead")]
-    pub fn into_boxed_slice(self) -> Box<[T]> {
-        self.into()
-    }
-
-    #[inline]
     #[deprecated(
         since = "2.0.0-alpha.13",
         note = "use `TryInto::<[T; N]>::try_into` instead"
@@ -1505,7 +1452,7 @@ impl<T, const N: usize, A: Allocator> Drop for SmallVec<T, N, A> {
 pub fn from_elem<T: Clone, const N: usize>(elem: T, n: usize) -> SmallVec<T, N, Global> {
     if n > SmallVec::<T, N>::inline_size() {
         // Standard Rust vectors are already specialized.
-        SmallVec::from_vec(vec![elem; n])
+        vec![elem; n].into()
     } else {
         #[cfg(feature = "specialization")]
         {
