@@ -6,6 +6,7 @@ use {
     }
 };
 
+#[repr(transparent)]
 pub struct Allocref<'valid, Heap: Allocator>(pub &'valid Heap);
 
 impl<'valid, Heap: Allocator> Allocator for Allocref<'valid, Heap> {
