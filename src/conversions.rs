@@ -189,7 +189,7 @@ impl<T, const N: usize, A: BaseAllocator> SmallVec<T, N, A> {
         let this = ManuallyDrop::new(self);
         unsafe {
             // SAFETY: we don't call any allocator-using methods on `this`, so
-            // it's         fine to copy it out
+            //         it's fine to copy it out
             let allocator = core::ptr::read(&this.allocator);
             if !on_heap {
                 let layout =
