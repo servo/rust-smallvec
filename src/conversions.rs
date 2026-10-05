@@ -138,8 +138,8 @@ impl<T, A: BaseAllocator> Parts<T, A> for crate::Vec<T, A> {
 #[cfg(any(not(feature = "allocator-api"), feature = "allocator-api2"))]
 impl<T> Parts<T, Global> for alloc::vec::Vec<T> {
     fn into_parts(self) -> (*mut T, usize, usize, Global) {
-        let (ptr, length, cap) = self.into_raw_parts();
-        (ptr, length, cap, Global)
+        let mut this = ManuallyDrop::new(self);
+        (this.as_mut_ptr(), this.len(), this.capacity(), Global)
     }
 
     unsafe fn from_parts(ptr: *mut T, length: usize, cap: usize, _: Global) -> Self {
