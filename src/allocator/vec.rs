@@ -8,13 +8,10 @@ use {
         like::Like,
         requirement::Requirement
     },
-    core::{
-        convert::Infallible,
-        marker::PhantomData
-    }
+    core::marker::PhantomData
 };
 
-pub struct Vec<Item, Heap: Allocator + Requirement>(Infallible, PhantomData<(Heap, Item)>);
+pub struct Vec<Item, Heap: Allocator + Requirement>(PhantomData<(Heap, Item)>);
 
 impl<Item, Heap: Allocator + Requirement> Like for Vec<Item, Heap> {
     #[cfg(not(feature = "allocator-api"))]

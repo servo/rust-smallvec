@@ -4,13 +4,10 @@ use {
         like::Like,
         requirement::Requirement
     },
-    core::{
-        convert::Infallible,
-        marker::PhantomData
-    }
+    core::marker::PhantomData
 };
 
-pub struct Box<Item: ?Sized, Heap: Allocator + Requirement>(Infallible, PhantomData<(Heap, Item)>);
+pub struct Box<Item: ?Sized, Heap: Allocator + Requirement>(PhantomData<(Heap, Item)>);
 
 impl<Item: ?Sized, Heap: Allocator + Requirement> Like for Box<Item, Heap> {
     #[cfg(not(feature = "allocator-api"))]
