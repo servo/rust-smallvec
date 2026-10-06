@@ -60,6 +60,7 @@ use {
         Allocator,
         boxed::Box,
         global::Global,
+        like::Like,
         vec::{
             Vec,
             vec
@@ -222,7 +223,7 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     }
 
     #[inline]
-    pub fn from_vec(vec: Vec<T>) -> Self {
+    pub fn from_vec(vec: <Vec<T, Global> as Like>::Type) -> Self {
         if vec.capacity() == 0 {
             return Self::new();
         }
@@ -759,7 +760,8 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 let (ptr, capacity) = self.raw.heap;
                 copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), length);
                 self.length.set_location::<false>();
-                self.allocator.deallocate(
+                Allocator::deallocate(
+                    &self.allocator,
                     ptr.cast(),
                     Layout::from_size_align_unchecked(capacity * size_of::<T>(), align_of::<T>())
                 );
@@ -793,7 +795,8 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                     let (ptr, capacity) = self.raw.heap;
                     copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), length);
                     self.length.set_location::<false>();
-                    self.allocator.deallocate(
+                    Allocator::deallocate(
+                        &self.allocator,
                         ptr.cast(),
                         Layout::from_size_align_unchecked(
                             capacity * size_of::<T>(),
@@ -982,13 +985,13 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
 
     #[inline]
     #[deprecated(since = "2.0.0", note = "use `Into::<Vec<T>>::into` instead")]
-    pub fn into_vec(self) -> Vec<T> {
+    pub fn into_vec(self) -> <Vec<T, Global> as Like>::Type {
         self.into()
     }
 
     #[inline]
     #[deprecated(since = "2.0.0", note = "use `Into::<Box<[T]>>::into` instead")]
-    pub fn into_boxed_slice(self) -> Box<[T]> {
+    pub fn into_boxed_slice(self) -> <Box<[T], Global> as Like>::Type {
         self.into()
     }
 
@@ -1468,7 +1471,8 @@ impl<A: Allocator> Drop for DropDealloc<'_, A> {
     fn drop(&mut self) {
         unsafe {
             if self.size_bytes > 0 {
-                self.allocator.deallocate(
+                Allocator::deallocate(
+                    self.allocator,
                     self.ptr,
                     Layout::from_size_align_unchecked(self.size_bytes, self.align)
                 );

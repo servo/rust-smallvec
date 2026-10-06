@@ -126,8 +126,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         let new_ptr = if !was_on_heap {
             // get a fresh allocation
             // `new_layout` has nonzero size.
-            let new_ptr = allocator
-                .allocate(new_layout)
+            let new_ptr = Allocator::allocate(allocator, new_layout)
                 .ok_or(SmallVecError::AllocationError(new_layout))?
                 .cast();
             unsafe { copy_nonoverlapping(ptr, new_ptr.as_ptr(), length) };
@@ -149,9 +148,9 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             // with Layout::array
             unsafe {
                 (if self.heap.1 < new_capacity {
-                    A::grow
+                    <A as Allocator>::grow
                 } else {
-                    A::shrink
+                    <A as Allocator>::shrink
                 })(
                     allocator,
                     NonNull::new(ptr as *mut u8).unwrap(),
