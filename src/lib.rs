@@ -219,7 +219,7 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     }
 
     #[inline]
-    #[deprecated(since = "2.0.0", note = "use `From::<Vec<T>>::from` instead")]
+    #[deprecated(since = "2.0.0-beta.3", note = "use `From::<Vec<T>>::from` instead")]
     pub fn from_vec(vec: Vec<T>) -> Self {
         vec.into()
     }
