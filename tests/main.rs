@@ -1143,3 +1143,21 @@ fn spare_capacity_mut() {
     assert!(!spare.is_empty());
     assert_eq!(spare.as_ptr().cast::<u8>(), unsafe { v.as_ptr().add(3) });
 }
+
+#[test]
+fn into_box_from_inline_and_spilled() {
+    let inline: SmallVec<u32, 8> = SmallVec::from([1, 2, 3]);
+    assert!(!inline.spilled());
+    let boxed: Box<[u32]> = inline.into();
+    assert_eq!(&*boxed, &[1, 2, 3]);
+
+    let mut spilled: SmallVec<u32, 2> = SmallVec::new();
+    spilled.extend(1..6);
+    assert!(spilled.spilled());
+    let boxed: Box<[u32]> = spilled.into();
+    assert_eq!(&*boxed, &[1, 2, 3, 4, 5]);
+
+    let empty: SmallVec<u32, 4> = SmallVec::new();
+    let boxed: Box<[u32]> = empty.into();
+    assert!(boxed.is_empty());
+}

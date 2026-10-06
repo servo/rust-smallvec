@@ -987,7 +987,9 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     #[inline]
     #[deprecated(since = "2.0.0", note = "use `Into::<Box<[T]>>::into` instead")]
     pub fn into_boxed_slice(self) -> Box<[T]> {
-        self.into()
+        // `From` for `Box<[T], A>` is not always `Box<[T]>` (the `Global`
+        // box). Keep this deprecated helper on the global allocator.
+        Vec::from(self).into_boxed_slice()
     }
 
     #[inline]
