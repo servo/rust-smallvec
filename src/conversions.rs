@@ -4,7 +4,8 @@ use {
         Box,
         Global,
         SmallVec,
-        Vec
+        Vec,
+        allocator::like::Like
     },
     core::{
         mem::ManuallyDrop,
@@ -17,7 +18,7 @@ impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N, Global> {
     fn from(slice: &[T]) -> Self {
         if slice.len() > Self::inline_size() {
             // Standard Rust vectors are already specialized.
-            Self::from_vec(Vec::from(slice))
+            Self::from_vec(<Vec<T, Global> as Like>::Type::from(slice))
         } else {
             // SAFETY: The precondition is checked in the initial comparison
             // above.
@@ -62,7 +63,7 @@ impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N, Global> 
         if M > N {
             // If M > N, we'd have to heap allocate anyway,
             // so delegate for Vec for the allocation.
-            Self::from(Vec::from(array))
+            Self::from(<Vec<T, Global> as Like>::Type::from(array))
         } else {
             // M <= N
             let mut this = Self::new();
@@ -97,17 +98,17 @@ impl<T, const N: usize, const M: usize, A: Allocator> TryFrom<SmallVec<T, N, A>>
     }
 }
 
-impl<T, const N: usize> From<Vec<T>> for SmallVec<T, N, Global> {
-    fn from(array: Vec<T>) -> Self {
+impl<T, const N: usize> From<<Vec<T, Global> as Like>::Type> for SmallVec<T, N, Global> {
+    fn from(array: <Vec<T, Global> as Like>::Type) -> Self {
         Self::from_vec(array)
     }
 }
 
-impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for Vec<T> {
+impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for <Vec<T, Global> as Like>::Type {
     fn from(this: SmallVec<T, N, A>) -> Self {
         let (length, on_heap) = this.length.parts();
         if !on_heap {
-            let mut vec = Vec::with_capacity(length);
+            let mut vec = <Vec<T, Global> as Like>::Type::with_capacity(length);
             let this = ManuallyDrop::new(this);
             // SAFETY: we create a new vector with sufficient capacity, copy our
             // elements into it to transfer ownership and then set
@@ -129,14 +130,14 @@ impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for Vec<T> {
             // - the allocation is not larger than `isize::MAX`
             unsafe {
                 let (ptr, cap) = this.raw.heap;
-                Vec::from_raw_parts(ptr.as_ptr(), length, cap)
+                <Vec<T, Global> as Like>::Type::from_raw_parts(ptr.as_ptr(), length, cap)
             }
         }
     }
 }
 
-impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for Box<[T]> {
+impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for <Box<[T], Global> as Like>::Type {
     fn from(this: SmallVec<T, N, A>) -> Self {
-        Vec::from(this).into_boxed_slice()
+        <Vec<T, Global> as Like>::Type::from(this).into_boxed_slice()
     }
 }
