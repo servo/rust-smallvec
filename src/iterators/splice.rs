@@ -1,13 +1,11 @@
-use {
+use super::{
     super::{
-        super::{
-            Allocator,
-            Global,
-            SmallVec,
-            allocator::proxy::Proxy
-        },
-        drain::Drain
-    }
+        Allocator,
+        Global,
+        SmallVec,
+        allocator::proxy::Proxy
+    },
+    drain::Drain
 };
 
 pub struct Splice<'a, I: Iterator + 'a, const N: usize, A: Allocator = Global> {
