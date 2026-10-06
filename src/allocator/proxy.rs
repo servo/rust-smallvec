@@ -7,9 +7,9 @@ use {
 };
 
 #[repr(transparent)]
-pub struct Allocref<'valid, Heap: Allocator>(pub &'valid Heap);
+pub struct Proxy<'valid, Heap: Allocator>(pub &'valid Heap);
 
-impl<'valid, Heap: Allocator> Allocator for Allocref<'valid, Heap> {
+impl<'valid, Heap: Allocator> Allocator for Proxy<'valid, Heap> {
     #[inline]
     fn allocate(&self, layout: Layout) -> Option<NonNull<[u8]>> {
         self.0.allocate(layout)

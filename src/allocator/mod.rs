@@ -4,6 +4,7 @@ mod base;
 mod external;
 #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
 mod native;
+pub mod proxy;
 
 use core::{
     alloc::Layout,
