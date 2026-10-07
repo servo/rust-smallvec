@@ -53,6 +53,7 @@ use defmt::{
     write as dewrite
 };
 pub use errors::SmallVecError;
+use core::ptr;
 #[cfg(feature = "std")]
 use std::io;
 use {
@@ -265,34 +266,93 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
         }
     }
 
-    /// Creates a `SmallVec` directly from the raw components of another
-    /// `SmallVec`.
+    /// Creates a `SmallVec<T, N>` directly from a `NonNull` pointer, a length, and
+    /// a capacity.
     ///
     /// # Safety
     ///
     /// This is highly unsafe, due to the number of invariants that aren’t
     /// checked:
     ///
-    /// - `ptr` needs to have been previously allocated via `SmallVec` from its
-    ///   spilled storage (at least, it’s highly likely to be incorrect if it
-    ///   wasn’t).
-    /// - `ptr`’s `T` type needs to be the same size and alignment that it was
-    ///   allocated with
+    /// - `ptr` must be [*currently allocated*] via the global allocator.
+    /// As such, if it belonged to a `SmallVec`, it must have been spilled to
+    /// the heap.
+    /// - `T` needs to have the same alignment as what `ptr` was allocated with.
+    ///   (`T` having a less strict alignment is not sufficient, the alignment really
+    ///   needs to be equal to satisfy the [`dealloc`] requirement that memory must be
+    ///   allocated and deallocated with the same layout.)
+    /// - The size of `T` times the `capacity` (i.e. the allocated size in bytes) needs
+    ///   to be the same size as the pointer was allocated with. (Because similar to
+    ///   alignment, [`dealloc`] must be called with the same layout `size`.)
     /// - `length` needs to be less than or equal to `capacity`.
+    /// - The first `length` values must be properly initialized values of type `T`.
     /// - `capacity` needs to be the capacity that the pointer was allocated
     ///   with.
+    /// - The allocated size in bytes must be no larger than `isize::MAX`.
+    ///   See the safety documentation of [`std::pointer::offset`].
     ///
-    /// Violating these may cause problems like corrupting the allocator’s
-    /// internal data structures.
+    /// These requirements are always upheld by any `ptr` that has been allocated
+    /// via any `SmallVec<T, _>`. Other allocation sources are allowed
+    /// if the invariants are upheld.
     ///
     /// Additionally, `capacity` must be greater than `N`; that is, the new
     /// `SmallVec` must need to spill over into heap allocated storage. This
     /// condition is asserted against.
     ///
-    /// The ownership of `ptr` is effectively transferred to the `SmallVec`
+    /// Violating these may cause problems like corrupting the allocator’s
+    /// internal data structures.
+    ///
+    /// The ownership of `ptr` is effectively transferred to the `SmallVec<T, N>`
     /// which may then deallocate, reallocate or change the contents of memory
     /// pointed to by the pointer at will. Ensure that nothing else uses the
     /// pointer after calling this function.
+    ///
+    /// [*currently allocated*]: std::alloc::Allocator#currently-allocated-memory
+    ///
+    /// # Examples
+    ///
+    /// Creates a `SmallVec<T, N, A>` directly from a `NonNull` pointer, a length, a capacity,
+    /// and an allocator.
+    ///
+    /// # Safety
+    ///
+    /// This is highly unsafe, due to the number of invariants that aren’t
+    /// checked:
+    ///
+    /// - `ptr` must be [*currently allocated*] via the given allocator `alloc`.
+    /// If it belonged to a `SmallVec`, it must have been spilled to
+    /// the heap.
+    /// - `T` needs to have the same alignment as what `ptr` was allocated with.
+    ///   (`T` having a less strict alignment is not sufficient, the alignment really
+    ///   needs to be equal to satisfy the [`dealloc`] requirement that memory must be
+    ///   allocated and deallocated with the same layout.)
+    /// - The size of `T` times the `capacity` (i.e. the allocated size in bytes) needs
+    ///   to be the same size as the pointer was allocated with. (Because similar to
+    ///   alignment, [`dealloc`] must be called with the same layout `size`.)
+    /// - `length` needs to be less than or equal to `capacity`.
+    /// - The first `length` values must be properly initialized values of type `T`.
+    /// - `capacity` needs to [*fit*] the layout size that the pointer was allocated with.
+    /// - The allocated size in bytes must be no larger than `isize::MAX`.
+    ///   See the safety documentation of [`std::pointer::offset`].
+    ///
+    /// These requirements are always upheld by any `ptr` that has been allocated
+    /// via any `SmallVec<T, _, A>`. Other allocation sources are allowed
+    /// if the invariants are upheld.
+    ///
+    /// Additionally, `capacity` must be greater than `N`; that is, the new
+    /// `SmallVec` must need to spill over into heap allocated storage. This
+    /// condition is asserted against.
+    ///
+    /// Violating these may cause problems like corrupting the allocator’s
+    /// internal data structures.
+    ///
+    /// The ownership of `ptr` is effectively transferred to the `SmallVec<T, N, A>`
+    /// which may then deallocate, reallocate or change the contents of memory
+    /// pointed to by the pointer at will. Ensure that nothing else uses the
+    /// pointer after calling this function.
+    ///
+    /// [*currently allocated*]: std::alloc::Allocator#currently-allocated-memory
+    /// [*fit*]: std::alloc::Allocator#memory-fitting
     ///
     /// # Examples
     ///
@@ -301,17 +361,11 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     ///
     /// let mut v: SmallVec<_, 1> = SmallVec::from([1, 2, 3]);
     ///
-    /// // Pull out the important parts of `v`.
-    /// let p = v.as_mut_ptr();
-    /// let length = v.len();
-    /// let cap = v.capacity();
+    /// // Pull out the important parts of `v`
     /// let spilled = v.spilled();
+    /// let (ptr, length, capacity) = v.into_parts();
     ///
     /// unsafe {
-    ///     // Forget all about `v`. The heap allocation that stored the
-    ///     // three values won't be deallocated.
-    ///     std::mem::forget(v);
-    ///
     ///     // Overwrite memory with [4, 5, 6].
     ///     //
     ///     // This is only safe if `spilled` is true! Otherwise, we are
@@ -319,35 +373,70 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     ///     // stack.
     ///     assert!(spilled);
     ///     for i in 0..length {
-    ///         std::ptr::write(p.add(i), 4 + i);
+    ///         ptr.add(i).write(4 + i);
     ///     }
     ///
     ///     // Put everything back together into a SmallVec with a different
-    ///     // amount of inline storage, but which is still less than `cap`.
-    ///     let rebuilt = SmallVec::<_, 2>::from_raw_parts(p, length, cap);
-    ///     assert_eq!(&*rebuilt, &[4, 5, 6]);
+    ///     // amount of inline storage, but which is still less than `capacity`.
+    ///     let rebuilt = SmallVec::<_, 2>::from_parts(ptr, length, capacity);
+    ///     assert_eq!(rebuilt, &[4, 5, 6]);
     /// }
     /// ```
     #[inline]
-    pub unsafe fn from_raw_parts(
-        ptr: *mut T,
+    pub unsafe fn from_parts(
+        ptr: NonNull<T>,
         length: usize,
         capacity: usize
     ) -> SmallVec<T, N, Global> {
-        assert!(!Self::IS_ZST);
+        unsafe { Self::from_parts_in(ptr, length, capacity, Global) }
+    }
 
-        // SAFETY: We require caller to provide same ptr as we alloc
-        // and we never alloc null pointer.
-        let ptr = unsafe {
-            debug_assert!(!ptr.is_null(), "Called `from_raw_parts` with null pointer.");
-            NonNull::new_unchecked(ptr)
-        };
-
-        SmallVec {
-            length: LocatedLength::new(length, true),
-            raw: RawSmallVec::new_heap(ptr, capacity),
-            allocator: Global
-        }
+    /// Decomposes a `SmallVec<T, N>` into its raw components:
+    /// `(NonNull pointer, length, capacity)`.
+    ///
+    /// Returns the `NonNull` pointer to the underlying data, the length of
+    /// the vector (in elements), and the allocated capacity of the
+    /// data (in elements). These are the same arguments
+    /// in the same order as the arguments to [`from_parts`].
+    ///
+    /// After calling this function, the caller is responsible for the
+    /// memory previously managed by the `SmallVec`. Most often, one does
+    /// this by converting the raw pointer, length, and capacity back
+    /// into a `SmallVec` with the [`from_parts`] function, allowing the
+    /// destructor to perform the cleanup; more generally,
+    /// if `T` is non-zero-sized and the capacity is non-zero, one may use
+    /// any method that calls [`dealloc`] with a layout of
+    /// `Layout::array::<T>(capacity)`; if `T` is zero-sized or the
+    /// capacity is zero, nothing needs to be done.
+    ///
+    /// [`from_parts`]: SmallVec::from_parts
+    /// [`dealloc`]: alloc::alloc::GlobalAlloc::dealloc
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the contents are not spilled on the heap.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use smallvec::SmallVec;
+    /// let v: SmallVec<i32, 1> = SmallVec::from([-1, 0, 1]);
+    ///
+    /// let (ptr, length, cap) = v.into_parts();
+    ///
+    /// let rebuilt = unsafe {
+    ///     // We can now make changes to the components, such as
+    ///     // transmuting the raw pointer to a compatible type.
+    ///     let ptr = ptr.cast::<u32>();
+    ///
+    ///     SmallVec::<u32, 5>::from_parts(ptr, length, cap)
+    /// };
+    /// assert_eq!(rebuilt, [4294967295, 0, 1]);
+    /// ```
+    #[inline]
+    pub fn into_parts(self) -> (NonNull<T>, usize, usize) {
+        let (ptr, len, capacity, _) = self.into_parts_with_allocator();
+        (ptr, len, capacity)
     }
 }
 
@@ -1203,25 +1292,112 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         }
     }
 
-    /// Decomposes a `SmallVec<T, N, Global>` into its raw components:
-    /// `(pointer, length, capacity)`.
+    /// Creates a `SmallVec<T, N, A>` directly from a `NonNull` pointer, a length, a capacity,
+    /// and an allocator.
     ///
-    /// Returns the raw pointer to the underlying data, the length of
-    /// the vector (in elements), and the allocated capacity of the
-    /// data (in elements). These are the same arguments in the same
-    /// order as the arguments to [`from_raw_parts`].
+    /// # Safety
+    ///
+    /// This is highly unsafe, due to the number of invariants that aren’t
+    /// checked:
+    ///
+    /// - `ptr` must be [*currently allocated*] via the given allocator `alloc`.
+    /// If it belonged to a `SmallVec`, it must have been spilled to
+    /// the heap.
+    /// - `T` needs to have the same alignment as what `ptr` was allocated with.
+    ///   (`T` having a less strict alignment is not sufficient, the alignment really
+    ///   needs to be equal to satisfy the [`dealloc`] requirement that memory must be
+    ///   allocated and deallocated with the same layout.)
+    /// - The size of `T` times the `capacity` (i.e. the allocated size in bytes) needs
+    ///   to be the same size as the pointer was allocated with. (Because similar to
+    ///   alignment, [`dealloc`] must be called with the same layout `size`.)
+    /// - `length` needs to be less than or equal to `capacity`.
+    /// - The first `length` values must be properly initialized values of type `T`.
+    /// - `capacity` needs to [*fit*] the layout size that the pointer was allocated with.
+    /// - The allocated size in bytes must be no larger than `isize::MAX`.
+    ///   See the safety documentation of [`std::pointer::offset`].
+    ///
+    /// These requirements are always upheld by any `ptr` that has been allocated
+    /// via any `SmallVec<T, _, A>`. Other allocation sources are allowed
+    /// if the invariants are upheld.
+    ///
+    /// Additionally, `capacity` must be greater than `N`; that is, the new
+    /// `SmallVec` must need to spill over into heap allocated storage. This
+    /// condition is asserted against.
+    ///
+    /// Violating these may cause problems like corrupting the allocator’s
+    /// internal data structures.
+    ///
+    /// The ownership of `ptr` is effectively transferred to the `SmallVec<T, N, A>`
+    /// which may then deallocate, reallocate or change the contents of memory
+    /// pointed to by the pointer at will. Ensure that nothing else uses the
+    /// pointer after calling this function.
+    ///
+    /// [*currently allocated*]: std::alloc::Allocator#currently-allocated-memory
+    /// [*fit*]: std::alloc::Allocator#memory-fitting
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use smallvec::SmallVec;
+    ///
+    /// let mut v: SmallVec<_, 1> = SmallVec::from([1, 2, 3]);
+    ///
+    /// // Pull out the important parts of `v`
+    /// let spilled = v.spilled();
+    /// let (ptr, length, capacity) = v.into_parts();
+    ///
+    /// unsafe {
+    ///     // Overwrite memory with [4, 5, 6].
+    ///     //
+    ///     // This is only safe if `spilled` is true! Otherwise, we are
+    ///     // writing into the old `SmallVec`'s inline storage on the
+    ///     // stack.
+    ///     assert!(spilled);
+    ///     for i in 0..length {
+    ///         ptr.add(i).write(4 + i);
+    ///     }
+    ///
+    ///     // Put everything back together into a SmallVec with a different
+    ///     // amount of inline storage, but which is still less than `capacity`.
+    ///     let rebuilt = SmallVec::<_, 2>::from_parts(ptr, length, capacity);
+    ///     assert_eq!(rebuilt, &[4, 5, 6]);
+    /// }
+    /// ```
+    #[inline]
+    pub unsafe fn from_parts_in(
+        ptr: NonNull<T>,
+        length: usize,
+        capacity: usize,
+        allocator: A
+    ) -> SmallVec<T, N, A> {
+        assert!(!Self::IS_ZST);
+
+        SmallVec {
+            length: LocatedLength::new(length, true),
+            raw: RawSmallVec::new_heap(ptr, capacity),
+            allocator
+        }
+    }
+
+    /// Decomposes a `SmallVec<T, N, A>` into its raw components:
+    /// `(NonNull pointer, length, capacity, allocator)`.
+    ///
+    /// Returns the `NonNull` pointer to the underlying data, the length of
+    /// the vector (in elements), the allocated capacity of the
+    /// data (in elements), and the allocator. These are the same arguments
+    /// in the same order as the arguments to [`from_parts_in`].
     ///
     /// After calling this function, the caller is responsible for the
     /// memory previously managed by the `SmallVec`. Most often, one does
     /// this by converting the raw pointer, length, and capacity back
-    /// into a `SmallVec` with the [`from_raw_parts`] function; more generally,
-    /// if `T` is non-zero-sized and the capacity is nonzero, one may use
-    /// any method that calls [`dealloc`] with a layout of
+    /// into a `SmallVec` with the [`from_parts_in`] function, allowing the
+    /// destructor to perform the cleanup; more generally,
+    /// if `T` is non-zero-sized and the capacity is non-zero, one may use
+    /// any method that calls [`A::dealloc`] with a layout of
     /// `Layout::array::<T>(capacity)`; if `T` is zero-sized or the
     /// capacity is zero, nothing needs to be done.
     ///
-    /// [`from_raw_parts`]: SmallVec::from_raw_parts
-    /// [`dealloc`]: alloc::alloc::GlobalAlloc::dealloc
+    /// [`from_parts_in`]: SmallVec::from_parts_in
     ///
     /// # Panics
     ///
@@ -1233,25 +1409,25 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// # use smallvec::SmallVec;
     /// let v: SmallVec<i32, 1> = SmallVec::from([-1, 0, 1]);
     ///
-    /// let (ptr, length, cap) = v.into_raw_parts();
+    /// let (ptr, length, cap, alloc) = v.into_parts_with_allocator();
     ///
     /// let rebuilt = unsafe {
     ///     // We can now make changes to the components, such as
     ///     // transmuting the raw pointer to a compatible type.
-    ///     let ptr = ptr as *mut u32;
+    ///     let ptr = ptr.cast::<u32>();
     ///
-    ///     SmallVec::<u32, 5>::from_raw_parts(ptr, length, cap)
+    ///     SmallVec::<u32, 5>::from_parts_in(ptr, length, cap, alloc)
     /// };
     /// assert_eq!(rebuilt, [4294967295, 0, 1]);
     /// ```
     #[inline]
-    pub fn into_raw_parts(self) -> (*mut T, usize, usize) {
+    pub fn into_parts_with_allocator(self) -> (NonNull<T>, usize, usize, A) {
         #[cold]
         #[inline(never)]
         #[track_caller]
         fn assert_failed() -> ! {
             panic!(
-                "SmallVec::into_raw_parts() called on inline (stack) SmallVec, \
+                "into_parts called on inline (stack) SmallVec, \
                  which cannot be safely leaked"
             );
         }
@@ -1260,7 +1436,15 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         }
 
         let mut me = ManuallyDrop::new(self);
-        (me.as_mut_ptr(), me.len(), me.capacity())
+        // SAFETY: The `SmallVec` is spilled.
+        unsafe {
+            (
+                NonNull::new_unchecked(me.as_mut_ptr()),
+                me.len(),
+                me.capacity(),
+                ptr::read(&me.allocator),
+            )
+        }
     }
 
     #[inline]

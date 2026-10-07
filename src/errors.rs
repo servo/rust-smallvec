@@ -12,7 +12,7 @@ use {
     }
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SmallVecError {
     CapacityOverflow,
     AllocationError(Layout)
