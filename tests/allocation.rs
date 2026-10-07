@@ -1,5 +1,5 @@
 #![cfg(all(
-    any(feature = "allocator-api", feature = "allocator-api2"),
+    feature = "allocator-api",
     feature = "std" // `std` is necessary for the base `System` allocator
 ))]
 
