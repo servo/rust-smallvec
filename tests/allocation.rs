@@ -247,7 +247,7 @@ fn test_moving_does_not_deallocate() {
     let alloc_b = TestAlloc::new();
 
     let vec = SmallVec::<i32, INLINE_SIZE, &TestAlloc>::with_capacity_in(INLINE_SIZE + 1, &alloc_a);
-    let (ptr, len, cap, allocator) = vec.into_parts_with_allocator();
+    let (ptr, len, cap, allocator) = vec.into_parts_with_alloc();
 
     // moving to a different inline size must not deallocate
     let vec = unsafe {
@@ -575,13 +575,13 @@ fn test_alignment_is_respected() {
 
 #[test]
 #[should_panic]
-fn test_into_parts_with_allocator_inline_panics() {
+fn test_into_parts_with_alloc_inline_panics() {
     const INLINE_SIZE: usize = 4;
 
     let alloc = TestAlloc::new();
 
     let vec = SmallVec::<i32, INLINE_SIZE, &TestAlloc>::new_in(&alloc);
-    let _ = vec.into_parts_with_allocator();
+    let _ = vec.into_parts_with_alloc();
 }
 
 #[test]
