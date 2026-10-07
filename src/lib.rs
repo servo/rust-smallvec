@@ -435,7 +435,7 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     /// ```
     #[inline]
     pub fn into_parts(self) -> (NonNull<T>, usize, usize) {
-        let (ptr, len, capacity, _) = self.into_parts_with_allocator();
+        let (ptr, len, capacity, _) = self.into_parts_with_alloc();
         (ptr, len, capacity)
     }
 }
@@ -1409,7 +1409,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// # use smallvec::SmallVec;
     /// let v: SmallVec<i32, 1> = SmallVec::from([-1, 0, 1]);
     ///
-    /// let (ptr, length, cap, alloc) = v.into_parts_with_allocator();
+    /// let (ptr, length, cap, alloc) = v.into_parts_with_alloc();
     ///
     /// let rebuilt = unsafe {
     ///     // We can now make changes to the components, such as
@@ -1421,7 +1421,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// assert_eq!(rebuilt, [4294967295, 0, 1]);
     /// ```
     #[inline]
-    pub fn into_parts_with_allocator(self) -> (NonNull<T>, usize, usize, A) {
+    pub fn into_parts_with_alloc(self) -> (NonNull<T>, usize, usize, A) {
         #[cold]
         #[inline(never)]
         #[track_caller]
