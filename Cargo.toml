@@ -36,6 +36,7 @@ rayon = ["std", "dep:rayon"]
 serde = ["dep:serde_core"]
 specialization = []
 std = []
+default = ["encase"]
 
 [dependencies]
 allocator-api2 = { version = "0.4", optional = true, features = ["alloc"], default-features = false }

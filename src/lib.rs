@@ -53,7 +53,6 @@ use defmt::{
     write as dewrite
 };
 pub use errors::SmallVecError;
-use core::ptr;
 #[cfg(feature = "std")]
 use std::io;
 use {
@@ -78,6 +77,7 @@ use {
             size_of
         },
         ptr::{
+            self,
             NonNull,
             copy,
             copy_nonoverlapping,
@@ -266,8 +266,8 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
         }
     }
 
-    /// Creates a `SmallVec<T, N>` directly from a `NonNull` pointer, a length, and
-    /// a capacity.
+    /// Creates a `SmallVec<T, N>` directly from a `NonNull` pointer, a length,
+    /// and a capacity.
     ///
     /// # Safety
     ///
@@ -278,22 +278,24 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     /// As such, if it belonged to a `SmallVec`, it must have been spilled to
     /// the heap.
     /// - `T` needs to have the same alignment as what `ptr` was allocated with.
-    ///   (`T` having a less strict alignment is not sufficient, the alignment really
-    ///   needs to be equal to satisfy the [`dealloc`] requirement that memory must be
-    ///   allocated and deallocated with the same layout.)
-    /// - The size of `T` times the `capacity` (i.e. the allocated size in bytes) needs
-    ///   to be the same size as the pointer was allocated with. (Because similar to
-    ///   alignment, [`dealloc`] must be called with the same layout `size`.)
+    ///   (`T` having a less strict alignment is not sufficient, the alignment
+    ///   really needs to be equal to satisfy the [`dealloc`] requirement that
+    ///   memory must be allocated and deallocated with the same layout.)
+    /// - The size of `T` times the `capacity` (i.e. the allocated size in
+    ///   bytes) needs to be the same size as the pointer was allocated with.
+    ///   (Because similar to alignment, [`dealloc`] must be called with the
+    ///   same layout `size`.)
     /// - `length` needs to be less than or equal to `capacity`.
-    /// - The first `length` values must be properly initialized values of type `T`.
+    /// - The first `length` values must be properly initialized values of type
+    ///   `T`.
     /// - `capacity` needs to be the capacity that the pointer was allocated
     ///   with.
-    /// - The allocated size in bytes must be no larger than `isize::MAX`.
-    ///   See the safety documentation of [`std::pointer::offset`].
+    /// - The allocated size in bytes must be no larger than `isize::MAX`. See
+    ///   the safety documentation of [`std::pointer::offset`].
     ///
-    /// These requirements are always upheld by any `ptr` that has been allocated
-    /// via any `SmallVec<T, _>`. Other allocation sources are allowed
-    /// if the invariants are upheld.
+    /// These requirements are always upheld by any `ptr` that has been
+    /// allocated via any `SmallVec<T, _>`. Other allocation sources are
+    /// allowed if the invariants are upheld.
     ///
     /// Additionally, `capacity` must be greater than `N`; that is, the new
     /// `SmallVec` must need to spill over into heap allocated storage. This
@@ -302,17 +304,17 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     /// Violating these may cause problems like corrupting the allocator’s
     /// internal data structures.
     ///
-    /// The ownership of `ptr` is effectively transferred to the `SmallVec<T, N>`
-    /// which may then deallocate, reallocate or change the contents of memory
-    /// pointed to by the pointer at will. Ensure that nothing else uses the
-    /// pointer after calling this function.
+    /// The ownership of `ptr` is effectively transferred to the `SmallVec<T,
+    /// N>` which may then deallocate, reallocate or change the contents of
+    /// memory pointed to by the pointer at will. Ensure that nothing else
+    /// uses the pointer after calling this function.
     ///
     /// [*currently allocated*]: std::alloc::Allocator#currently-allocated-memory
     ///
     /// # Examples
     ///
-    /// Creates a `SmallVec<T, N, A>` directly from a `NonNull` pointer, a length, a capacity,
-    /// and an allocator.
+    /// Creates a `SmallVec<T, N, A>` directly from a `NonNull` pointer, a
+    /// length, a capacity, and an allocator.
     ///
     /// # Safety
     ///
@@ -323,21 +325,24 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     /// If it belonged to a `SmallVec`, it must have been spilled to
     /// the heap.
     /// - `T` needs to have the same alignment as what `ptr` was allocated with.
-    ///   (`T` having a less strict alignment is not sufficient, the alignment really
-    ///   needs to be equal to satisfy the [`dealloc`] requirement that memory must be
-    ///   allocated and deallocated with the same layout.)
-    /// - The size of `T` times the `capacity` (i.e. the allocated size in bytes) needs
-    ///   to be the same size as the pointer was allocated with. (Because similar to
-    ///   alignment, [`dealloc`] must be called with the same layout `size`.)
+    ///   (`T` having a less strict alignment is not sufficient, the alignment
+    ///   really needs to be equal to satisfy the [`dealloc`] requirement that
+    ///   memory must be allocated and deallocated with the same layout.)
+    /// - The size of `T` times the `capacity` (i.e. the allocated size in
+    ///   bytes) needs to be the same size as the pointer was allocated with.
+    ///   (Because similar to alignment, [`dealloc`] must be called with the
+    ///   same layout `size`.)
     /// - `length` needs to be less than or equal to `capacity`.
-    /// - The first `length` values must be properly initialized values of type `T`.
-    /// - `capacity` needs to [*fit*] the layout size that the pointer was allocated with.
-    /// - The allocated size in bytes must be no larger than `isize::MAX`.
-    ///   See the safety documentation of [`std::pointer::offset`].
+    /// - The first `length` values must be properly initialized values of type
+    ///   `T`.
+    /// - `capacity` needs to [*fit*] the layout size that the pointer was
+    ///   allocated with.
+    /// - The allocated size in bytes must be no larger than `isize::MAX`. See
+    ///   the safety documentation of [`std::pointer::offset`].
     ///
-    /// These requirements are always upheld by any `ptr` that has been allocated
-    /// via any `SmallVec<T, _, A>`. Other allocation sources are allowed
-    /// if the invariants are upheld.
+    /// These requirements are always upheld by any `ptr` that has been
+    /// allocated via any `SmallVec<T, _, A>`. Other allocation sources are
+    /// allowed if the invariants are upheld.
     ///
     /// Additionally, `capacity` must be greater than `N`; that is, the new
     /// `SmallVec` must need to spill over into heap allocated storage. This
@@ -346,10 +351,10 @@ impl<T, const N: usize> SmallVec<T, N, Global> {
     /// Violating these may cause problems like corrupting the allocator’s
     /// internal data structures.
     ///
-    /// The ownership of `ptr` is effectively transferred to the `SmallVec<T, N, A>`
-    /// which may then deallocate, reallocate or change the contents of memory
-    /// pointed to by the pointer at will. Ensure that nothing else uses the
-    /// pointer after calling this function.
+    /// The ownership of `ptr` is effectively transferred to the `SmallVec<T, N,
+    /// A>` which may then deallocate, reallocate or change the contents of
+    /// memory pointed to by the pointer at will. Ensure that nothing else
+    /// uses the pointer after calling this function.
     ///
     /// [*currently allocated*]: std::alloc::Allocator#currently-allocated-memory
     /// [*fit*]: std::alloc::Allocator#memory-fitting
@@ -1292,8 +1297,8 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
         }
     }
 
-    /// Creates a `SmallVec<T, N, A>` directly from a `NonNull` pointer, a length, a capacity,
-    /// and an allocator.
+    /// Creates a `SmallVec<T, N, A>` directly from a `NonNull` pointer, a
+    /// length, a capacity, and an allocator.
     ///
     /// # Safety
     ///
@@ -1304,21 +1309,24 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// If it belonged to a `SmallVec`, it must have been spilled to
     /// the heap.
     /// - `T` needs to have the same alignment as what `ptr` was allocated with.
-    ///   (`T` having a less strict alignment is not sufficient, the alignment really
-    ///   needs to be equal to satisfy the [`dealloc`] requirement that memory must be
-    ///   allocated and deallocated with the same layout.)
-    /// - The size of `T` times the `capacity` (i.e. the allocated size in bytes) needs
-    ///   to be the same size as the pointer was allocated with. (Because similar to
-    ///   alignment, [`dealloc`] must be called with the same layout `size`.)
+    ///   (`T` having a less strict alignment is not sufficient, the alignment
+    ///   really needs to be equal to satisfy the [`dealloc`] requirement that
+    ///   memory must be allocated and deallocated with the same layout.)
+    /// - The size of `T` times the `capacity` (i.e. the allocated size in
+    ///   bytes) needs to be the same size as the pointer was allocated with.
+    ///   (Because similar to alignment, [`dealloc`] must be called with the
+    ///   same layout `size`.)
     /// - `length` needs to be less than or equal to `capacity`.
-    /// - The first `length` values must be properly initialized values of type `T`.
-    /// - `capacity` needs to [*fit*] the layout size that the pointer was allocated with.
-    /// - The allocated size in bytes must be no larger than `isize::MAX`.
-    ///   See the safety documentation of [`std::pointer::offset`].
+    /// - The first `length` values must be properly initialized values of type
+    ///   `T`.
+    /// - `capacity` needs to [*fit*] the layout size that the pointer was
+    ///   allocated with.
+    /// - The allocated size in bytes must be no larger than `isize::MAX`. See
+    ///   the safety documentation of [`std::pointer::offset`].
     ///
-    /// These requirements are always upheld by any `ptr` that has been allocated
-    /// via any `SmallVec<T, _, A>`. Other allocation sources are allowed
-    /// if the invariants are upheld.
+    /// These requirements are always upheld by any `ptr` that has been
+    /// allocated via any `SmallVec<T, _, A>`. Other allocation sources are
+    /// allowed if the invariants are upheld.
     ///
     /// Additionally, `capacity` must be greater than `N`; that is, the new
     /// `SmallVec` must need to spill over into heap allocated storage. This
@@ -1327,10 +1335,10 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
     /// Violating these may cause problems like corrupting the allocator’s
     /// internal data structures.
     ///
-    /// The ownership of `ptr` is effectively transferred to the `SmallVec<T, N, A>`
-    /// which may then deallocate, reallocate or change the contents of memory
-    /// pointed to by the pointer at will. Ensure that nothing else uses the
-    /// pointer after calling this function.
+    /// The ownership of `ptr` is effectively transferred to the `SmallVec<T, N,
+    /// A>` which may then deallocate, reallocate or change the contents of
+    /// memory pointed to by the pointer at will. Ensure that nothing else
+    /// uses the pointer after calling this function.
     ///
     /// [*currently allocated*]: std::alloc::Allocator#currently-allocated-memory
     /// [*fit*]: std::alloc::Allocator#memory-fitting
@@ -1442,7 +1450,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 NonNull::new_unchecked(me.as_mut_ptr()),
                 me.len(),
                 me.capacity(),
-                ptr::read(&me.allocator),
+                ptr::read(&me.allocator)
             )
         }
     }
@@ -2093,4 +2101,8 @@ impl<T: Format, const N: usize, A: Allocator> Format for SmallVec<T, N, A> {
 }
 
 #[cfg(feature = "encase")]
-encase::rts_array::impl_rts_array!(SmallVec<T, N, A>; (T, const N: usize, A: Allocator); using len truncate);
+encase::rts_array::impl_rts_array!(
+    SmallVec<T, N, A>;
+    (T, const N: usize, A: Allocator);
+    using len truncate
+);
