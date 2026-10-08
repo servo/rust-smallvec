@@ -65,6 +65,7 @@ v.sort();
 - `specialization` (nightly): enables specialization,
  improving performance on some cases
 - `std`: implements the `std::io::Write` type for `SmallVec<u8, N>`
+- `zeroize`: implements `zeroize::Zeroize`, erasing elements and storage
 
 > [!NOTE]
 >
