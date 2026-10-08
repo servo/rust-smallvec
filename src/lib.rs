@@ -55,6 +55,8 @@ use defmt::{
 pub use errors::SmallVecError;
 #[cfg(feature = "std")]
 use std::io;
+#[cfg(feature = "zeroize")]
+use zeroize::Zeroize;
 use {
     allocator::{
         Allocator,
@@ -1793,6 +1795,22 @@ impl<T: Hash, const N: usize, A: Allocator> Hash for SmallVec<T, N, A> {
 impl<T: Debug, const N: usize, A: Allocator> Debug for SmallVec<T, N, A> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_list().entries(self.iter()).finish()
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl<T: Zeroize, const N: usize, A: Allocator> Zeroize for SmallVec<T, N, A> {
+    fn zeroize(&mut self) {
+        // Wipe the spare capacity before `clear` resets the length to zero,
+        // otherwise it would cover the whole allocation and wipe the elements
+        // a second time.
+        self.spare_capacity_mut().zeroize();
+
+        // Zeroize the elements in place so nested allocations, such as a
+        // `String`'s heap buffer, are wiped before they are dropped.
+        self.iter_mut().zeroize();
+
+        self.clear();
     }
 }
 
