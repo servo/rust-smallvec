@@ -1799,7 +1799,6 @@ impl<T: Debug, const N: usize, A: Allocator> Debug for SmallVec<T, N, A> {
 }
 
 #[cfg(feature = "zeroize")]
-#[cfg_attr(docsrs, doc(cfg(feature = "zeroize")))]
 impl<T: Zeroize, const N: usize, A: Allocator> Zeroize for SmallVec<T, N, A> {
     fn zeroize(&mut self) {
         // Wipe the spare capacity before `clear` resets the length to zero,
