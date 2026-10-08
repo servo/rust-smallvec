@@ -11,7 +11,7 @@ use crate::{
 /// Returned from [`SmallVec::drain`][1].
 ///
 /// [1]: struct.SmallVec.html#method.drain
-pub struct Drain<'a, T: 'a, const N: usize, A: Allocator = Global> {
+pub struct Drain<'a, Item: 'a, const INLINE: usize, Heap: Allocator = Global> {
     // `vec` points to a valid object within its lifetime.
     // This is ensured by the fact that we're holding an iterator to its items.
     //
@@ -21,15 +21,17 @@ pub struct Drain<'a, T: 'a, const N: usize, A: Allocator = Global> {
     // even though vec has length < tail_start
     pub(crate) tail_start: usize,
     pub(crate) tail_len: usize,
-    pub(crate) iter: core::slice::Iter<'a, T>,
-    pub(crate) vec: core::ptr::NonNull<SmallVec<T, N, A>>
+    pub(crate) iter: core::slice::Iter<'a, Item>,
+    pub(crate) vec: core::ptr::NonNull<SmallVec<Item, INLINE, Heap>>
 }
 
-impl<'a, T: 'a, const N: usize, A: Allocator> Iterator for Drain<'a, T, N, A> {
-    type Item = T;
+impl<'a, Item: 'a, const INLINE: usize, Heap: Allocator> Iterator
+    for Drain<'a, Item, INLINE, Heap>
+{
+    type Item = Item;
 
     #[inline]
-    fn next(&mut self) -> Option<T> {
+    fn next(&mut self) -> Option<Item> {
         // SAFETY: we shrunk the length of the vector so it no longer owns these
         // items, and we can take ownership of them.
         self.iter
@@ -43,9 +45,11 @@ impl<'a, T: 'a, const N: usize, A: Allocator> Iterator for Drain<'a, T, N, A> {
     }
 }
 
-impl<'a, T: 'a, const N: usize, A: Allocator> DoubleEndedIterator for Drain<'a, T, N, A> {
+impl<'a, Item: 'a, const INLINE: usize, Heap: Allocator> DoubleEndedIterator
+    for Drain<'a, Item, INLINE, Heap>
+{
     #[inline]
-    fn next_back(&mut self) -> Option<T> {
+    fn next_back(&mut self) -> Option<Item> {
         // SAFETY: see above
         self.iter
             .next_back()
@@ -53,21 +57,30 @@ impl<'a, T: 'a, const N: usize, A: Allocator> DoubleEndedIterator for Drain<'a, 
     }
 }
 
-impl<T, const N: usize, A: Allocator> ExactSizeIterator for Drain<'_, T, N, A> {
+impl<Item, const INLINE: usize, Heap: Allocator> ExactSizeIterator
+    for Drain<'_, Item, INLINE, Heap>
+{
     #[inline]
     fn len(&self) -> usize {
         self.iter.len()
     }
 }
 
-impl<T, const N: usize, A: Allocator> core::iter::FusedIterator for Drain<'_, T, N, A> {}
+impl<Item, const INLINE: usize, Heap: Allocator> core::iter::FusedIterator
+    for Drain<'_, Item, INLINE, Heap>
+{
+}
 
-impl<'a, T: 'a, const N: usize, A: Allocator> Drop for Drain<'a, T, N, A> {
+impl<'a, Item: 'a, const INLINE: usize, Heap: Allocator> Drop for Drain<'a, Item, INLINE, Heap> {
     fn drop(&mut self) {
         /// Moves back the un-`Drain`ed elements to restore the original `Vec`.
-        struct DropGuard<'r, 'a, T, const N: usize, A: Allocator>(&'r mut Drain<'a, T, N, A>);
+        struct DropGuard<'r, 'a, Item, const INLINE: usize, Heap: Allocator>(
+            &'r mut Drain<'a, Item, INLINE, Heap>
+        );
 
-        impl<'r, 'a, T, const N: usize, A: Allocator> Drop for DropGuard<'r, 'a, T, N, A> {
+        impl<'r, 'a, Item, const INLINE: usize, Heap: Allocator> Drop
+            for DropGuard<'r, 'a, Item, INLINE, Heap>
+        {
             fn drop(&mut self) {
                 if self.0.tail_len > 0 {
                     unsafe {
@@ -92,7 +105,7 @@ impl<'a, T: 'a, const N: usize, A: Allocator> Drop for Drain<'a, T, N, A> {
 
         let mut vec = self.vec;
 
-        if SmallVec::<T, N, A>::IS_ZST {
+        if SmallVec::<Item, INLINE, Heap>::IS_ZST {
             // ZSTs have no identity, so we don't need to move them around, we
             // only need to drop the correct amount. this can be
             // achieved by manipulating the Vec length instead of
@@ -123,12 +136,13 @@ impl<'a, T: 'a, const N: usize, A: Allocator> Drop for Drain<'a, T, N, A> {
         let drop_ptr = iter.as_slice().as_ptr();
 
         unsafe {
-            // drop_ptr comes from a slice::Iter which only gives us a &[T] but
-            // for drop_in_place a pointer with mutable provenance
-            // is necessary. Therefore we must reconstruct it from
-            // the original vec but also avoid creating a &mut to
-            // the front since that could invalidate raw pointers to
-            // it which some unsafe code might rely on.
+            // drop_ptr comes from a slice::Iter which only gives us a &[Item]
+            // but for drop_in_place a pointer with mutable
+            // provenance is necessary. Therefore we must
+            // reconstruct it from the original vec but also avoid
+            // creating a &mut to the front since that could
+            // invalidate raw pointers to it which some unsafe code
+            // might rely on.
             let vec_ptr = vec.as_mut().as_mut_ptr();
             // May be replaced with the line below later, once this crate's MSRV
             // is >= 1.87. let drop_offset =
@@ -140,9 +154,9 @@ impl<'a, T: 'a, const N: usize, A: Allocator> Drop for Drain<'a, T, N, A> {
     }
 }
 
-impl<T, const N: usize, A: Allocator> Drain<'_, T, N, A> {
+impl<Item, const INLINE: usize, Heap: Allocator> Drain<'_, Item, INLINE, Heap> {
     #[must_use]
-    pub fn as_slice(&self) -> &[T] {
+    pub fn as_slice(&self) -> &[Item] {
         self.iter.as_slice()
     }
 
@@ -151,7 +165,7 @@ impl<T, const N: usize, A: Allocator> Drain<'_, T, N, A> {
     /// Fill that range as much as possible with new elements from the
     /// `replace_with` iterator. Returns `true` if we filled the entire
     /// range. (`replace_with.next()` didn’t return `None`.)
-    pub(crate) unsafe fn fill<I: Iterator<Item = T>>(&mut self, replace_with: &mut I) -> bool {
+    pub(crate) unsafe fn fill<I: Iterator<Item = Item>>(&mut self, replace_with: &mut I) -> bool {
         let vec = unsafe { self.vec.as_mut() };
         let range_end = self.tail_start;
 
@@ -196,7 +210,9 @@ impl<T, const N: usize, A: Allocator> Drain<'_, T, N, A> {
     }
 }
 
-impl<T: core::fmt::Debug, const N: usize, A: Allocator> core::fmt::Debug for Drain<'_, T, N, A> {
+impl<Item: core::fmt::Debug, const INLINE: usize, Heap: Allocator> core::fmt::Debug
+    for Drain<'_, Item, INLINE, Heap>
+{
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("Drain").field(&self.iter.as_slice()).finish()
     }
