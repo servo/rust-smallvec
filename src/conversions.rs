@@ -150,3 +150,9 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
         Vec::from(this).into_boxed_slice()
     }
 }
+
+impl<T, const N: usize> From<Box<[T]>> for SmallVec<T, N> {
+    fn from(boxed: Box<[T]>) -> Self {
+        Self::from_vec(boxed.into_vec())
+    }
+}
