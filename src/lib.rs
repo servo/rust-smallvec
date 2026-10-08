@@ -228,6 +228,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     }
 
     #[inline]
+    #[deprecated(since = "2.0.0-beta.3", note = "use `From::<Vec<T>>::from` instead")]
     pub fn from_vec(vec: Vec<Item>) -> Self {
         if vec.capacity() == 0 {
             return Self::new();
@@ -1524,7 +1525,7 @@ pub fn from_elem<Item: Clone, const INLINE: usize>(
 ) -> SmallVec<Item, INLINE, Global> {
     if n > SmallVec::<Item, INLINE>::inline_size() {
         // Standard Rust vectors are already specialized.
-        SmallVec::from_vec(vec![elem; n])
+        vec![elem; n].into()
     } else {
         #[cfg(feature = "specialization")]
         {

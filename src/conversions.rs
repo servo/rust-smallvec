@@ -17,7 +17,7 @@ impl<Item: Clone, const INLINE: usize> From<&[Item]> for SmallVec<Item, INLINE, 
     fn from(slice: &[Item]) -> Self {
         if slice.len() > Self::inline_size() {
             // Standard Rust vectors are already specialized.
-            Self::from_vec(Vec::from(slice))
+            Vec::from(slice).into()
         } else {
             // SAFETY: The precondition is checked in the initial comparison
             // above.
@@ -153,6 +153,6 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
 
 impl<T, const N: usize> From<Box<[T]>> for SmallVec<T, N> {
     fn from(boxed: Box<[T]>) -> Self {
-        Self::from_vec(boxed.into_vec())
+        boxed.into_vec().into()
     }
 }
