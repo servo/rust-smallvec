@@ -10,10 +10,10 @@ use crate::{
 /// Returned from [`SmallVec::extract_if`][1].
 ///
 /// [1]: struct.SmallVec.html#method.extract_if
-pub struct ExtractIf<'a, T, const N: usize, F, A: Allocator = Global>
-where F: FnMut(&mut T) -> bool
+pub struct ExtractIf<'a, Item, const INLINE: usize, F, Heap: Allocator = Global>
+where F: FnMut(&mut Item) -> bool
 {
-    pub(crate) vec: &'a mut SmallVec<T, N, A>,
+    pub(crate) vec: &'a mut SmallVec<Item, INLINE, Heap>,
     /// The index of the item that will be inspected by the next call to `next`.
     pub(crate) idx: usize,
     /// Elements at and beyond this point will be retained. Must be equal or
@@ -27,10 +27,11 @@ where F: FnMut(&mut T) -> bool
     pub(crate) pred: F
 }
 
-impl<T, const N: usize, A: Allocator, F> core::fmt::Debug for ExtractIf<'_, T, N, F, A>
+impl<Item, const INLINE: usize, Heap: Allocator, F> core::fmt::Debug
+    for ExtractIf<'_, Item, INLINE, F, Heap>
 where
-    F: FnMut(&mut T) -> bool,
-    T: core::fmt::Debug
+    F: FnMut(&mut Item) -> bool,
+    Item: core::fmt::Debug
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("ExtractIf")
@@ -39,12 +40,13 @@ where
     }
 }
 
-impl<T, F, const N: usize, A: Allocator> Iterator for ExtractIf<'_, T, N, F, A>
-where F: FnMut(&mut T) -> bool
+impl<Item, F, const INLINE: usize, Heap: Allocator> Iterator
+    for ExtractIf<'_, Item, INLINE, F, Heap>
+where F: FnMut(&mut Item) -> bool
 {
-    type Item = T;
+    type Item = Item;
 
-    fn next(&mut self) -> Option<T> {
+    fn next(&mut self) -> Option<Item> {
         unsafe {
             while self.idx < self.end {
                 let i = self.idx;
@@ -73,8 +75,8 @@ where F: FnMut(&mut T) -> bool
     }
 }
 
-impl<T, F, const N: usize, A: Allocator> Drop for ExtractIf<'_, T, N, F, A>
-where F: FnMut(&mut T) -> bool
+impl<Item, F, const INLINE: usize, Heap: Allocator> Drop for ExtractIf<'_, Item, INLINE, F, Heap>
+where F: FnMut(&mut Item) -> bool
 {
     fn drop(&mut self) {
         unsafe {

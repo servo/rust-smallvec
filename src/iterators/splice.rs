@@ -1,17 +1,20 @@
-use crate::{
-    Allocator,
-    Drain,
-    Global,
-    SmallVec
+use super::{
+    super::{
+        Allocator,
+        Global,
+        SmallVec,
+        allocator::proxy::Proxy
+    },
+    drain::Drain
 };
 
-pub struct Splice<'a, I: Iterator + 'a, const N: usize, A: Allocator = Global> {
-    drain: Drain<'a, I::Item, N, A>,
+pub struct Splice<'a, I: Iterator + 'a, const INLINE: usize, Heap: Allocator = Global> {
+    drain: Drain<'a, I::Item, INLINE, Heap>,
     replace_with: I
 }
 
-impl<'a, I: Iterator + 'a, const N: usize, A: Allocator> Splice<'a, I, N, A> {
-    pub(crate) fn new(drain: Drain<'a, I::Item, N, A>, replace_with: I) -> Self {
+impl<'a, I: Iterator + 'a, const INLINE: usize, Heap: Allocator> Splice<'a, I, INLINE, Heap> {
+    pub(crate) fn new(drain: Drain<'a, I::Item, INLINE, Heap>, replace_with: I) -> Self {
         Self {
             drain,
             replace_with
@@ -19,7 +22,7 @@ impl<'a, I: Iterator + 'a, const N: usize, A: Allocator> Splice<'a, I, N, A> {
     }
 }
 
-impl<'a, I, const N: usize, A: Allocator> core::fmt::Debug for Splice<'a, I, N, A>
+impl<'a, I, const INLINE: usize, Heap: Allocator> core::fmt::Debug for Splice<'a, I, INLINE, Heap>
 where
     I: core::fmt::Debug + Iterator + 'a,
     <I as Iterator>::Item: core::fmt::Debug
@@ -29,7 +32,7 @@ where
     }
 }
 
-impl<I: Iterator, const N: usize, A: Allocator> Iterator for Splice<'_, I, N, A> {
+impl<I: Iterator, const INLINE: usize, Heap: Allocator> Iterator for Splice<'_, I, INLINE, Heap> {
     type Item = I::Item;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -41,15 +44,20 @@ impl<I: Iterator, const N: usize, A: Allocator> Iterator for Splice<'_, I, N, A>
     }
 }
 
-impl<I: Iterator, const N: usize, A: Allocator> DoubleEndedIterator for Splice<'_, I, N, A> {
+impl<I: Iterator, const INLINE: usize, Heap: Allocator> DoubleEndedIterator
+    for Splice<'_, I, INLINE, Heap>
+{
     fn next_back(&mut self) -> Option<Self::Item> {
         self.drain.next_back()
     }
 }
 
-impl<I: Iterator, const N: usize, A: Allocator> ExactSizeIterator for Splice<'_, I, N, A> {}
+impl<I: Iterator, const INLINE: usize, Heap: Allocator> ExactSizeIterator
+    for Splice<'_, I, INLINE, Heap>
+{
+}
 
-impl<I: Iterator, const N: usize, A: Allocator> Drop for Splice<'_, I, N, A> {
+impl<I: Iterator, const INLINE: usize, Heap: Allocator> Drop for Splice<'_, I, INLINE, Heap> {
     fn drop(&mut self) {
         self.drain.by_ref().for_each(drop);
         // At this point draining is done and the only remaining tasks are
@@ -81,12 +89,10 @@ impl<I: Iterator, const N: usize, A: Allocator> Drop for Splice<'_, I, N, A> {
                 }
             }
 
-            // Collect any remaining elements.
-            let mut collected = self
-                .replace_with
-                .by_ref()
-                .collect::<SmallVec<I::Item, N, Global>>()
-                .into_iter();
+            let mut smallvec =
+                SmallVec::<_, INLINE, _>::new_in(Proxy(&self.drain.vec.as_ref().allocator));
+            smallvec.extend(self.replace_with.by_ref());
+            let mut collected = smallvec.into_iter();
 
             // Now we have an exact count.
             if collected.len() > 0 {

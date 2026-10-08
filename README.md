@@ -64,7 +64,8 @@ v.sort();
 - `serde`: implements serde's serialization and deserialization
 - `specialization` (nightly): enables specialization,
  improving performance on some cases
-- `std`: implements the `std::io::Write` type for `SmallVec<u8, N>`
+- `std`: implements the `std::io::Write` type for `SmallVec<u8, INLINE>`
+- `zeroize`: implements `zeroize::Zeroize`, erasing elements and storage
 
 > [!NOTE]
 >
