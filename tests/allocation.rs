@@ -1,9 +1,5 @@
-#![cfg(all(
-    feature = "allocator-api",
-    feature = "std" // `std` is necessary for the base `System` allocator
-))]
+#![cfg(feature = "allocator-api")]
 
-#[cfg(not(feature = "allocator-api2"))]
 extern crate alloc;
 #[cfg(not(feature = "allocator-api2"))]
 use alloc::alloc::{
@@ -20,20 +16,15 @@ use allocator_api2::alloc::{
 #[cfg(feature = "allocator-api2")]
 use std::alloc::Allocator as _;
 use {
+    alloc::alloc::Global,
     core::{
-        cell::{
-            Cell,
-            RefCell
-        },
+        assert_matches,
+        cell::Cell,
         ptr::NonNull
     },
     smallvec::{
         SmallVec,
         SmallVecError
-    },
-    std::{
-        alloc::System,
-        assert_matches
     }
 };
 
@@ -50,7 +41,7 @@ struct AllocStats {
 
 #[derive(Clone, Debug, Default)]
 struct TestAlloc {
-    stats: RefCell<AllocStats>
+    stats: Cell<AllocStats>
 }
 
 impl TestAlloc {
@@ -61,32 +52,36 @@ impl TestAlloc {
 
     #[inline]
     fn stats(&self) -> AllocStats {
-        *self.stats.borrow()
+        self.stats.get()
     }
 
     #[inline]
     fn is_clean(&self) -> bool {
-        let s = self.stats.borrow();
+        let s = self.stats.get();
         s.alloc_calls == s.dealloc_calls && s.allocated_bytes == 0
     }
 }
 
 unsafe impl Allocator for TestAlloc {
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
-        let ptr = System.allocate(layout).map_err(|_| AllocError)?;
-        let mut s = self.stats.borrow_mut();
-        s.alloc_calls += 1;
-        s.allocated_bytes += layout.size() as isize;
-        s.alloc_align = layout.align();
+        let ptr = Global.allocate(layout).map_err(|_| AllocError)?;
+        self.stats.update(|mut s| {
+            s.alloc_calls += 1;
+            s.allocated_bytes += layout.size() as isize;
+            s.alloc_align = layout.align();
+            s
+        });
         Ok(ptr)
     }
 
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-        let mut s = self.stats.borrow_mut();
-        s.dealloc_calls += 1;
-        s.allocated_bytes -= layout.size() as isize;
-        s.dealloc_align = layout.align();
-        unsafe { System.deallocate(ptr, layout) };
+        self.stats.update(|mut s| {
+            s.dealloc_calls += 1;
+            s.allocated_bytes -= layout.size() as isize;
+            s.dealloc_align = layout.align();
+            s
+        });
+        unsafe { Global.deallocate(ptr, layout) };
     }
 
     unsafe fn grow(
@@ -95,10 +90,12 @@ unsafe impl Allocator for TestAlloc {
         old: Layout,
         new: Layout
     ) -> Result<NonNull<[u8]>, AllocError> {
-        let out = unsafe { System.grow(ptr, old, new) }.map_err(|_| AllocError)?;
-        let mut s = self.stats.borrow_mut();
-        s.grow_calls += 1;
-        s.allocated_bytes += new.size() as isize - old.size() as isize;
+        let out = unsafe { Global.grow(ptr, old, new) }.map_err(|_| AllocError)?;
+        self.stats.update(|mut s| {
+            s.grow_calls += 1;
+            s.allocated_bytes += new.size() as isize - old.size() as isize;
+            s
+        });
         Ok(out)
     }
 
@@ -108,10 +105,12 @@ unsafe impl Allocator for TestAlloc {
         old: Layout,
         new: Layout
     ) -> Result<NonNull<[u8]>, AllocError> {
-        let out = unsafe { System.shrink(ptr, old, new) }.map_err(|_| AllocError)?;
-        let mut s = self.stats.borrow_mut();
-        s.shrink_calls += 1;
-        s.allocated_bytes -= old.size() as isize - new.size() as isize;
+        let out = unsafe { Global.shrink(ptr, old, new) }.map_err(|_| AllocError)?;
+        self.stats.update(|mut s| {
+            s.shrink_calls += 1;
+            s.allocated_bytes -= old.size() as isize - new.size() as isize;
+            s
+        });
         Ok(out)
     }
 }
