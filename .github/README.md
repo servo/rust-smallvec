@@ -29,5 +29,6 @@ SmallVec:
 * [@TDecking](https://github.com/TDecking)
 * [@bolshoytoster](https://github.com/bolshoytoster)
 * [@pedrodesu](https://github.com/pedrodesu)
+* [@GuaravPawar101](https://github.com/GauravPawar101)
 
 [![SmallVec contributors](https://contrib.rocks/image?repo=servo/rust-smallvec)](https://github.com/servo/rust-smallvec/graphs/contributors)
