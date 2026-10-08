@@ -14,6 +14,7 @@ use core::{
 #[rustfmt::skip]
 pub use {
     alloc::{
+        boxed::Box,
         vec::Vec,
         vec
     },
