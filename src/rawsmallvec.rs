@@ -18,14 +18,14 @@ use {
 };
 
 #[repr(C)]
-pub union RawSmallVec<T, const N: usize> {
-    pub inline: ManuallyDrop<MaybeUninit<[T; N]>>,
-    pub heap: (NonNull<T>, usize)
+pub union RawSmallVec<Item, const INLINE: usize> {
+    pub inline: ManuallyDrop<MaybeUninit<[Item; INLINE]>>,
+    pub heap: (NonNull<Item>, usize)
 }
 
-impl<T, const N: usize> RawSmallVec<T, N> {
-    pub const INLINE_CAP: usize = if Self::IS_ZST { usize::MAX } else { N };
-    const IS_ZST: bool = size_of::<T>() == 0;
+impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
+    pub const INLINE_CAP: usize = if Self::IS_ZST { usize::MAX } else { INLINE };
+    const IS_ZST: bool = size_of::<Item>() == 0;
 
     #[inline]
     pub const fn new() -> Self {
@@ -33,21 +33,21 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     }
 
     #[inline]
-    pub const fn new_inline(inline: MaybeUninit<[T; N]>) -> Self {
+    pub const fn new_inline(inline: MaybeUninit<[Item; INLINE]>) -> Self {
         Self {
             inline: ManuallyDrop::new(inline)
         }
     }
 
     #[inline]
-    pub const fn new_heap(ptr: NonNull<T>, capacity: usize) -> Self {
+    pub const fn new_heap(ptr: NonNull<Item>, capacity: usize) -> Self {
         Self {
             heap: (ptr, capacity)
         }
     }
 
     #[inline]
-    pub const fn as_ptr_inline(&self) -> *const T {
+    pub const fn as_ptr_inline(&self) -> *const Item {
         // SAFETY: it is safe because we aren't reading the value, just getting
         // a reference to it. reading it would be UB potentially, but
         // for that downstream unsafe is required
@@ -56,7 +56,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     }
 
     #[inline]
-    pub const fn as_mut_ptr_inline(&mut self) -> *mut T {
+    pub const fn as_mut_ptr_inline(&mut self) -> *mut Item {
         // SAFETY: same as above
         #[allow(unused_unsafe, reason = "Unsafe in MSRV")]
         (unsafe { &raw mut self.inline }).cast()
@@ -66,7 +66,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     ///
     /// `on_heap` must be true if and only if `self.heap` is the active member.
     #[inline(always)]
-    pub const unsafe fn as_ptr(&self, on_heap: bool) -> *const T {
+    pub const unsafe fn as_ptr(&self, on_heap: bool) -> *const Item {
         if on_heap {
             unsafe { self.heap.0.as_ptr() }
         } else {
@@ -78,7 +78,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     ///
     /// `on_heap` must be true if and only if `self.heap` is the active member.
     #[inline(always)]
-    pub const unsafe fn as_mut_ptr(&mut self, on_heap: bool) -> *mut T {
+    pub const unsafe fn as_mut_ptr(&mut self, on_heap: bool) -> *mut Item {
         if on_heap {
             unsafe { self.heap.0.as_ptr() }
         } else {
@@ -101,14 +101,14 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     /// # Safety
     ///
     /// `new_capacity` must be non zero, and greater or equal to the length.
-    /// T must not be a ZST.
+    /// Item must not be a ZST.
     ///
     /// the allocator must be the same one the data was allocated with
-    pub unsafe fn try_grow_raw<A: Allocator>(
+    pub unsafe fn try_grow_raw<Heap: Allocator>(
         &mut self,
-        length: LocatedLength<T>,
+        length: LocatedLength<Item>,
         new_capacity: usize,
-        allocator: &A
+        allocator: &Heap
     ) -> Result<(), SmallVecError> {
         let (length, was_on_heap) = length.parts();
         debug_assert!(!Self::IS_ZST);
@@ -118,7 +118,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
         let ptr = unsafe { self.as_mut_ptr(was_on_heap) };
 
         let new_layout =
-            Layout::array::<T>(new_capacity).map_err(|_| SmallVecError::CapacityOverflow)?;
+            Layout::array::<Item>(new_capacity).map_err(|_| SmallVecError::CapacityOverflow)?;
         if new_layout.size() > isize::MAX as usize {
             return Err(SmallVecError::CapacityOverflow);
         }
@@ -138,7 +138,10 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             // this can't overflow since we already constructed an equivalent
             // layout during the previous allocation
             let old_layout = unsafe {
-                Layout::from_size_align_unchecked(self.heap.1 * size_of::<T>(), align_of::<T>())
+                Layout::from_size_align_unchecked(
+                    self.heap.1 * size_of::<Item>(),
+                    align_of::<Item>()
+                )
             };
 
             // SAFETY: ptr was allocated with this allocator
@@ -149,9 +152,9 @@ impl<T, const N: usize> RawSmallVec<T, N> {
             // with Layout::array
             unsafe {
                 (if self.heap.1 < new_capacity {
-                    A::grow
+                    Heap::grow
                 } else {
-                    A::shrink
+                    Heap::shrink
                 })(
                     allocator,
                     NonNull::new(ptr as *mut u8).unwrap(),
@@ -167,7 +170,7 @@ impl<T, const N: usize> RawSmallVec<T, N> {
     }
 }
 
-impl<Type, const N: usize> Default for RawSmallVec<Type, N> {
+impl<Item, const INLINE: usize> Default for RawSmallVec<Item, INLINE> {
     fn default() -> Self {
         Self::new()
     }

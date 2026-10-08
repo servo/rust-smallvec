@@ -12,9 +12,9 @@ use {
 
 macro_rules! __impl_slice_eq1 {
     ([$($vars:tt)*] $lhs:ty, $rhs:ty $(where $ty:ty: $bound:ident)?) => {
-        impl<T, U, A: Allocator, const N: usize, $($vars)*> PartialEq<$rhs> for $lhs
+        impl<Item, U, Heap: Allocator, const INLINE: usize, $($vars)*> PartialEq<$rhs> for $lhs
         where
-            T: PartialEq<U>,
+            Item: PartialEq<U>,
             $($ty: $bound)?
         {
             #[inline]
@@ -23,25 +23,29 @@ macro_rules! __impl_slice_eq1 {
     };
 }
 
-__impl_slice_eq1! { [const M: usize, A2: Allocator] SmallVec<T, M, A>, SmallVec<U, N, A2> }
-__impl_slice_eq1! { [const M: usize] SmallVec<T, M, A>, [U; N] }
-__impl_slice_eq1! { [const M: usize] SmallVec<T, M, A>, &[U; N] }
-__impl_slice_eq1! { [] SmallVec<T, N, A>, [U] }
-__impl_slice_eq1! { [] SmallVec<T, N, A>, &[U] }
-__impl_slice_eq1! { [] SmallVec<T, N, A>, &mut [U] }
-__impl_slice_eq1! { [] [T], SmallVec<U, N, A> }
-__impl_slice_eq1! { [] &[T], SmallVec<U, N, A> }
-__impl_slice_eq1! { [] &mut [T], SmallVec<U, N, A> }
-__impl_slice_eq1! { [] Vec<T>, SmallVec<U, N, A> }
-__impl_slice_eq1! { [] SmallVec<T, N, A>, Vec<U> }
-__impl_slice_eq1! { [] Cow<'_, [T]>, SmallVec<U, N, A> where T: Clone }
-__impl_slice_eq1! { [] SmallVec<T, N, A>, Cow<'_, [U]> where U: Clone }
+__impl_slice_eq1! { [const M: usize, A2: Allocator]
+    SmallVec<Item, M, Heap>,
+    SmallVec<U, INLINE, A2>
+}
+__impl_slice_eq1! { [const M: usize] SmallVec<Item, M, Heap>, [U; INLINE] }
+__impl_slice_eq1! { [const M: usize] SmallVec<Item, M, Heap>, &[U; INLINE] }
+__impl_slice_eq1! { [] SmallVec<Item, INLINE, Heap>, [U] }
+__impl_slice_eq1! { [] SmallVec<Item, INLINE, Heap>, &[U] }
+__impl_slice_eq1! { [] SmallVec<Item, INLINE, Heap>, &mut [U] }
+__impl_slice_eq1! { [] [Item], SmallVec<U, INLINE, Heap> }
+__impl_slice_eq1! { [] &[Item], SmallVec<U, INLINE, Heap> }
+__impl_slice_eq1! { [] &mut [Item], SmallVec<U, INLINE, Heap> }
+__impl_slice_eq1! { [] Vec<Item>, SmallVec<U, INLINE, Heap> }
+__impl_slice_eq1! { [] SmallVec<Item, INLINE, Heap>, Vec<U> }
+__impl_slice_eq1! { [] Cow<'_, [Item]>, SmallVec<U, INLINE, Heap> where Item: Clone }
+__impl_slice_eq1! { [] SmallVec<Item, INLINE, Heap>, Cow<'_, [U]> where U: Clone }
 
-impl<T, U, const N: usize, A: Allocator> PartialEq<SmallVec<U, N, A>> for VecDeque<T>
-where T: PartialEq<U>
+impl<Item, U, const INLINE: usize, Heap: Allocator> PartialEq<SmallVec<U, INLINE, Heap>>
+    for VecDeque<Item>
+where Item: PartialEq<U>
 {
     #[inline]
-    fn eq(&self, other: &SmallVec<U, N, A>) -> bool {
+    fn eq(&self, other: &SmallVec<U, INLINE, Heap>) -> bool {
         let other = other.as_slice();
         if self.len() != other.len() {
             return false;
@@ -52,22 +56,22 @@ where T: PartialEq<U>
     }
 }
 
-impl<T, const N: usize, A: Allocator> Eq for SmallVec<T, N, A> where T: Eq {}
+impl<Item: Eq, const INLINE: usize, Heap: Allocator> Eq for SmallVec<Item, INLINE, Heap> {}
 
-impl<T, const N: usize, A: Allocator> PartialOrd for SmallVec<T, N, A>
-where T: PartialOrd
+impl<Item, const INLINE: usize, Heap: Allocator> PartialOrd for SmallVec<Item, INLINE, Heap>
+where Item: PartialOrd
 {
     #[inline]
-    fn partial_cmp(&self, other: &SmallVec<T, N, A>) -> Option<core::cmp::Ordering> {
+    fn partial_cmp(&self, other: &SmallVec<Item, INLINE, Heap>) -> Option<core::cmp::Ordering> {
         self.as_slice().partial_cmp(other.as_slice())
     }
 }
 
-impl<T, const N: usize, A: Allocator> Ord for SmallVec<T, N, A>
-where T: Ord
+impl<Item, const INLINE: usize, Heap: Allocator> Ord for SmallVec<Item, INLINE, Heap>
+where Item: Ord
 {
     #[inline]
-    fn cmp(&self, other: &SmallVec<T, N, A>) -> core::cmp::Ordering {
+    fn cmp(&self, other: &SmallVec<Item, INLINE, Heap>) -> core::cmp::Ordering {
         self.as_slice().cmp(other.as_slice())
     }
 }
