@@ -18,18 +18,20 @@ const MAX_CAP: usize = 1024;
 pub struct Bounded<T, const CAP: usize = 255>(pub T);
 
 // Bounded `usize` between `0..=CAP`
-impl<'a, const CAP: usize> Arbitrary<'a> for Bounded<usize, CAP> {
+impl<'data, const CAP: usize> Arbitrary<'data> for Bounded<usize, CAP> {
+    /// Generates an arbitrary bounded usize value using the unstructured fuzzing data of lifetime 'data.
     #[inline]
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'data>) -> arbitrary::Result<Self> {
         Ok(Bounded(u.int_in_range(0..=CAP)?))
     }
 }
 
 // Bounded `Vec<T>` whose length is between `0..=CAP`
-impl<'a, T, const CAP: usize> Arbitrary<'a> for Bounded<Vec<T>, CAP>
-where T: Arbitrary<'a>
+impl<'data, T, const CAP: usize> Arbitrary<'data> for Bounded<Vec<T>, CAP>
+where T: Arbitrary<'data>
 {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+    /// Generates an arbitrary bounded vector by consuming items from the unstructured data stream of lifetime 'data.
+    fn arbitrary(u: &mut arbitrary::Unstructured<'data>) -> arbitrary::Result<Self> {
         let len = u.int_in_range(0..=CAP)?;
         let vec = u
             .arbitrary_iter()?

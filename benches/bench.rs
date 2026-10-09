@@ -15,7 +15,8 @@ use {
 const VEC_SIZE: usize = 16;
 const SPILLED_SIZE: usize = 100;
 
-trait Vector<T>: for<'a> From<&'a [T]> + Extend<T> + FromIterator<T> {
+/// A trait defining common vector operations, implemented by vectors taking items from a slice of lifetime 'slice.
+trait Vector<T>: for<'slice> From<&'slice [T]> + Extend<T> + FromIterator<T> {
     fn new() -> Self;
     fn push(&mut self, val: T);
     fn pop(&mut self) -> Option<T>;
