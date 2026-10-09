@@ -30,6 +30,7 @@ strip = false
 
 [features]
 allocator-api = []
+proptest = ["dep:proptest", "std"]
 allocator-api2 = ["dep:allocator-api2", "allocator-api"]
 internals = []
 rayon = ["std", "dep:rayon"]
@@ -43,6 +44,7 @@ allocator-api2 = { version = "0.4", optional = true, features = ["alloc"], defau
 arbitrary = { version = "1.4", optional = true, default-features = false }
 borsh = { version = "1.8", optional = true, features = ["derive", "unstable__schema"], default-features = false }
 bytes = { version = "1.12", optional = true, default-features = false }
+proptest = { version = "1.11", optional = true, features = ["std"], default-features = false }
 defmt = { version = "1.1", optional = true, default-features = false }
 encase = { version = "0.13", optional = true, default-features = false }
 rayon = { version = "1.12", optional = true, default-features = false }
@@ -58,6 +60,10 @@ iai-callgrind = "0.14"
 [[test]]
 name = "arbitrary"
 required-features = ["arbitrary"]
+
+[[test]]
+name = "proptest"
+required-features = ["proptest"]
 
 [[test]]
 name = "borsh"
