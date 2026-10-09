@@ -1,5 +1,8 @@
 use {
-    super::Allocator,
+    super::super::{
+        Allocator,
+        global::Global
+    },
     alloc::alloc::{
         alloc,
         dealloc,
@@ -10,9 +13,6 @@ use {
         ptr::NonNull
     }
 };
-
-#[derive(Clone)]
-pub struct Global;
 
 impl Allocator for Global {
     #[inline]

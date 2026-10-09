@@ -60,10 +60,12 @@ use zeroize::Zeroize;
 use {
     allocator::{
         Allocator,
-        Box,
-        Global,
-        Vec,
-        vec
+        boxed::Box,
+        global::Global,
+        vec::{
+            Vec,
+            vec
+        }
     },
     core::{
         alloc::Layout,
