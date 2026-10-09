@@ -1859,6 +1859,24 @@ where Item: arbitrary::Arbitrary<'a>
     }
 }
 
+#[cfg(all(feature = "proptest", not(feature = "allocator-api2")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "proptest")))]
+impl<Item, const INLINE: usize> proptest::arbitrary::Arbitrary for SmallVec<Item, INLINE, Global>
+where Item: proptest::arbitrary::Arbitrary + Debug
+{
+    type Parameters = proptest::collection::SizeRange;
+    type Strategy = proptest::strategy::Map<
+        proptest::collection::VecStrategy<Item::Strategy>,
+        fn(std::vec::Vec<Item>) -> Self
+    >;
+
+    fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
+        use proptest::strategy::Strategy;
+        proptest::collection::vec(Item::arbitrary(), args)
+            .prop_map(|v: std::vec::Vec<Item>| SmallVec::from(v))
+    }
+}
+
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl<const INLINE: usize, Heap: Allocator> io::Write for SmallVec<u8, INLINE, Heap> {
