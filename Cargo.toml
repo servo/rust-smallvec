@@ -30,9 +30,9 @@ strip = false
 
 [features]
 allocator-api = []
-proptest = ["dep:proptest", "std"]
 allocator-api2 = ["dep:allocator-api2", "allocator-api"]
 internals = []
+proptest = ["dep:proptest", "std"]
 rayon = ["std", "dep:rayon"]
 serde = ["dep:serde_core"]
 specialization = []
@@ -44,13 +44,13 @@ allocator-api2 = { version = "0.4", optional = true, features = ["alloc"], defau
 arbitrary = { version = "1.4", optional = true, default-features = false }
 borsh = { version = "1.8", optional = true, features = ["derive", "unstable__schema"], default-features = false }
 bytes = { version = "1.12", optional = true, default-features = false }
-proptest = { version = "1.11", optional = true, features = ["std"], default-features = false }
 defmt = { version = "1.1", optional = true, default-features = false }
 encase = { version = "0.13", optional = true, default-features = false }
+malloc_size_of = { version = "0.1", optional = true, default-features = false }
+proptest = { version = "1.11", optional = true, features = ["std"], default-features = false }
 rayon = { version = "1.12", optional = true, default-features = false }
 serde_core = { version = "1.0", optional = true, default-features = false }
 zeroize = { version = "1.9", optional = true, default-features = false }
-malloc_size_of = { version = "0.1", optional = true, default-features = false }
 
 [dev-dependencies]
 serde_test = "1.0"
@@ -60,10 +60,6 @@ iai-callgrind = "0.14"
 [[test]]
 name = "arbitrary"
 required-features = ["arbitrary"]
-
-[[test]]
-name = "proptest"
-required-features = ["proptest"]
 
 [[test]]
 name = "borsh"
