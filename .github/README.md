@@ -20,7 +20,7 @@ The source code for the latest smallvec 1.x.y release can be found on the
 smallvec v1 should be based on that branch, while new feature development
 should go on the v2 branch.
 
-## v2 Active Core Contributors
+## v2 Core Contributors
 
 The following contributors are actively helping advance the v2 development of
 SmallVec:
@@ -28,5 +28,7 @@ SmallVec:
 * [@fereidani](https://github.com/fereidani)
 * [@TDecking](https://github.com/TDecking)
 * [@bolshoytoster](https://github.com/bolshoytoster)
+* [@pedrodesu](https://github.com/pedrodesu)
+* [@GauravPawar101](https://github.com/GauravPawar101)
 
 [![SmallVec contributors](https://contrib.rocks/image?repo=servo/rust-smallvec)](https://github.com/servo/rust-smallvec/graphs/contributors)
