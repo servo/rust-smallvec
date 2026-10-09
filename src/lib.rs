@@ -1862,13 +1862,12 @@ where Item: arbitrary::Arbitrary<'a>
 #[cfg(all(feature = "proptest", not(feature = "allocator-api2")))]
 #[cfg_attr(docsrs, doc(cfg(feature = "proptest")))]
 impl<Item, const INLINE: usize> proptest::arbitrary::Arbitrary for SmallVec<Item, INLINE, Global>
-where
-    Item: proptest::arbitrary::Arbitrary + Debug,
+where Item: proptest::arbitrary::Arbitrary + Debug
 {
     type Parameters = proptest::collection::SizeRange;
     type Strategy = proptest::strategy::Map<
         proptest::collection::VecStrategy<Item::Strategy>,
-        fn(std::vec::Vec<Item>) -> Self,
+        fn(std::vec::Vec<Item>) -> Self
     >;
 
     fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
