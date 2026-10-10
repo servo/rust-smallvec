@@ -1,15 +1,6 @@
 use {
-    crate::{
-        Allocator,
-        Box,
-        Global,
-        SmallVec,
-        Vec
-    },
-    core::{
-        mem::ManuallyDrop,
-        ptr::copy_nonoverlapping
-    }
+    crate::{Allocator, Box, Global, SmallVec, Vec},
+    core::{mem::ManuallyDrop, ptr::copy_nonoverlapping},
 };
 
 impl<Item: Clone, const INLINE: usize> From<&[Item]> for SmallVec<Item, INLINE, Global> {
@@ -89,7 +80,7 @@ impl<Item, const INLINE: usize, const M: usize, Heap: Allocator>
 
     #[inline]
     fn try_from(
-        mut this: SmallVec<Item, INLINE, Heap>
+        mut this: SmallVec<Item, INLINE, Heap>,
     ) -> Result<[Item; M], SmallVec<Item, INLINE, Heap>> {
         if this.len() != M {
             Err(this)

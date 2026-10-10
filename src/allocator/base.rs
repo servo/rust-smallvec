@@ -1,14 +1,7 @@
 use {
     super::Allocator,
-    alloc::alloc::{
-        alloc,
-        dealloc,
-        realloc
-    },
-    core::{
-        alloc::Layout,
-        ptr::NonNull
-    }
+    alloc::alloc::{alloc, dealloc, realloc},
+    core::{alloc::Layout, ptr::NonNull},
 };
 
 #[derive(Clone)]
@@ -19,7 +12,7 @@ impl Allocator for Global {
     fn allocate(&self, layout: Layout) -> Option<NonNull<[u8]>> {
         Some(NonNull::slice_from_raw_parts(
             NonNull::new(unsafe { alloc(layout) })?,
-            layout.size()
+            layout.size(),
         ))
     }
 
@@ -32,7 +25,7 @@ impl Allocator for Global {
     unsafe fn grow(&self, pointer: NonNull<u8>, old: Layout, new: Layout) -> Option<NonNull<[u8]>> {
         Some(NonNull::slice_from_raw_parts(
             NonNull::new(unsafe { realloc(pointer.as_ptr(), old, new.size()) })?,
-            new.size()
+            new.size(),
         ))
     }
 
@@ -41,11 +34,11 @@ impl Allocator for Global {
         &self,
         pointer: NonNull<u8>,
         old: Layout,
-        new: Layout
+        new: Layout,
     ) -> Option<NonNull<[u8]>> {
         Some(NonNull::slice_from_raw_parts(
             NonNull::new(unsafe { realloc(pointer.as_ptr(), old, new.size()) })?,
-            new.size()
+            new.size(),
         ))
     }
 }

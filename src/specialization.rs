@@ -1,12 +1,6 @@
 use {
-    crate::{
-        Allocator,
-        DropGuard,
-        Global,
-        IntoIter,
-        SmallVec
-    },
-    core::ptr::copy_nonoverlapping
+    crate::{Allocator, DropGuard, Global, IntoIter, SmallVec},
+    core::ptr::copy_nonoverlapping,
 };
 
 /// A trait for specializing the implementation of [`from_elem`].
@@ -66,7 +60,8 @@ pub trait SpecExtend<Item, I> {
 
 impl<Item, I, const INLINE: usize, Heap: Allocator> SpecExtend<Item, I>
     for SmallVec<Item, INLINE, Heap>
-where I: Iterator<Item = Item>
+where
+    I: Iterator<Item = Item>,
 {
     #[inline]
     default fn spec_extend(&mut self, iter: I) {
@@ -76,7 +71,8 @@ where I: Iterator<Item = Item>
 
 impl<Item, I, const INLINE: usize, Heap: Allocator> SpecExtend<Item, I>
     for SmallVec<Item, INLINE, Heap>
-where I: core::iter::TrustedLen<Item = Item>
+where
+    I: core::iter::TrustedLen<Item = Item>,
 {
     fn spec_extend(&mut self, iter: I) {
         let (_, Some(additional)) = iter.size_hint() else {
@@ -91,10 +87,7 @@ where I: core::iter::TrustedLen<Item = Item>
         unsafe {
             let length = self.len();
             let ptr = self.as_mut_ptr().add(length);
-            let mut guard = DropGuard {
-                ptr,
-                length: 0
-            };
+            let mut guard = DropGuard { ptr, length: 0 };
 
             for x in iter {
                 ptr.add(guard.length).write(x);
@@ -136,11 +129,11 @@ impl<Item, const INLINE: usize, const M: usize, Heap: Allocator>
     }
 }
 
-impl<'a, Item: 'a, const INLINE: usize, I, Heap: Allocator> SpecExtend<&'a Item, I>
+impl<'valid, Item: 'valid, const INLINE: usize, I, Heap: Allocator> SpecExtend<&'valid Item, I>
     for SmallVec<Item, INLINE, Heap>
 where
-    I: Iterator<Item = &'a Item>,
-    Item: Clone
+    I: Iterator<Item = &'valid Item>,
+    Item: Clone,
 {
     #[inline]
     default fn spec_extend(&mut self, iterator: I) {
@@ -148,11 +141,12 @@ where
     }
 }
 
-impl<'a, Item: 'a, const INLINE: usize, Heap: Allocator>
-    SpecExtend<&'a Item, core::slice::Iter<'a, Item>> for SmallVec<Item, INLINE, Heap>
-where Item: Copy
+impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator>
+    SpecExtend<&'valid Item, core::slice::Iter<'valid, Item>> for SmallVec<Item, INLINE, Heap>
+where
+    Item: Copy,
 {
-    fn spec_extend(&mut self, iter: core::slice::Iter<'a, Item>) {
+    fn spec_extend(&mut self, iter: core::slice::Iter<'valid, Item>) {
         let slice = iter.as_slice();
         let length = slice.len();
         let old_len = self.len();
@@ -235,7 +229,8 @@ pub trait SpecFromIterator<Item, I> {
 }
 
 impl<Item, I, const INLINE: usize> SpecFromIterator<Item, I> for SmallVec<Item, INLINE, Global>
-where I: Iterator<Item = Item>
+where
+    I: Iterator<Item = Item>,
 {
     #[inline]
     default fn spec_from_iter(iter: I) -> Self {
@@ -244,7 +239,8 @@ where I: Iterator<Item = Item>
 }
 
 impl<Item, I, const INLINE: usize> SpecFromIterator<Item, I> for SmallVec<Item, INLINE, Global>
-where I: core::iter::TrustedLen<Item = Item>
+where
+    I: core::iter::TrustedLen<Item = Item>,
 {
     fn spec_from_iter(iter: I) -> Self {
         let mut v = match iter.size_hint() {
@@ -253,7 +249,7 @@ where I: core::iter::TrustedLen<Item = Item>
             // are more than `usize::MAX` elements.
             // Since the previous branch would eagerly panic if the capacity is too large
             // (via `with_capacity`) we do the same here.
-            _ => panic!("capacity overflow")
+            _ => panic!("capacity overflow"),
         };
         // Reuse the extend specialization for TrustedLen.
         v.spec_extend(iter);

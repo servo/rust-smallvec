@@ -2,12 +2,7 @@
 
 #![no_main]
 
-use {
-    arbitrary::Arbitrary,
-    libfuzzer_sys::fuzz_target,
-    smallvec::SmallVec,
-    std::fmt::Debug
-};
+use {arbitrary::Arbitrary, libfuzzer_sys::fuzz_target, smallvec::SmallVec, std::fmt::Debug};
 
 // Upper bound on the harness's test vectors's capacity.
 const MAX_CAP: usize = 1024;
@@ -19,7 +14,6 @@ pub struct Bounded<T, const CAP: usize = 255>(pub T);
 
 // Bounded `usize` between `0..=CAP`
 impl<'valid, const CAP: usize> Arbitrary<'valid> for Bounded<usize, CAP> {
-    /// Generates an arbitrary bounded usize value using the unstructured fuzzing data of lifetime 'valid.
     #[inline]
     fn arbitrary(u: &mut arbitrary::Unstructured<'valid>) -> arbitrary::Result<Self> {
         Ok(Bounded(u.int_in_range(0..=CAP)?))
@@ -28,9 +22,9 @@ impl<'valid, const CAP: usize> Arbitrary<'valid> for Bounded<usize, CAP> {
 
 // Bounded `Vec<T>` whose length is between `0..=CAP`
 impl<'valid, T, const CAP: usize> Arbitrary<'valid> for Bounded<Vec<T>, CAP>
-where T: Arbitrary<'valid>
+where
+    T: Arbitrary<'valid>,
 {
-    /// Generates an arbitrary bounded vector by consuming items from the unstructured data stream of lifetime 'valid.
     fn arbitrary(u: &mut arbitrary::Unstructured<'valid>) -> arbitrary::Result<Self> {
         let len = u.int_in_range(0..=CAP)?;
         let vec = u
@@ -44,7 +38,7 @@ where T: Arbitrary<'valid>
 #[inline]
 fn choose_range(
     u: &mut arbitrary::Unstructured,
-    len: usize
+    len: usize,
 ) -> arbitrary::Result<std::ops::Range<usize>> {
     let start = u.int_in_range(0..=len)?;
     let end = u.int_in_range(start..=len)?;
@@ -74,14 +68,14 @@ enum Op {
     Dedup,
     ExtendFromSlice(Bounded<Vec<u64>>),
     ExtendFromWithin,
-    Resize(Bounded<usize>, u64)
+    Resize(Bounded<usize>, u64),
 }
 
 /// Helper to assert equivalence of all structural invariants of `SmallVec`
 /// against `alloc::Vec`
 fn assert_invariants<T: Copy + PartialEq + Debug, const N: usize>(
     small_vec: &mut SmallVec<T, N>,
-    std_vec: &mut Vec<T>
+    std_vec: &mut Vec<T>,
 ) {
     // Length and content equivalence
     assert_eq!(small_vec.len(), std_vec.len(), "`len()` mismatch");
@@ -144,7 +138,7 @@ fn assert_invariants<T: Copy + PartialEq + Debug, const N: usize>(
 
 fn test_with_inline_cap<const N: usize>(
     u: &mut arbitrary::Unstructured,
-    ops: &[Op]
+    ops: &[Op],
 ) -> arbitrary::Result<()> {
     // We let `T` be `u64` instead of `u8` because, albeit less efficient,
     // this incurs potential memory misalignment which should be properly

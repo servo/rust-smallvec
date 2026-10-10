@@ -1,8 +1,4 @@
-use core::ops::{
-    Bound,
-    Range,
-    RangeBounds
-};
+use core::ops::{Bound, Range, RangeBounds};
 
 pub trait NewRange {
     fn new(rangebounds: impl RangeBounds<usize>, length: usize) -> Self;
@@ -27,7 +23,7 @@ impl NewRange for Range<usize> {
             Bound::Excluded(start) => start
                 .checked_add(1)
                 .unwrap_or_else(|| panic!("attempted to index slice from after maximum usize")),
-            Bound::Unbounded => 0
+            Bound::Unbounded => 0,
         };
 
         let end = match rangebounds.end_bound() {
@@ -35,16 +31,13 @@ impl NewRange for Range<usize> {
                 .checked_add(1)
                 .unwrap_or_else(|| panic!("attempted to index slice up to maximum usize")),
             Bound::Excluded(&end) => end,
-            Bound::Unbounded => length
+            Bound::Unbounded => length,
         };
 
         if start > end || end > length {
             assert_failed(start, end, length);
         }
 
-        Range {
-            start,
-            end
-        }
+        Range { start, end }
     }
 }

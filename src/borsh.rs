@@ -1,29 +1,12 @@
 use {
-    super::{
-        Allocator,
-        Global,
-        SmallVec
-    },
-    alloc::{
-        collections::BTreeMap as Map,
-        format
-    },
+    super::{Allocator, Global, SmallVec},
+    alloc::{collections::BTreeMap as Map, format},
     borsh::{
-        BorshDeserialize,
-        BorshSchema,
-        BorshSerialize,
-        io::{
-            Error,
-            ErrorKind,
-            Result as Serial,
-            Write
-        },
-        schema::{
-            Declaration,
-            Definition
-        }
+        BorshDeserialize, BorshSchema, BorshSerialize,
+        io::{Error, ErrorKind, Result as Serial, Write},
+        schema::{Declaration, Definition},
     },
-    core::iter::repeat_with
+    core::iter::repeat_with,
 };
 
 impl<Item: BorshSerialize, const INLINE: usize, Heap: Allocator> BorshSerialize
@@ -71,8 +54,8 @@ impl<Item: BorshSchema, const INLINE: usize, Heap: Allocator> BorshSchema
             Definition::Sequence {
                 length_width: 8,
                 length_range: 0..=u64::MAX,
-                elements: Item::declaration()
-            }
+                elements: Item::declaration(),
+            },
         );
     }
 }

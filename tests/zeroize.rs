@@ -1,7 +1,4 @@
-use {
-    smallvec::SmallVec,
-    zeroize::Zeroize
-};
+use {smallvec::SmallVec, zeroize::Zeroize};
 
 fn assert_fully_zeroed<const N: usize>(v: &mut SmallVec<u8, N>) {
     assert!(v.is_empty());

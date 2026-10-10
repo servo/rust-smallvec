@@ -1,13 +1,6 @@
 use {
-    super::{
-        Allocator,
-        SmallVec
-    },
-    malloc_size_of::{
-        MallocShallowSizeOf,
-        MallocSizeOf,
-        MallocSizeOfOps
-    }
+    super::{Allocator, SmallVec},
+    malloc_size_of::{MallocShallowSizeOf, MallocSizeOf, MallocSizeOfOps},
 };
 
 impl<Item, const INLINE: usize, Heap: Allocator> MallocShallowSizeOf

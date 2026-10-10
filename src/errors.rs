@@ -3,19 +3,14 @@ use {
     core::{
         alloc::Layout,
         error::Error,
-        fmt::{
-            Debug,
-            Display,
-            Formatter,
-            Result as Format
-        }
-    }
+        fmt::{Debug, Display, Formatter, Result as Format},
+    },
 };
 
 #[derive(Debug)]
 pub enum SmallVecError {
     CapacityOverflow,
-    AllocationError(Layout)
+    AllocationError(Layout),
 }
 
 impl Display for SmallVecError {
@@ -32,7 +27,7 @@ impl SmallVecError {
     pub fn handle<Type>(self) -> Type {
         match self {
             SmallVecError::CapacityOverflow => panic!("capacity overflow"),
-            SmallVecError::AllocationError(layout) => handle_alloc_error(layout)
+            SmallVecError::AllocationError(layout) => handle_alloc_error(layout),
         }
     }
 }

@@ -1,7 +1,4 @@
-use {
-    smallvec::SmallVec,
-    std::io::Write
-};
+use {smallvec::SmallVec, std::io::Write};
 
 #[test]
 fn write() {

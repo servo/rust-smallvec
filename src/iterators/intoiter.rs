@@ -1,21 +1,10 @@
 use {
-    crate::{
-        Allocator,
-        DropDealloc,
-        Global,
-        LocatedLength,
-        RawSmallVec,
-        SmallVec
-    },
+    crate::{Allocator, DropDealloc, Global, LocatedLength, RawSmallVec, SmallVec},
     core::{
         fmt::Debug,
-        mem::{
-            ManuallyDrop,
-            align_of,
-            size_of
-        },
-        ptr::NonNull
-    }
+        mem::{ManuallyDrop, align_of, size_of},
+        ptr::NonNull,
+    },
 };
 
 /// An iterator that consumes a `SmallVec` and yields its items by value.
@@ -32,7 +21,7 @@ pub struct IntoIter<Item, const INLINE: usize, Heap: Allocator = Global> {
     raw: RawSmallVec<Item, INLINE>,
     allocator: Heap,
     begin: usize,
-    end: LocatedLength<Item>
+    end: LocatedLength<Item>,
 }
 
 // SAFETY: IntoIter has unique ownership of its contents.  Sending (or sharing)
@@ -144,7 +133,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> Drop for IntoIter<Item, INLINE,
                     ptr: NonNull::new_unchecked(ptr as *mut u8),
                     size_bytes: capacity * size_of::<Item>(),
                     align: align_of::<Item>(),
-                    allocator: &self.allocator
+                    allocator: &self.allocator,
                 })
             } else {
                 None
@@ -162,7 +151,7 @@ impl<Item: Clone, const INLINE: usize, Heap: Allocator + Clone> Clone
         let mut vec = SmallVec {
             length: LocatedLength::new(0, false),
             raw: RawSmallVec::new(),
-            allocator: self.allocator.clone()
+            allocator: self.allocator.clone(),
         };
 
         vec.extend(self.as_slice());
@@ -186,7 +175,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> IntoIterator for SmallVec<Item,
                 raw: (&raw const this.raw).read(),
                 allocator: (&raw const this.allocator).read(),
                 begin: 0,
-                end: this.length
+                end: this.length,
             }
         }
     }

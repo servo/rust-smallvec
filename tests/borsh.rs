@@ -1,9 +1,6 @@
 use {
-    borsh::{
-        BorshDeserialize,
-        to_vec
-    },
-    smallvec::SmallVec
+    borsh::{BorshDeserialize, to_vec},
+    smallvec::SmallVec,
 };
 
 #[test]
