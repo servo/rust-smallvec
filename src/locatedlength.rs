@@ -35,7 +35,7 @@ impl<Item> LocatedLength<Item> {
         debug_assert!(!on_heap || Self::TAG != 0);
         Self(
             (length << Self::SHIFT) | ((on_heap as usize) & Self::TAG),
-            PhantomData
+            PhantomData,
         )
     }
 
@@ -80,7 +80,7 @@ impl<Item> LocatedLength<Item> {
                         assert_failed()
                     }
                 }
-                None => assert_failed()
+                None => assert_failed(),
             }
         }
         self.0 += n << Self::SHIFT;

@@ -1,18 +1,9 @@
 use {
-    super::{
-        Allocator,
-        SmallVec
-    },
+    super::{Allocator, SmallVec},
     core::{
-        borrow::{
-            Borrow,
-            BorrowMut
-        },
-        ops::{
-            Deref,
-            DerefMut
-        }
-    }
+        borrow::{Borrow, BorrowMut},
+        ops::{Deref, DerefMut},
+    },
 };
 
 impl<Item, const INLINE: usize, Heap: Allocator> Borrow<[Item]> for SmallVec<Item, INLINE, Heap> {

@@ -1,11 +1,7 @@
 use {
-    iai_callgrind::{
-        library_benchmark,
-        library_benchmark_group,
-        main
-    },
+    iai_callgrind::{library_benchmark, library_benchmark_group, main},
     smallvec::SmallVec,
-    std::hint::black_box
+    std::hint::black_box,
 };
 
 const INLINE_CAP: usize = 16;

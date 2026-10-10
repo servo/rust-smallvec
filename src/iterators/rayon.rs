@@ -2,29 +2,19 @@
 //! need, except it's all private
 
 use {
-    crate::{
-        Allocator,
-        SmallVec
-    },
+    crate::{Allocator, SmallVec},
     core::{
         mem::take,
-        ptr::{
-            self,
-            drop_in_place
-        },
-        slice
+        ptr::{self, drop_in_place},
+        slice,
     },
     rayon::{
-        iter::plumbing::{
-            Producer,
-            UnindexedConsumer,
-            bridge_producer_consumer
-        },
-        prelude::ParallelIterator
-    }
+        iter::plumbing::{Producer, UnindexedConsumer, bridge_producer_consumer},
+        prelude::ParallelIterator,
+    },
 };
 
-struct SliceDrain<'a, Item>(slice::IterMut<'a, Item>);
+struct SliceDrain<'valid, Item>(slice::IterMut<'valid, Item>);
 
 impl<Item> Iterator for SliceDrain<'_, Item> {
     type Item = Item;
@@ -52,13 +42,13 @@ impl<Item> Drop for SliceDrain<'_, Item> {
     }
 }
 
-struct DrainProducer<'a, Item>(&'a mut [Item]);
+struct DrainProducer<'valid, Item>(&'valid mut [Item]);
 
-impl<'a, Item: Send> Producer for DrainProducer<'a, Item> {
-    type IntoIter = SliceDrain<'a, Item>;
+impl<'valid, Item: Send> Producer for DrainProducer<'valid, Item> {
+    type IntoIter = SliceDrain<'valid, Item>;
     type Item = Item;
 
-    fn into_iter(mut self) -> SliceDrain<'a, Item> {
+    fn into_iter(mut self) -> SliceDrain<'valid, Item> {
         SliceDrain(take(&mut self.0).iter_mut())
     }
 
@@ -96,7 +86,7 @@ impl<Item: Send, const INLINE: usize, Heap: Allocator + Send> ParallelIterator
                 // are still valid.
                 slice::from_raw_parts_mut(self.as_mut_ptr(), length)
             }),
-            consumer
+            consumer,
         )
     }
 }

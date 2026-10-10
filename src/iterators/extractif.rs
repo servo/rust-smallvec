@@ -1,8 +1,4 @@
-use crate::{
-    Allocator,
-    Global,
-    SmallVec
-};
+use crate::{Allocator, Global, SmallVec};
 
 /// An iterator which uses a closure to determine if an element should be
 /// removed.
@@ -10,10 +6,11 @@ use crate::{
 /// Returned from [`SmallVec::extract_if`][1].
 ///
 /// [1]: struct.SmallVec.html#method.extract_if
-pub struct ExtractIf<'a, Item, const INLINE: usize, F, Heap: Allocator = Global>
-where F: FnMut(&mut Item) -> bool
+pub struct ExtractIf<'valid, Item, const INLINE: usize, F, Heap: Allocator = Global>
+where
+    F: FnMut(&mut Item) -> bool,
 {
-    pub(crate) vec: &'a mut SmallVec<Item, INLINE, Heap>,
+    pub(crate) vec: &'valid mut SmallVec<Item, INLINE, Heap>,
     /// The index of the item that will be inspected by the next call to `next`.
     pub(crate) idx: usize,
     /// Elements at and beyond this point will be retained. Must be equal or
@@ -24,14 +21,14 @@ where F: FnMut(&mut Item) -> bool
     /// The original length of `vec` prior to draining.
     pub(crate) old_len: usize,
     /// The filter test predicate.
-    pub(crate) pred: F
+    pub(crate) pred: F,
 }
 
 impl<Item, const INLINE: usize, Heap: Allocator, F> core::fmt::Debug
     for ExtractIf<'_, Item, INLINE, F, Heap>
 where
     F: FnMut(&mut Item) -> bool,
-    Item: core::fmt::Debug
+    Item: core::fmt::Debug,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("ExtractIf")
@@ -42,7 +39,8 @@ where
 
 impl<Item, F, const INLINE: usize, Heap: Allocator> Iterator
     for ExtractIf<'_, Item, INLINE, F, Heap>
-where F: FnMut(&mut Item) -> bool
+where
+    F: FnMut(&mut Item) -> bool,
 {
     type Item = Item;
 
@@ -76,7 +74,8 @@ where F: FnMut(&mut Item) -> bool
 }
 
 impl<Item, F, const INLINE: usize, Heap: Allocator> Drop for ExtractIf<'_, Item, INLINE, F, Heap>
-where F: FnMut(&mut Item) -> bool
+where
+    F: FnMut(&mut Item) -> bool,
 {
     fn drop(&mut self) {
         unsafe {

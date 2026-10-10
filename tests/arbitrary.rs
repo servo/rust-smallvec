@@ -1,9 +1,6 @@
 use {
-    arbitrary::{
-        Arbitrary,
-        Unstructured
-    },
-    smallvec::SmallVec
+    arbitrary::{Arbitrary, Unstructured},
+    smallvec::SmallVec,
 };
 
 #[test]

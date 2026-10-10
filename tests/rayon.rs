@@ -1,11 +1,8 @@
 #![cfg(not(miri))]
 
 use {
-    rayon::{
-        iter::ParallelIterator,
-        prelude::ParallelSlice
-    },
-    smallvec::SmallVec
+    rayon::{iter::ParallelIterator, prelude::ParallelSlice},
+    smallvec::SmallVec,
 };
 
 #[test]

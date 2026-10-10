@@ -1,23 +1,10 @@
 use {
-    super::{
-        Allocator,
-        Global,
-        SmallVec
-    },
+    super::{Allocator, Global, SmallVec},
     core::marker::PhantomData,
     serde_core::{
-        de::{
-            Deserialize,
-            Deserializer,
-            SeqAccess,
-            Visitor
-        },
-        ser::{
-            Serialize,
-            SerializeSeq,
-            Serializer
-        }
-    }
+        de::{Deserialize, Deserializer, SeqAccess, Visitor},
+        ser::{Serialize, SerializeSeq, Serializer},
+    },
 };
 
 impl<Item: Serialize, const INLINE: usize, Heap: Allocator> Serialize
@@ -37,13 +24,13 @@ impl<'de, Item: Deserialize<'de>, const INLINE: usize> Deserialize<'de>
 {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_seq(SmallVecVisitor {
-            phantom: PhantomData
+            phantom: PhantomData,
         })
     }
 }
 
 struct SmallVecVisitor<Item, const INLINE: usize> {
-    phantom: PhantomData<Item>
+    phantom: PhantomData<Item>,
 }
 
 impl<'de, Item: Deserialize<'de>, const INLINE: usize> Visitor<'de>

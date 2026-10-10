@@ -1,32 +1,16 @@
 #[cfg(feature = "allocator-api2")]
-use allocator_api2::{
-    boxed::Box,
-    vec::Vec
-};
+use allocator_api2::{boxed::Box, vec::Vec};
 #[cfg(not(feature = "allocator-api2"))]
-use std::{
-    boxed::Box,
-    vec::Vec
-};
+use std::{boxed::Box, vec::Vec};
 use {
     core::{
-        borrow::{
-            Borrow,
-            BorrowMut
-        },
+        borrow::{Borrow, BorrowMut},
         cell::Cell,
-        hash::{
-            Hash,
-            Hasher
-        },
-        iter::FromIterator
+        hash::{Hash, Hasher},
+        iter::FromIterator,
     },
     smallvec::SmallVec,
-    std::{
-        borrow::ToOwned,
-        hash::DefaultHasher,
-        rc::Rc
-    }
+    std::{borrow::ToOwned, hash::DefaultHasher, rc::Rc},
 };
 
 #[test]
@@ -237,7 +221,7 @@ fn splice_inline_fill_then_move_tail_ub_test() {
 
 #[test]
 fn splice_reserve_panic() {
-    struct CountDrop<'a>(&'a Cell<usize>);
+    struct CountDrop<'valid>(&'valid Cell<usize>);
 
     impl Drop for CountDrop<'_> {
         fn drop(&mut self) {
@@ -254,7 +238,7 @@ fn splice_reserve_panic() {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 drop(v.splice(
                     0..0,
-                    std::iter::repeat_with(|| Box::new(CountDrop(&drops))).take(additional)
+                    std::iter::repeat_with(|| Box::new(CountDrop(&drops))).take(additional),
                 ));
             }));
 
@@ -311,9 +295,9 @@ fn into_iter_rev() {
 
 #[test]
 fn into_iter_drop() {
-    struct DropCounter<'a>(&'a Cell<i32>);
+    struct DropCounter<'valid>(&'valid Cell<i32>);
 
-    impl<'a> Drop for DropCounter<'a> {
+    impl<'valid> Drop for DropCounter<'valid> {
         fn drop(&mut self) {
             self.0.set(self.0.get() + 1);
         }

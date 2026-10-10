@@ -6,10 +6,7 @@ mod external;
 mod native;
 pub mod proxy;
 
-use core::{
-    alloc::Layout,
-    ptr::NonNull
-};
+use core::{alloc::Layout, ptr::NonNull};
 
 #[cfg(not(feature = "allocator-api"))]
 #[rustfmt::skip]
@@ -46,6 +43,6 @@ pub trait Allocator {
         &self,
         pointer: NonNull<u8>,
         old: Layout,
-        new: Layout
+        new: Layout,
     ) -> Option<NonNull<[u8]>>;
 }

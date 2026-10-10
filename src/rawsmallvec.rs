@@ -1,26 +1,16 @@
 use {
-    super::{
-        Allocator,
-        SmallVecError,
-        locatedlength::LocatedLength
-    },
+    super::{Allocator, SmallVecError, locatedlength::LocatedLength},
     core::{
         alloc::Layout,
-        mem::{
-            ManuallyDrop,
-            MaybeUninit
-        },
-        ptr::{
-            NonNull,
-            copy_nonoverlapping
-        }
-    }
+        mem::{ManuallyDrop, MaybeUninit},
+        ptr::{NonNull, copy_nonoverlapping},
+    },
 };
 
 #[repr(C)]
 pub union RawSmallVec<Item, const INLINE: usize> {
     pub inline: ManuallyDrop<MaybeUninit<[Item; INLINE]>>,
-    pub heap: (NonNull<Item>, usize)
+    pub heap: (NonNull<Item>, usize),
 }
 
 impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
@@ -35,14 +25,14 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
     #[inline]
     pub const fn new_inline(inline: MaybeUninit<[Item; INLINE]>) -> Self {
         Self {
-            inline: ManuallyDrop::new(inline)
+            inline: ManuallyDrop::new(inline),
         }
     }
 
     #[inline]
     pub const fn new_heap(ptr: NonNull<Item>, capacity: usize) -> Self {
         Self {
-            heap: (ptr, capacity)
+            heap: (ptr, capacity),
         }
     }
 
@@ -108,7 +98,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
         &mut self,
         length: LocatedLength<Item>,
         new_capacity: usize,
-        allocator: &Heap
+        allocator: &Heap,
     ) -> Result<(), SmallVecError> {
         let (length, was_on_heap) = length.parts();
         debug_assert!(!Self::IS_ZST);
@@ -140,7 +130,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
             let old_layout = unsafe {
                 Layout::from_size_align_unchecked(
                     self.heap.1 * size_of::<Item>(),
-                    align_of::<Item>()
+                    align_of::<Item>(),
                 )
             };
 
@@ -159,7 +149,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
                     allocator,
                     NonNull::new(ptr as *mut u8).unwrap(),
                     old_layout,
-                    new_layout
+                    new_layout,
                 )
             }
             .ok_or(SmallVecError::AllocationError(new_layout))?

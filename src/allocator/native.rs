@@ -1,10 +1,7 @@
 use {
     super::Allocator,
     alloc::alloc::Allocator as Native,
-    core::{
-        alloc::Layout,
-        ptr::NonNull
-    }
+    core::{alloc::Layout, ptr::NonNull},
 };
 
 impl<Type: Native> Allocator for Type {
@@ -28,7 +25,7 @@ impl<Type: Native> Allocator for Type {
         &self,
         pointer: NonNull<u8>,
         old: Layout,
-        new: Layout
+        new: Layout,
     ) -> Option<NonNull<[u8]>> {
         unsafe { Native::shrink(&self, pointer, old, new).ok() }
     }

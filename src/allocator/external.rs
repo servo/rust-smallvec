@@ -1,10 +1,7 @@
 use {
     super::Allocator,
     allocator_api2::alloc::Allocator as External,
-    core::{
-        alloc::Layout,
-        ptr::NonNull
-    }
+    core::{alloc::Layout, ptr::NonNull},
 };
 
 impl<Type: External> Allocator for Type {
@@ -28,7 +25,7 @@ impl<Type: External> Allocator for Type {
         &self,
         pointer: NonNull<u8>,
         old: Layout,
-        new: Layout
+        new: Layout,
     ) -> Option<NonNull<[u8]>> {
         unsafe { External::shrink(&self, pointer, old, new).ok() }
     }

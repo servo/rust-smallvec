@@ -1,13 +1,6 @@
 use {
-    crate::{
-        Allocator,
-        SmallVec
-    },
-    alloc::{
-        borrow::Cow,
-        collections::VecDeque,
-        vec::Vec
-    }
+    crate::{Allocator, SmallVec},
+    alloc::{borrow::Cow, collections::VecDeque, vec::Vec},
 };
 
 macro_rules! __impl_slice_eq1 {
@@ -42,7 +35,8 @@ __impl_slice_eq1! { [] SmallVec<Item, INLINE, Heap>, Cow<'_, [U]> where U: Clone
 
 impl<Item, U, const INLINE: usize, Heap: Allocator> PartialEq<SmallVec<U, INLINE, Heap>>
     for VecDeque<Item>
-where Item: PartialEq<U>
+where
+    Item: PartialEq<U>,
 {
     #[inline]
     fn eq(&self, other: &SmallVec<U, INLINE, Heap>) -> bool {
@@ -59,7 +53,8 @@ where Item: PartialEq<U>
 impl<Item: Eq, const INLINE: usize, Heap: Allocator> Eq for SmallVec<Item, INLINE, Heap> {}
 
 impl<Item, const INLINE: usize, Heap: Allocator> PartialOrd for SmallVec<Item, INLINE, Heap>
-where Item: PartialOrd
+where
+    Item: PartialOrd,
 {
     #[inline]
     fn partial_cmp(&self, other: &SmallVec<Item, INLINE, Heap>) -> Option<core::cmp::Ordering> {
@@ -68,7 +63,8 @@ where Item: PartialOrd
 }
 
 impl<Item, const INLINE: usize, Heap: Allocator> Ord for SmallVec<Item, INLINE, Heap>
-where Item: Ord
+where
+    Item: Ord,
 {
     #[inline]
     fn cmp(&self, other: &SmallVec<Item, INLINE, Heap>) -> core::cmp::Ordering {
