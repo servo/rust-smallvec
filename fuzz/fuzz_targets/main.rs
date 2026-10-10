@@ -19,7 +19,6 @@ pub struct Bounded<T, const CAP: usize = 255>(pub T);
 
 // Bounded `usize` between `0..=CAP`
 impl<'valid, const CAP: usize> Arbitrary<'valid> for Bounded<usize, CAP> {
-    /// Generates an arbitrary bounded usize value using the unstructured fuzzing data of lifetime 'valid.
     #[inline]
     fn arbitrary(u: &mut arbitrary::Unstructured<'valid>) -> arbitrary::Result<Self> {
         Ok(Bounded(u.int_in_range(0..=CAP)?))
@@ -30,7 +29,6 @@ impl<'valid, const CAP: usize> Arbitrary<'valid> for Bounded<usize, CAP> {
 impl<'valid, T, const CAP: usize> Arbitrary<'valid> for Bounded<Vec<T>, CAP>
 where T: Arbitrary<'valid>
 {
-    /// Generates an arbitrary bounded vector by consuming items from the unstructured data stream of lifetime 'valid.
     fn arbitrary(u: &mut arbitrary::Unstructured<'valid>) -> arbitrary::Result<Self> {
         let len = u.int_in_range(0..=CAP)?;
         let vec = u

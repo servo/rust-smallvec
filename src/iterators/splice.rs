@@ -8,13 +8,15 @@ use super::{
     drain::Drain
 };
 
-pub struct Splice<'a, I: Iterator + 'a, const INLINE: usize, Heap: Allocator = Global> {
-    drain: Drain<'a, I::Item, INLINE, Heap>,
+pub struct Splice<'valid, I: Iterator + 'valid, const INLINE: usize, Heap: Allocator = Global> {
+    drain: Drain<'valid, I::Item, INLINE, Heap>,
     replace_with: I
 }
 
-impl<'a, I: Iterator + 'a, const INLINE: usize, Heap: Allocator> Splice<'a, I, INLINE, Heap> {
-    pub(crate) fn new(drain: Drain<'a, I::Item, INLINE, Heap>, replace_with: I) -> Self {
+impl<'valid, I: Iterator + 'valid, const INLINE: usize, Heap: Allocator>
+    Splice<'valid, I, INLINE, Heap>
+{
+    pub(crate) fn new(drain: Drain<'valid, I::Item, INLINE, Heap>, replace_with: I) -> Self {
         Self {
             drain,
             replace_with
@@ -22,9 +24,10 @@ impl<'a, I: Iterator + 'a, const INLINE: usize, Heap: Allocator> Splice<'a, I, I
     }
 }
 
-impl<'a, I, const INLINE: usize, Heap: Allocator> core::fmt::Debug for Splice<'a, I, INLINE, Heap>
+impl<'valid, I, const INLINE: usize, Heap: Allocator> core::fmt::Debug
+    for Splice<'valid, I, INLINE, Heap>
 where
-    I: core::fmt::Debug + Iterator + 'a,
+    I: core::fmt::Debug + Iterator + 'valid,
     <I as Iterator>::Item: core::fmt::Debug
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

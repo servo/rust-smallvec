@@ -15,7 +15,6 @@ use {
 const VEC_SIZE: usize = 16;
 const SPILLED_SIZE: usize = 100;
 
-/// A trait defining common vector operations, implemented by vectors taking items from a slice of lifetime 'valid.
 trait Vector<T>: for<'valid> From<&'valid [T]> + Extend<T> + FromIterator<T> {
     fn new() -> Self;
     fn push(&mut self, val: T);

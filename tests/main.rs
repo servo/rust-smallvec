@@ -237,7 +237,6 @@ fn splice_inline_fill_then_move_tail_ub_test() {
 
 #[test]
 fn splice_reserve_panic() {
-    /// A helper struct that increments a counter when dropped, bound to the cell's lifetime 'valid.
     struct CountDrop<'valid>(&'valid Cell<usize>);
 
     impl Drop for CountDrop<'_> {
@@ -312,7 +311,6 @@ fn into_iter_rev() {
 
 #[test]
 fn into_iter_drop() {
-    /// A helper struct that increments a counter when dropped, bound to the cell's lifetime 'valid.
     struct DropCounter<'valid>(&'valid Cell<i32>);
 
     impl<'valid> Drop for DropCounter<'valid> {

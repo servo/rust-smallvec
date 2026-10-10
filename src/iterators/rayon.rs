@@ -24,7 +24,7 @@ use {
     }
 };
 
-struct SliceDrain<'a, Item>(slice::IterMut<'a, Item>);
+struct SliceDrain<'valid, Item>(slice::IterMut<'valid, Item>);
 
 impl<Item> Iterator for SliceDrain<'_, Item> {
     type Item = Item;
@@ -52,13 +52,13 @@ impl<Item> Drop for SliceDrain<'_, Item> {
     }
 }
 
-struct DrainProducer<'a, Item>(&'a mut [Item]);
+struct DrainProducer<'valid, Item>(&'valid mut [Item]);
 
-impl<'a, Item: Send> Producer for DrainProducer<'a, Item> {
-    type IntoIter = SliceDrain<'a, Item>;
+impl<'valid, Item: Send> Producer for DrainProducer<'valid, Item> {
+    type IntoIter = SliceDrain<'valid, Item>;
     type Item = Item;
 
-    fn into_iter(mut self) -> SliceDrain<'a, Item> {
+    fn into_iter(mut self) -> SliceDrain<'valid, Item> {
         SliceDrain(take(&mut self.0).iter_mut())
     }
 
