@@ -13,19 +13,19 @@ use {
     }
 };
 
-impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N, Global> {
+impl<Item: Clone, const INLINE: usize> From<&[Item]> for SmallVec<Item, INLINE, Global> {
     #[inline]
-    fn from(slice: &[T]) -> Self {
+    fn from(slice: &[Item]) -> Self {
         if slice.len() > Self::inline_size() {
             // Standard Rust vectors are already specialized.
-            Self::from_vec(<Vec<T, Global> as Like>::Type::from(slice))
+            <Vec<Item, Global> as Like>::Type::from(slice).into()
         } else {
             // SAFETY: The precondition is checked in the initial comparison
             // above.
             unsafe {
                 #[cfg(feature = "specialization")]
                 {
-                    <Self as crate::specialization::SpecFromSlice<T>>::spec_from(slice)
+                    <Self as crate::specialization::SpecFromSlice<Item>>::spec_from(slice)
                 }
 
                 #[cfg(not(feature = "specialization"))]
@@ -37,35 +37,39 @@ impl<T: Clone, const N: usize> From<&[T]> for SmallVec<T, N, Global> {
     }
 }
 
-impl<T: Clone, const N: usize> From<&mut [T]> for SmallVec<T, N, Global> {
+impl<Item: Clone, const INLINE: usize> From<&mut [Item]> for SmallVec<Item, INLINE, Global> {
     #[inline]
-    fn from(slice: &mut [T]) -> Self {
-        Self::from(slice as &[T])
+    fn from(slice: &mut [Item]) -> Self {
+        Self::from(slice as &[Item])
     }
 }
 
-impl<T: Clone, const M: usize, const N: usize> From<&[T; M]> for SmallVec<T, N, Global> {
+impl<Item: Clone, const M: usize, const INLINE: usize> From<&[Item; M]>
+    for SmallVec<Item, INLINE, Global>
+{
     #[inline]
-    fn from(slice: &[T; M]) -> Self {
-        Self::from(slice as &[T])
+    fn from(slice: &[Item; M]) -> Self {
+        Self::from(slice as &[Item])
     }
 }
 
-impl<T: Clone, const M: usize, const N: usize> From<&mut [T; M]> for SmallVec<T, N, Global> {
+impl<Item: Clone, const M: usize, const INLINE: usize> From<&mut [Item; M]>
+    for SmallVec<Item, INLINE, Global>
+{
     #[inline]
-    fn from(slice: &mut [T; M]) -> Self {
-        Self::from(slice as &[T])
+    fn from(slice: &mut [Item; M]) -> Self {
+        Self::from(slice as &[Item])
     }
 }
 
-impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N, Global> {
-    fn from(array: [T; M]) -> Self {
-        if M > N {
-            // If M > N, we'd have to heap allocate anyway,
+impl<Item, const INLINE: usize, const M: usize> From<[Item; M]> for SmallVec<Item, INLINE, Global> {
+    fn from(array: [Item; M]) -> Self {
+        if M > INLINE {
+            // If M > INLINE, we'd have to heap allocate anyway,
             // so delegate for Vec for the allocation.
             Self::from(<Vec<T, Global> as Like>::Type::from(array))
         } else {
-            // M <= N
+            // M <= INLINE
             let mut this = Self::new();
             debug_assert!(M <= this.capacity());
             let array = ManuallyDrop::new(array);
@@ -79,11 +83,15 @@ impl<T, const N: usize, const M: usize> From<[T; M]> for SmallVec<T, N, Global> 
     }
 }
 
-impl<T, const N: usize, const M: usize, A: Allocator> TryFrom<SmallVec<T, N, A>> for [T; M] {
-    type Error = SmallVec<T, N, A>;
+impl<Item, const INLINE: usize, const M: usize, Heap: Allocator>
+    TryFrom<SmallVec<Item, INLINE, Heap>> for [Item; M]
+{
+    type Error = SmallVec<Item, INLINE, Heap>;
 
     #[inline]
-    fn try_from(mut this: SmallVec<T, N, A>) -> Result<[T; M], SmallVec<T, N, A>> {
+    fn try_from(
+        mut this: SmallVec<Item, INLINE, Heap>
+    ) -> Result<[Item; M], SmallVec<Item, INLINE, Heap>> {
         if this.len() != M {
             Err(this)
         } else {
@@ -91,21 +99,21 @@ impl<T, const N: usize, const M: usize, A: Allocator> TryFrom<SmallVec<T, N, A>>
             unsafe {
                 this.set_len(0);
             }
-            let ptr = this.as_ptr() as *const [T; M];
+            let ptr = this.as_ptr() as *const [Item; M];
             // SAFETY: these elements are initialized since the length was `M`
             unsafe { Ok(ptr.read()) }
         }
     }
 }
 
-impl<T, const N: usize> From<<Vec<T, Global> as Like>::Type> for SmallVec<T, N, Global> {
-    fn from(array: <Vec<T, Global> as Like>::Type) -> Self {
+impl<Item, const INLINE: usize> From<<Vec<Item, Global> as Like>::Type> for SmallVec<Item, INLINE, Global> {
+    fn from(array: <Vec<Item, Global> as Like>::Type) -> Self {
         Self::from_vec(array)
     }
 }
 
-impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for <Vec<T, Global> as Like>::Type {
-    fn from(this: SmallVec<T, N, A>) -> Self {
+impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Heap>> for <Vec<Item, Global> as Like>::Type {
+    fn from(this: SmallVec<Item, INLINE, Heap>) -> Self {
         let (length, on_heap) = this.length.parts();
         if !on_heap {
             let mut vec = <Vec<T, Global> as Like>::Type::with_capacity(length);
@@ -123,10 +131,10 @@ impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for <Vec<T, Global
             let this = ManuallyDrop::new(this);
             // SAFETY:
             // - `ptr` was created with the SmallVec's allocator
-            // - `ptr` was created with the appropriate alignment for `T`
-            // - the allocation pointed to by ptr is exactly cap * sizeof(T)
+            // - `ptr` was created with the appropriate alignment for `Item`
+            // - the allocation pointed to by ptr is exactly cap * sizeof(Item)
             // - `length` is less than or equal to `cap`
-            // - the first `length` entries are proper `T`-values
+            // - the first `length` entries are proper `Item`-values
             // - the allocation is not larger than `isize::MAX`
             unsafe {
                 let (ptr, cap) = this.raw.heap;
@@ -136,8 +144,14 @@ impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for <Vec<T, Global
     }
 }
 
-impl<T, const N: usize, A: Allocator> From<SmallVec<T, N, A>> for <Box<[T], Global> as Like>::Type {
-    fn from(this: SmallVec<T, N, A>) -> Self {
-        <Vec<T, Global> as Like>::Type::from(this).into_boxed_slice()
+impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Heap>> for <Box<[Item], Global> as Like>::Type {
+    fn from(this: SmallVec<Item, INLINE, Heap>) -> Self {
+        <Vec<Item, Global> as Like>::Type::from(this).into_boxed_slice()
+    }
+}
+
+impl<T, const N: usize> From<Box<[T]>> for SmallVec<T, N> {
+    fn from(boxed: Box<[T]>) -> Self {
+        boxed.into_vec().into()
     }
 }

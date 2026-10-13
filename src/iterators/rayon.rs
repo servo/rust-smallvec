@@ -24,41 +24,41 @@ use {
     }
 };
 
-struct SliceDrain<'a, T>(slice::IterMut<'a, T>);
+struct SliceDrain<'a, Item>(slice::IterMut<'a, Item>);
 
-impl<T> Iterator for SliceDrain<'_, T> {
-    type Item = T;
+impl<Item> Iterator for SliceDrain<'_, Item> {
+    type Item = Item;
 
-    fn next(&mut self) -> Option<T> {
+    fn next(&mut self) -> Option<Item> {
         self.0.next().map(|val| unsafe { ptr::read(val) })
     }
 }
 
-impl<T> DoubleEndedIterator for SliceDrain<'_, T> {
-    fn next_back(&mut self) -> Option<T> {
+impl<Item> DoubleEndedIterator for SliceDrain<'_, Item> {
+    fn next_back(&mut self) -> Option<Item> {
         self.0.next_back().map(|val| unsafe { ptr::read(val) })
     }
 }
 
-impl<T> ExactSizeIterator for SliceDrain<'_, T> {
+impl<Item> ExactSizeIterator for SliceDrain<'_, Item> {
     fn len(&self) -> usize {
         self.0.len()
     }
 }
 
-impl<T> Drop for SliceDrain<'_, T> {
+impl<Item> Drop for SliceDrain<'_, Item> {
     fn drop(&mut self) {
         unsafe { drop_in_place(take(&mut self.0).into_slice()) };
     }
 }
 
-struct DrainProducer<'a, T>(&'a mut [T]);
+struct DrainProducer<'a, Item>(&'a mut [Item]);
 
-impl<'a, T: Send> Producer for DrainProducer<'a, T> {
-    type IntoIter = SliceDrain<'a, T>;
-    type Item = T;
+impl<'a, Item: Send> Producer for DrainProducer<'a, Item> {
+    type IntoIter = SliceDrain<'a, Item>;
+    type Item = Item;
 
-    fn into_iter(mut self) -> SliceDrain<'a, T> {
+    fn into_iter(mut self) -> SliceDrain<'a, Item> {
         SliceDrain(take(&mut self.0).iter_mut())
     }
 
@@ -69,16 +69,18 @@ impl<'a, T: Send> Producer for DrainProducer<'a, T> {
     }
 }
 
-impl<T> Drop for DrainProducer<'_, T> {
+impl<Item> Drop for DrainProducer<'_, Item> {
     fn drop(&mut self) {
         unsafe { drop_in_place(self.0) };
     }
 }
 
-impl<T: Send, const N: usize, A: Allocator + Send> ParallelIterator for SmallVec<T, N, A> {
-    type Item = T;
+impl<Item: Send, const INLINE: usize, Heap: Allocator + Send> ParallelIterator
+    for SmallVec<Item, INLINE, Heap>
+{
+    type Item = Item;
 
-    fn drive_unindexed<C: UnindexedConsumer<T>>(mut self, consumer: C) -> C::Result {
+    fn drive_unindexed<C: UnindexedConsumer<Item>>(mut self, consumer: C) -> C::Result {
         let length = self.len();
 
         bridge_producer_consumer(

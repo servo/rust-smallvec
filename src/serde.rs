@@ -20,7 +20,9 @@ use {
     }
 };
 
-impl<T: Serialize, const N: usize, A: Allocator> Serialize for SmallVec<T, N, A> {
+impl<Item: Serialize, const INLINE: usize, Heap: Allocator> Serialize
+    for SmallVec<Item, INLINE, Heap>
+{
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut state = serializer.serialize_seq(Some(self.len()))?;
         for item in self {
@@ -30,7 +32,9 @@ impl<T: Serialize, const N: usize, A: Allocator> Serialize for SmallVec<T, N, A>
     }
 }
 
-impl<'de, T: Deserialize<'de>, const N: usize> Deserialize<'de> for SmallVec<T, N, Global> {
+impl<'de, Item: Deserialize<'de>, const INLINE: usize> Deserialize<'de>
+    for SmallVec<Item, INLINE, Global>
+{
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_seq(SmallVecVisitor {
             phantom: PhantomData
@@ -38,12 +42,14 @@ impl<'de, T: Deserialize<'de>, const N: usize> Deserialize<'de> for SmallVec<T, 
     }
 }
 
-struct SmallVecVisitor<T, const N: usize> {
-    phantom: PhantomData<T>
+struct SmallVecVisitor<Item, const INLINE: usize> {
+    phantom: PhantomData<Item>
 }
 
-impl<'de, T: Deserialize<'de>, const N: usize> Visitor<'de> for SmallVecVisitor<T, N> {
-    type Value = SmallVec<T, N, Global>;
+impl<'de, Item: Deserialize<'de>, const INLINE: usize> Visitor<'de>
+    for SmallVecVisitor<Item, INLINE>
+{
+    type Value = SmallVec<Item, INLINE, Global>;
 
     fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         formatter.write_str("a sequence")

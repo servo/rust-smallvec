@@ -9,6 +9,9 @@ use {
     std::fmt::Debug
 };
 
+// Upper bound on the harness's test vectors's capacity.
+const MAX_CAP: usize = 1024;
+
 /// A generic wrapper that bounds data generated via `arbitrary`.
 /// Default cap is 255.
 #[derive(Debug, Clone)]
@@ -51,8 +54,8 @@ enum Op {
     New,
     WithCapacity(Bounded<usize>),
     FromVec,
-    FromSlice(Bounded<Vec<usize>>),
-    Push(usize),
+    FromSlice(Bounded<Vec<u64>>),
+    Push(u64),
     Pop,
     Grow(Bounded<usize>),
     Reserve(Bounded<usize>),
@@ -62,14 +65,14 @@ enum Op {
     SwapRemove,
     Clear,
     Remove,
-    Insert(usize),
+    Insert(u64),
     Drain,
-    Splice(Bounded<Vec<usize>>),
+    Splice(Bounded<Vec<u64>>),
     RetainEven,
     Dedup,
-    ExtendFromSlice(Bounded<Vec<usize>>),
+    ExtendFromSlice(Bounded<Vec<u64>>),
     ExtendFromWithin,
-    Resize(Bounded<usize>, usize)
+    Resize(Bounded<usize>, u64)
 }
 
 /// Helper to assert equivalence of all structural invariants of `SmallVec`
@@ -141,12 +144,12 @@ fn test_with_inline_cap<const N: usize>(
     u: &mut arbitrary::Unstructured,
     ops: &[Op]
 ) -> arbitrary::Result<()> {
-    // We let `T` be `usize` instead of `u8` because, albeit less efficient,
+    // We let `T` be `u64` instead of `u8` because, albeit less efficient,
     // this incurs potential memory misalignment which should be properly
     // handled by the library.
 
-    let mut small_vec = SmallVec::<usize, N>::new();
-    let mut std_vec = Vec::<usize>::new();
+    let mut small_vec = SmallVec::<u64, N>::new();
+    let mut std_vec = Vec::<u64>::new();
 
     for op in ops {
         match op {
@@ -276,6 +279,13 @@ fn test_with_inline_cap<const N: usize>(
             }
         }
 
+        if small_vec.capacity() > MAX_CAP {
+            small_vec.truncate(MAX_CAP);
+            std_vec.truncate(MAX_CAP);
+            small_vec.shrink_to_fit();
+            std_vec.shrink_to_fit();
+        }
+
         assert_invariants(&mut small_vec, &mut std_vec);
     }
 
@@ -286,7 +296,7 @@ fn run_test(mut u: arbitrary::Unstructured) -> arbitrary::Result<()> {
     let ops = Vec::<Op>::arbitrary(&mut u)?;
     let dynamic_entropy = u.take_rest();
 
-    let run_test = |test_func: fn(&mut arbitrary::Unstructured, &[Op]) -> arbitrary::Result<()>| {
+    let run_test = |test_func: fn(&mut arbitrary::Unstructured, &[Op]) -> _| {
         test_func(&mut arbitrary::Unstructured::new(dynamic_entropy), &ops)
     };
 
