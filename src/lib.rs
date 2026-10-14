@@ -9,10 +9,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization, trusted_len))]
-#![cfg_attr(
-    all(feature = "allocator-api", not(feature = "allocator-api2")),
-    feature(allocator_api)
-)]
+#![cfg_attr(feature = "allocator-api", allow(clippy::incompatible_msrv))]
 
 extern crate alloc;
 
