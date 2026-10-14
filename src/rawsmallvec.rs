@@ -151,9 +151,9 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
             // with Layout::array
             unsafe {
                 (if self.heap.1 < new_capacity {
-                    <A as Allocator>::grow
+                    <Heap as Allocator>::grow
                 } else {
-                    <A as Allocator>::shrink
+                    <Heap as Allocator>::shrink
                 })(
                     allocator,
                     NonNull::new(ptr as *mut u8).unwrap(),

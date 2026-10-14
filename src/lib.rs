@@ -233,48 +233,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     #[inline]
     #[deprecated(since = "2.0.0-beta.3", note = "use `From::<Vec<T>>::from` instead")]
     pub fn from_vec(vec: <Vec<Item, Global> as Like>::Type) -> Self {
-        if vec.capacity() == 0 {
-            return Self::new();
-        }
-
-        if Self::IS_ZST {
-            // "Move" elements to stack buffer. They're ZST so we don't actually
-            // have to do anything. Just make sure they're not
-            // dropped. We don't wrap the vector in ManuallyDrop so
-            // that when it's dropped, the memory is deallocated, if
-            // it needs to be.
-            let mut vec = vec;
-            let length = vec.len();
-
-            // SAFETY: `0` is less than the vector's capacity.
-            // old_len..new_len is an empty range. So there are no uninitialized
-            // elements
-            unsafe { vec.set_len(0) };
-            Self {
-                length: LocatedLength::new(length, false),
-                raw: RawSmallVec::new(),
-                allocator: Global
-            }
-        } else {
-            let mut vec = ManuallyDrop::new(vec);
-            let length = vec.len();
-
-            // A heap-allocated `SmallVec` must always observe the invariant
-            // that `cap > INLINE`.
-            if vec.capacity() <= INLINE {
-                vec.reserve(INLINE + 1 - length);
-            }
-            let cap = vec.capacity();
-            // SAFETY: vec.capacity is not `0` (checked above), so the pointer
-            // can not dangle and thus specifically cannot be null.
-            let ptr = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
-
-            Self {
-                length: LocatedLength::new(length, true),
-                raw: RawSmallVec::new_heap(ptr, cap),
-                allocator: Global
-            }
-        }
+        vec.into()
     }
 
     /// Creates a `SmallVec` directly from the raw components of another
