@@ -10,23 +10,23 @@ use core::marker::PhantomData;
 ///
 /// For a ZST, we never use the heap, so we just store the length directly.
 #[repr(transparent)]
-pub struct LocatedLength<T>(usize, PhantomData<T>);
+pub struct LocatedLength<Item>(usize, PhantomData<Item>);
 
-// We don't use `#[derive(Clone, Copy)]` instead because `T` doesn't need to be
-// `Copy` or `Clone`.
-impl<T> Clone for LocatedLength<T> {
+// We don't use `#[derive(Clone, Copy)]` instead because `Item` doesn't need to
+// be `Copy` or `Clone`.
+impl<Item> Clone for LocatedLength<Item> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<T> Copy for LocatedLength<T> {}
+impl<Item> Copy for LocatedLength<Item> {}
 
 #[allow(clippy::len_without_is_empty)]
-impl<T> LocatedLength<T> {
+impl<Item> LocatedLength<Item> {
     const MAX_LEN: usize = usize::MAX >> Self::SHIFT;
-    const SHIFT: u32 = (size_of::<T>() != 0) as u32;
+    const SHIFT: u32 = (size_of::<Item>() != 0) as u32;
     const TAG: usize = Self::SHIFT as usize;
 
     #[inline(always)]
