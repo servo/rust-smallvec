@@ -3,17 +3,17 @@ use {
         Allocator,
         Box,
         Global,
+        LocatedLength,
+        RawSmallVec,
         SmallVec,
         Vec,
-        allocator::like::Like,
-        LocatedLength,
-        RawSmallVec
+        allocator::like::Like
     },
     core::{
         mem::ManuallyDrop,
         ptr::{
-            copy_nonoverlapping,
-            NonNull
+            NonNull,
+            copy_nonoverlapping
         }
     }
 };
