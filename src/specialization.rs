@@ -136,10 +136,10 @@ impl<Item, const INLINE: usize, const M: usize, Heap: Allocator>
     }
 }
 
-impl<'a, Item: 'a, const INLINE: usize, I, Heap: Allocator> SpecExtend<&'a Item, I>
+impl<'valid, Item: 'valid, const INLINE: usize, I, Heap: Allocator> SpecExtend<&'valid Item, I>
     for SmallVec<Item, INLINE, Heap>
 where
-    I: Iterator<Item = &'a Item>,
+    I: Iterator<Item = &'valid Item>,
     Item: Clone
 {
     #[inline]
@@ -148,11 +148,11 @@ where
     }
 }
 
-impl<'a, Item: 'a, const INLINE: usize, Heap: Allocator>
-    SpecExtend<&'a Item, core::slice::Iter<'a, Item>> for SmallVec<Item, INLINE, Heap>
+impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator>
+    SpecExtend<&'valid Item, core::slice::Iter<'valid, Item>> for SmallVec<Item, INLINE, Heap>
 where Item: Copy
 {
-    fn spec_extend(&mut self, iter: core::slice::Iter<'a, Item>) {
+    fn spec_extend(&mut self, iter: core::slice::Iter<'valid, Item>) {
         let slice = iter.as_slice();
         let length = slice.len();
         let old_len = self.len();

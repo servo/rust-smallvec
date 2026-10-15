@@ -326,7 +326,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     ///     // Overwrite memory with [4, 5, 6].
     ///     //
     ///     // This is only safe if `spilled` is true! Otherwise, we are
-    ///     // writing into the old `SmallVec`'s inline storage on the
+    ///     // writing into the old `SmallVec`'valid inline storage on the
     ///     // stack.
     ///     assert!(spilled);
     ///     for i in 0..length {
@@ -1057,8 +1057,8 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         // panicked. It shifts unchecked elements to cover holes and
         // `set_len` to the correct length. In cases when predicate and
         // `drop` never panic, it will be optimized out.
-        struct Guard<'a, Item, const INLINE: usize, Heap: Allocator> {
-            v: &'a mut SmallVec<Item, INLINE, Heap>,
+        struct Guard<'valid, Item, const INLINE: usize, Heap: Allocator> {
+            v: &'valid mut SmallVec<Item, INLINE, Heap>,
             read: usize,
             write: usize,
             original_len: usize
@@ -1193,7 +1193,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         }
     }
 
-    pub fn leak<'a>(self) -> &'a mut [Item] {
+    pub fn leak<'valid>(self) -> &'valid mut [Item] {
         let (length, on_heap) = self.length.parts();
         if !on_heap {
             panic!(
@@ -1473,11 +1473,11 @@ impl<Item> Drop for DropGuard<Item> {
     }
 }
 
-struct DropDealloc<'a, Heap: Allocator> {
+struct DropDealloc<'valid, Heap: Allocator> {
     ptr: NonNull<u8>,
     size_bytes: usize,
     align: usize,
-    allocator: &'a Heap
+    allocator: &'valid Heap
 }
 
 impl<Heap: Allocator> Drop for DropDealloc<'_, Heap> {
@@ -1761,14 +1761,14 @@ impl<Item, const INLINE: usize, Heap: Allocator> Extend<Item> for SmallVec<Item,
     }
 }
 
-impl<'a, Item: Clone + 'a, const INLINE: usize, Heap: Allocator> Extend<&'a Item>
+impl<'valid, Item: Clone + 'valid, const INLINE: usize, Heap: Allocator> Extend<&'valid Item>
     for SmallVec<Item, INLINE, Heap>
 {
     #[inline]
-    fn extend<I: IntoIterator<Item = &'a Item>>(&mut self, iter: I) {
+    fn extend<I: IntoIterator<Item = &'valid Item>>(&mut self, iter: I) {
         #[cfg(feature = "specialization")]
         {
-            specialization::SpecExtend::<&'a Item, _>::spec_extend(self, iter.into_iter());
+            specialization::SpecExtend::<&'valid Item, _>::spec_extend(self, iter.into_iter());
         }
 
         #[cfg(not(feature = "specialization"))]
@@ -1793,22 +1793,22 @@ impl<Item, const INLINE: usize> core::iter::FromIterator<Item> for SmallVec<Item
     }
 }
 
-impl<'a, Item, const INLINE: usize, Heap: Allocator> IntoIterator
-    for &'a SmallVec<Item, INLINE, Heap>
+impl<'valid, Item, const INLINE: usize, Heap: Allocator> IntoIterator
+    for &'valid SmallVec<Item, INLINE, Heap>
 {
-    type IntoIter = core::slice::Iter<'a, Item>;
-    type Item = &'a Item;
+    type IntoIter = core::slice::Iter<'valid, Item>;
+    type Item = &'valid Item;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, Item, const INLINE: usize, Heap: Allocator> IntoIterator
-    for &'a mut SmallVec<Item, INLINE, Heap>
+impl<'valid, Item, const INLINE: usize, Heap: Allocator> IntoIterator
+    for &'valid mut SmallVec<Item, INLINE, Heap>
 {
-    type IntoIter = core::slice::IterMut<'a, Item>;
-    type Item = &'a mut Item;
+    type IntoIter = core::slice::IterMut<'valid, Item>;
+    type Item = &'valid mut Item;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter_mut()
@@ -1836,7 +1836,7 @@ impl<Item: Zeroize, const INLINE: usize, Heap: Allocator> Zeroize for SmallVec<I
         self.spare_capacity_mut().zeroize();
 
         // Zeroize the elements in place so nested allocations, such as a
-        // `String`'s heap buffer, are wiped before they are dropped.
+        // `String`'valid heap buffer, are wiped before they are dropped.
         self.iter_mut().zeroize();
 
         self.clear();
@@ -1845,14 +1845,15 @@ impl<Item: Zeroize, const INLINE: usize, Heap: Allocator> Zeroize for SmallVec<I
 
 #[cfg(feature = "arbitrary")]
 #[cfg_attr(docsrs, doc(cfg(feature = "arbitrary")))]
-impl<'a, Item, const INLINE: usize> arbitrary::Arbitrary<'a> for SmallVec<Item, INLINE, Global>
-where Item: arbitrary::Arbitrary<'a>
+impl<'valid, Item, const INLINE: usize> arbitrary::Arbitrary<'valid>
+    for SmallVec<Item, INLINE, Global>
+where Item: arbitrary::Arbitrary<'valid>
 {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'valid>) -> arbitrary::Result<Self> {
         u.arbitrary_iter()?.collect()
     }
 
-    fn arbitrary_take_rest(u: arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+    fn arbitrary_take_rest(u: arbitrary::Unstructured<'valid>) -> arbitrary::Result<Self> {
         u.arbitrary_take_rest_iter()?.collect()
     }
 

@@ -11,7 +11,7 @@ use crate::{
 /// Returned from [`SmallVec::drain`][1].
 ///
 /// [1]: struct.SmallVec.html#method.drain
-pub struct Drain<'a, Item: 'a, const INLINE: usize, Heap: Allocator = Global> {
+pub struct Drain<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator = Global> {
     // `vec` points to a valid object within its lifetime.
     // This is ensured by the fact that we're holding an iterator to its items.
     //
@@ -21,12 +21,12 @@ pub struct Drain<'a, Item: 'a, const INLINE: usize, Heap: Allocator = Global> {
     // even though vec has length < tail_start
     pub(crate) tail_start: usize,
     pub(crate) tail_len: usize,
-    pub(crate) iter: core::slice::Iter<'a, Item>,
+    pub(crate) iter: core::slice::Iter<'valid, Item>,
     pub(crate) vec: core::ptr::NonNull<SmallVec<Item, INLINE, Heap>>
 }
 
-impl<'a, Item: 'a, const INLINE: usize, Heap: Allocator> Iterator
-    for Drain<'a, Item, INLINE, Heap>
+impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> Iterator
+    for Drain<'valid, Item, INLINE, Heap>
 {
     type Item = Item;
 
@@ -45,8 +45,8 @@ impl<'a, Item: 'a, const INLINE: usize, Heap: Allocator> Iterator
     }
 }
 
-impl<'a, Item: 'a, const INLINE: usize, Heap: Allocator> DoubleEndedIterator
-    for Drain<'a, Item, INLINE, Heap>
+impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> DoubleEndedIterator
+    for Drain<'valid, Item, INLINE, Heap>
 {
     #[inline]
     fn next_back(&mut self) -> Option<Item> {
@@ -71,15 +71,17 @@ impl<Item, const INLINE: usize, Heap: Allocator> core::iter::FusedIterator
 {
 }
 
-impl<'a, Item: 'a, const INLINE: usize, Heap: Allocator> Drop for Drain<'a, Item, INLINE, Heap> {
+impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> Drop
+    for Drain<'valid, Item, INLINE, Heap>
+{
     fn drop(&mut self) {
         /// Moves back the un-`Drain`ed elements to restore the original `Vec`.
-        struct DropGuard<'r, 'a, Item, const INLINE: usize, Heap: Allocator>(
-            &'r mut Drain<'a, Item, INLINE, Heap>
+        struct DropGuard<'guard, 'valid, Item, const INLINE: usize, Heap: Allocator>(
+            &'guard mut Drain<'valid, Item, INLINE, Heap>
         );
 
-        impl<'r, 'a, Item, const INLINE: usize, Heap: Allocator> Drop
-            for DropGuard<'r, 'a, Item, INLINE, Heap>
+        impl<'guard, 'valid, Item, const INLINE: usize, Heap: Allocator> Drop
+            for DropGuard<'guard, 'valid, Item, INLINE, Heap>
         {
             fn drop(&mut self) {
                 if self.0.tail_len > 0 {

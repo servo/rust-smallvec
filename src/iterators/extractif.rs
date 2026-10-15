@@ -10,10 +10,10 @@ use crate::{
 /// Returned from [`SmallVec::extract_if`][1].
 ///
 /// [1]: struct.SmallVec.html#method.extract_if
-pub struct ExtractIf<'a, Item, const INLINE: usize, F, Heap: Allocator = Global>
+pub struct ExtractIf<'valid, Item, const INLINE: usize, F, Heap: Allocator = Global>
 where F: FnMut(&mut Item) -> bool
 {
-    pub(crate) vec: &'a mut SmallVec<Item, INLINE, Heap>,
+    pub(crate) vec: &'valid mut SmallVec<Item, INLINE, Heap>,
     /// The index of the item that will be inspected by the next call to `next`.
     pub(crate) idx: usize,
     /// Elements at and beyond this point will be retained. Must be equal or
