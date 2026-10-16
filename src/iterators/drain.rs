@@ -156,10 +156,23 @@ impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> Drop
     }
 }
 
+impl<'valid, Item, const INLINE: usize, Heap: Allocator> AsRef<[Item]>
+    for Drain<'valid, Item, INLINE, Heap>
+{
+    #[inline]
+    fn as_ref(&self) -> &[Item] {
+        self.iter.as_slice()
+    }
+}
+
 impl<Item, const INLINE: usize, Heap: Allocator> Drain<'_, Item, INLINE, Heap> {
+    #[deprecated(
+        since = "2.0.0-beta.3",
+        note = "use `<Drain<'_, Item, INLINE, Heap> as AsRef<[Item]>>::as_ref` instead"
+    )]
     #[must_use]
     pub fn as_slice(&self) -> &[Item] {
-        self.iter.as_slice()
+        self.as_ref()
     }
 
     /// The range from `self.vec.length` to `self.tail_start` contains elements

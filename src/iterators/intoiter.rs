@@ -47,7 +47,37 @@ unsafe impl<Item: Sync, const INLINE: usize, Heap: Allocator + Sync> Sync
 {
 }
 
+impl<Item, const INLINE: usize, Heap: Allocator> AsRef<[Item]> for IntoIter<Item, INLINE, Heap> {
+    #[inline]
+    fn as_ref(&self) -> &[Item] {
+        let (end, on_heap) = self.end.parts();
+        // SAFETY: `end` tells which buffer is active, and the members in
+        // `self.begin..end` are all initialized. So the pointer arithmetic is
+        // valid, and so is the construction of the slice
+        unsafe {
+            let ptr = self.raw.as_ptr(on_heap);
+            core::slice::from_raw_parts(ptr.add(self.begin), end - self.begin)
+        }
+    }
+}
+
+impl<Item, const INLINE: usize, Heap: Allocator> AsMut<[Item]> for IntoIter<Item, INLINE, Heap> {
+    #[inline]
+    fn as_mut(&mut self) -> &mut [Item] {
+        let (end, on_heap) = self.end.parts();
+        // SAFETY: see above
+        unsafe {
+            let ptr = self.raw.as_mut_ptr(on_heap);
+            core::slice::from_raw_parts_mut(ptr.add(self.begin), end - self.begin)
+        }
+    }
+}
+
 impl<Item, const INLINE: usize, Heap: Allocator> IntoIter<Item, INLINE, Heap> {
+    #[deprecated(
+        since = "2.0.0-beta.3",
+        note = "use `<IntoIter<Item, INLINE, Heap> as AsRef<[Item]>>::as_ref` instead"
+    )]
     #[inline]
     pub const fn as_slice(&self) -> &[Item] {
         let (end, on_heap) = self.end.parts();
@@ -60,6 +90,10 @@ impl<Item, const INLINE: usize, Heap: Allocator> IntoIter<Item, INLINE, Heap> {
         }
     }
 
+    #[deprecated(
+        since = "2.0.0-beta.3",
+        note = "use `<IntoIter<Item, INLINE, Heap> as AsMut<[Item]>>::as_mut` instead"
+    )]
     #[inline]
     pub const fn as_mut_slice(&mut self) -> &mut [Item] {
         let (end, on_heap) = self.end.parts();
@@ -165,7 +199,7 @@ impl<Item: Clone, const INLINE: usize, Heap: Allocator + Clone> Clone
             allocator: self.allocator.clone()
         };
 
-        vec.extend(self.as_slice());
+        vec.extend(self.as_ref());
 
         vec.into_iter()
     }
@@ -194,6 +228,6 @@ impl<Item, const INLINE: usize, Heap: Allocator> IntoIterator for SmallVec<Item,
 
 impl<Item: Debug, const INLINE: usize, Heap: Allocator> Debug for IntoIter<Item, INLINE, Heap> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("IntoIter").field(&self.as_slice()).finish()
+        f.debug_tuple("IntoIter").field(&self.as_ref()).finish()
     }
 }

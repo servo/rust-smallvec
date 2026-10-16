@@ -710,6 +710,7 @@ fn exact_size_iterator() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn into_iter_as_slice() {
     let vec = SmallVec::<u32, 2>::from(&[1, 2, 3][..]);
     let mut iter = vec.clone().into_iter();
@@ -721,6 +722,27 @@ fn into_iter_as_slice() {
     iter.next_back();
     assert_eq!(iter.as_slice(), &[2]);
     assert_eq!(iter.as_mut_slice(), &[2]);
+}
+
+#[test]
+fn into_iter_as_ref() {
+    let vec = SmallVec::<u32, 2>::from(&[1, 2, 3][..]);
+    let mut iter = vec.clone().into_iter();
+    assert_eq!(iter.as_ref(), &[1, 2, 3]);
+    assert_eq!(iter.as_mut(), &[1, 2, 3]);
+    iter.next();
+    assert_eq!(iter.as_ref(), &[2, 3]);
+    assert_eq!(iter.as_mut(), &[2, 3]);
+    iter.next_back();
+    assert_eq!(iter.as_ref(), &[2]);
+    assert_eq!(iter.as_mut(), &[2]);
+}
+
+#[test]
+fn drain_as_ref() {
+    let mut vec = SmallVec::<u32, 4>::from(&[1, 2, 3, 4][..]);
+    let drain = vec.drain(1..3);
+    assert_eq!(drain.as_ref(), &[2, 3]);
 }
 
 #[test]
