@@ -25,7 +25,7 @@ fn zeroize_inline() {
 
     // It is still usable.
     v.extend_from_slice(&[1, 2, 3]);
-    assert_eq!(v.as_slice(), &[1, 2, 3]);
+    assert_eq!(v.as_ref(), &[1, 2, 3]);
 }
 
 #[test]
@@ -42,7 +42,7 @@ fn zeroize_spilled() {
     assert_fully_zeroed(&mut v);
 
     v.extend_from_slice(&[10, 11]);
-    assert_eq!(v.as_slice(), &[10, 11]);
+    assert_eq!(v.as_ref(), &[10, 11]);
 }
 
 #[test]

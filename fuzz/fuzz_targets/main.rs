@@ -89,9 +89,9 @@ fn assert_invariants<T: Copy + PartialEq + Debug, const N: usize>(
         "`is_empty()` mismatch"
     );
     assert_eq!(
-        small_vec.as_slice(),
+        small_vec.as_ref(),
         std_vec.as_slice(),
-        "`as_slice()` mismatch"
+        "`as_ref()` mismatch"
     );
 
     // Capacity & spilling invariants

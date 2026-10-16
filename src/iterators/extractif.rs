@@ -35,7 +35,7 @@ where
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("ExtractIf")
-            .field(&self.vec.as_slice())
+            .field(&self.vec.as_ref())
             .finish()
     }
 }

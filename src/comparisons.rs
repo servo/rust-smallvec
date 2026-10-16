@@ -46,7 +46,7 @@ where Item: PartialEq<U>
 {
     #[inline]
     fn eq(&self, other: &SmallVec<U, INLINE, Heap>) -> bool {
-        let other = other.as_slice();
+        let other = other.as_ref();
         if self.len() != other.len() {
             return false;
         }
@@ -63,7 +63,7 @@ where Item: PartialOrd
 {
     #[inline]
     fn partial_cmp(&self, other: &SmallVec<Item, INLINE, Heap>) -> Option<core::cmp::Ordering> {
-        self.as_slice().partial_cmp(other.as_slice())
+        self.as_ref().partial_cmp(other.as_ref())
     }
 }
 
@@ -72,6 +72,6 @@ where Item: Ord
 {
     #[inline]
     fn cmp(&self, other: &SmallVec<Item, INLINE, Heap>) -> core::cmp::Ordering {
-        self.as_slice().cmp(other.as_slice())
+        self.as_ref().cmp(other.as_ref())
     }
 }

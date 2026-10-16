@@ -970,18 +970,22 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         unsafe { &mut *ptr }
     }
 
+    #[deprecated(
+        since = "2.0.0-beta.3",
+        note = "use `<SmallVec<Item, INLINE, Heap> as AsRef<[Item]>>::as_ref` instead"
+    )]
     #[inline]
-    pub const fn as_slice(&self) -> &[Item] {
-        let (length, on_heap) = self.length.parts();
-        // SAFETY: all the elements in `..length` are initialized
-        unsafe { core::slice::from_raw_parts(self.raw.as_ptr(on_heap), length) }
+    pub fn as_slice(&self) -> &[Item] {
+        self.as_ref()
     }
 
+    #[deprecated(
+        since = "2.0.0-beta.3",
+        note = "use `<SmallVec<Item, INLINE, Heap> as AsMut<[Item]>>::as_mut` instead"
+    )]
     #[inline]
-    pub const fn as_mut_slice(&mut self) -> &mut [Item] {
-        let (length, on_heap) = self.length.parts();
-        // SAFETY: see above
-        unsafe { core::slice::from_raw_parts_mut(self.raw.as_mut_ptr(on_heap), length) }
+    pub fn as_mut_slice(&mut self) -> &mut [Item] {
+        self.as_mut()
     }
 
     #[inline]
@@ -1817,7 +1821,7 @@ impl<'valid, Item, const INLINE: usize, Heap: Allocator> IntoIterator
 
 impl<Item: Hash, const INLINE: usize, Heap: Allocator> Hash for SmallVec<Item, INLINE, Heap> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_slice().hash(state)
+        self.as_ref().hash(state)
     }
 }
 

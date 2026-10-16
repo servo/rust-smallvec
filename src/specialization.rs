@@ -112,7 +112,7 @@ impl<Item, const INLINE: usize, const M: usize, Heap: Allocator>
     SpecExtend<Item, IntoIter<Item, M, Heap>> for SmallVec<Item, INLINE, Heap>
 {
     fn spec_extend(&mut self, mut iter: IntoIter<Item, M, Heap>) {
-        let slice = iter.as_slice();
+        let slice = iter.as_ref();
         let length = slice.len();
         let old_len = self.len();
 
