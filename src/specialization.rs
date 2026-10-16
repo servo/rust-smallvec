@@ -22,7 +22,9 @@ pub trait SpecFromElem<Item> {
     unsafe fn spec_from_elem(elem: Item, n: usize) -> Self;
 }
 
-impl<Item: Clone, const INLINE: usize> SpecFromElem<Item> for SmallVec<Item, INLINE, Global> {
+impl<Item: Clone, const INLINE: usize, Heap: Allocator + Default> SpecFromElem<Item>
+    for SmallVec<Item, INLINE, Heap>
+{
     #[inline]
     default unsafe fn spec_from_elem(elem: Item, n: usize) -> Self {
         // SAFETY: Safety conditions are identical.
@@ -30,9 +32,11 @@ impl<Item: Clone, const INLINE: usize> SpecFromElem<Item> for SmallVec<Item, INL
     }
 }
 
-impl<Item: Copy, const INLINE: usize> SpecFromElem<Item> for SmallVec<Item, INLINE, Global> {
+impl<Item: Copy, const INLINE: usize, Heap: Allocator + Default> SpecFromElem<Item>
+    for SmallVec<Item, INLINE, Heap>
+{
     unsafe fn spec_from_elem(elem: Item, n: usize) -> Self {
-        let mut result = Self::new();
+        let mut result = Self::new_in(Heap::default());
 
         if n > 0 {
             let ptr = result.raw.as_mut_ptr_inline();
@@ -298,16 +302,20 @@ pub trait SpecFromSlice<Item> {
     unsafe fn spec_from(slice: &[Item]) -> Self;
 }
 
-impl<Item: Clone, const INLINE: usize> SpecFromSlice<Item> for SmallVec<Item, INLINE, Global> {
+impl<Item: Clone, const INLINE: usize, Heap: Allocator + Default> SpecFromSlice<Item>
+    for SmallVec<Item, INLINE, Heap>
+{
     default unsafe fn spec_from(slice: &[Item]) -> Self {
         // SAFETY: Safety conditions are identical.
         unsafe { Self::from_slice_fallback(slice) }
     }
 }
 
-impl<Item: Copy, const INLINE: usize> SpecFromSlice<Item> for SmallVec<Item, INLINE, Global> {
+impl<Item: Copy, const INLINE: usize, Heap: Allocator + Default> SpecFromSlice<Item>
+    for SmallVec<Item, INLINE, Heap>
+{
     unsafe fn spec_from(slice: &[Item]) -> Self {
-        let mut v = Self::new();
+        let mut v = Self::new_in(Heap::default());
 
         let source = slice.as_ptr();
         let length = slice.len();

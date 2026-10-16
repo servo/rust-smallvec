@@ -116,10 +116,12 @@ unsafe impl<Item: Sync, const INLINE: usize, Heap: Allocator + Sync> Sync
 {
 }
 
-impl<Item, const INLINE: usize> Default for SmallVec<Item, INLINE, Global> {
+impl<Item, const INLINE: usize, Heap: Allocator + Default> Default
+    for SmallVec<Item, INLINE, Heap>
+{
     #[inline]
     fn default() -> Self {
-        Self::new()
+        Self::new_in(Heap::default())
     }
 }
 
@@ -1551,7 +1553,7 @@ pub fn from_elem<Item: Clone, const INLINE: usize>(
 /// Fallback functions for various specialized methods. These are kept in
 /// a separate implementation block for easy access whenever specialization is
 /// disabled.
-impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
+impl<Item, const INLINE: usize, Heap: Allocator + Default> SmallVec<Item, INLINE, Heap> {
     /// Creates a `Smallvec` value where `elem` is repeated `n` times.
     /// This will use the inline storage, not the heap.
     ///
@@ -1560,7 +1562,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     /// The caller must ensure that `n <= Self::inline_size()`.
     unsafe fn from_elem_fallback(elem: Item, n: usize) -> Self
     where Item: Clone {
-        let mut result = Self::new();
+        let mut result = Self::new_in(Heap::default());
 
         if n > 0 {
             let ptr = result.raw.as_mut_ptr_inline();
@@ -1590,14 +1592,6 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
         result
     }
 
-    fn from_iter_fallback<I>(iter: I) -> Self
-    where I: Iterator<Item = Item> {
-        let (size, _) = iter.size_hint();
-        let mut v = Self::with_capacity(size);
-        v.extend_fallback(iter);
-        v
-    }
-
     /// Creates a `SmallVec` value based on the contents of `slice`.
     /// This will use the inline storage, not the heap.
     ///
@@ -1606,7 +1600,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     /// The caller must ensure that `slice.len() <= Self::inline_size()`.
     unsafe fn from_slice_fallback(slice: &[Item]) -> Self
     where Item: Clone {
-        let mut v = Self::new();
+        let mut v = Self::new_in(Heap::default());
 
         let source = slice.as_ptr();
         let length = slice.len();
@@ -1632,6 +1626,16 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
             v.set_len(length);
         }
 
+        v
+    }
+}
+
+impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
+    fn from_iter_fallback<I>(iter: I) -> Self
+    where I: Iterator<Item = Item> {
+        let (size, _) = iter.size_hint();
+        let mut v = Self::with_capacity(size);
+        v.extend_fallback(iter);
         v
     }
 }
