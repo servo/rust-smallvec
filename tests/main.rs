@@ -766,7 +766,7 @@ fn shrink_to_fit_unspill() {
 
 #[test]
 fn shrink_after_from_empty_vec() {
-    let mut v = SmallVec::<u8, 2>::from_vec(Vec::new());
+    let mut v = SmallVec::<u8, 2>::from(Vec::new());
     v.shrink_to_fit();
     assert!(!v.spilled())
 }
@@ -835,32 +835,32 @@ fn try_into_array() {
 #[test]
 fn from_vec() {
     let vec = Vec::new();
-    let small_vec: SmallVec<u8, 3> = SmallVec::from_vec(vec);
+    let small_vec: SmallVec<u8, 3> = SmallVec::from(vec);
     assert_eq!(&*small_vec, &[0u8; 0]);
     drop(small_vec);
 
     let vec = Vec::new();
-    let small_vec: SmallVec<u8, 1> = SmallVec::from_vec(vec);
+    let small_vec: SmallVec<u8, 1> = SmallVec::from(vec);
     assert_eq!(&*small_vec, &[0u8; 0]);
     drop(small_vec);
 
     let vec = Vec::from([1]);
-    let small_vec: SmallVec<u8, 3> = SmallVec::from_vec(vec);
+    let small_vec: SmallVec<u8, 3> = SmallVec::from(vec);
     assert_eq!(&*small_vec, &[1]);
     drop(small_vec);
 
     let vec = Vec::from([1, 2, 3]);
-    let small_vec: SmallVec<u8, 3> = SmallVec::from_vec(vec);
+    let small_vec: SmallVec<u8, 3> = SmallVec::from(vec);
     assert_eq!(&*small_vec, &[1, 2, 3]);
     drop(small_vec);
 
     let vec = Vec::from([1, 2, 3, 4, 5]);
-    let small_vec: SmallVec<u8, 3> = SmallVec::from_vec(vec);
+    let small_vec: SmallVec<u8, 3> = SmallVec::from(vec);
     assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
     drop(small_vec);
 
     let vec = Vec::from([1, 2, 3, 4, 5]);
-    let small_vec: SmallVec<u8, 1> = SmallVec::from_vec(vec);
+    let small_vec: SmallVec<u8, 1> = SmallVec::from(vec);
     assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
     drop(small_vec);
 }

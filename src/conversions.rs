@@ -3,12 +3,18 @@ use {
         Allocator,
         Box,
         Global,
+        LocatedLength,
+        RawSmallVec,
         SmallVec,
-        Vec
+        Vec,
+        allocator::like::Like
     },
     core::{
         mem::ManuallyDrop,
-        ptr::copy_nonoverlapping
+        ptr::{
+            NonNull,
+            copy_nonoverlapping
+        }
     }
 };
 
@@ -17,7 +23,7 @@ impl<Item: Clone, const INLINE: usize> From<&[Item]> for SmallVec<Item, INLINE, 
     fn from(slice: &[Item]) -> Self {
         if slice.len() > Self::inline_size() {
             // Standard Rust vectors are already specialized.
-            Vec::from(slice).into()
+            <Vec<Item, Global> as Like>::Type::from(slice).into()
         } else {
             // SAFETY: The precondition is checked in the initial comparison
             // above.
@@ -66,7 +72,7 @@ impl<Item, const INLINE: usize, const M: usize> From<[Item; M]> for SmallVec<Ite
         if M > INLINE {
             // If M > INLINE, we'd have to heap allocate anyway,
             // so delegate for Vec for the allocation.
-            Self::from(Vec::from(array))
+            Self::from(<Vec<Item, Global> as Like>::Type::from(array))
         } else {
             // M <= INLINE
             let mut this = Self::new();
@@ -105,17 +111,62 @@ impl<Item, const INLINE: usize, const M: usize, Heap: Allocator>
     }
 }
 
-impl<Item, const INLINE: usize> From<Vec<Item>> for SmallVec<Item, INLINE, Global> {
-    fn from(array: Vec<Item>) -> Self {
-        Self::from_vec(array)
+impl<Item, const INLINE: usize> From<<Vec<Item, Global> as Like>::Type>
+    for SmallVec<Item, INLINE, Global>
+{
+    fn from(array: <Vec<Item, Global> as Like>::Type) -> Self {
+        if array.capacity() == 0 {
+            return Self::new();
+        }
+
+        if Self::IS_ZST {
+            // "Move" elements to stack buffer. They're ZST so we don't actually
+            // have to do anything. Just make sure they're not
+            // dropped. We don't wrap the vector in ManuallyDrop so
+            // that when it's dropped, the memory is deallocated, if
+            // it needs to be.
+            let mut vec = array;
+            let length = vec.len();
+
+            // SAFETY: `0` is less than the vector's capacity.
+            // old_len..new_len is an empty range. So there are no uninitialized
+            // elements
+            unsafe { vec.set_len(0) };
+            Self {
+                length: LocatedLength::new(length, false),
+                raw: RawSmallVec::new(),
+                allocator: Global
+            }
+        } else {
+            let mut vec = ManuallyDrop::new(array);
+            let length = vec.len();
+
+            // A heap-allocated `SmallVec` must always observe the invariant
+            // that `cap > INLINE`.
+            if vec.capacity() <= INLINE {
+                vec.reserve(INLINE + 1 - length);
+            }
+            let cap = vec.capacity();
+            // SAFETY: vec.capacity is not `0` (checked above), so the pointer
+            // can not dangle and thus specifically cannot be null.
+            let ptr = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
+
+            Self {
+                length: LocatedLength::new(length, true),
+                raw: RawSmallVec::new_heap(ptr, cap),
+                allocator: Global
+            }
+        }
     }
 }
 
-impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Heap>> for Vec<Item> {
+impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Heap>>
+    for <Vec<Item, Global> as Like>::Type
+{
     fn from(this: SmallVec<Item, INLINE, Heap>) -> Self {
         let (length, on_heap) = this.length.parts();
         if !on_heap {
-            let mut vec = Vec::with_capacity(length);
+            let mut vec = <Vec<Item, Global> as Like>::Type::with_capacity(length);
             let this = ManuallyDrop::new(this);
             // SAFETY: we create a new vector with sufficient capacity, copy our
             // elements into it to transfer ownership and then set
@@ -137,22 +188,22 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
             // - the allocation is not larger than `isize::MAX`
             unsafe {
                 let (ptr, cap) = this.raw.heap;
-                Vec::from_raw_parts(ptr.as_ptr(), length, cap)
+                <Vec<Item, Global> as Like>::Type::from_raw_parts(ptr.as_ptr(), length, cap)
             }
         }
     }
 }
 
 impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Heap>>
-    for Box<[Item]>
+    for <Box<[Item], Global> as Like>::Type
 {
     fn from(this: SmallVec<Item, INLINE, Heap>) -> Self {
-        Vec::from(this).into_boxed_slice()
+        <Vec<Item, Global> as Like>::Type::from(this).into_boxed_slice()
     }
 }
 
-impl<T, const N: usize> From<Box<[T]>> for SmallVec<T, N> {
-    fn from(boxed: Box<[T]>) -> Self {
+impl<T, const N: usize> From<<Box<[T], Global> as Like>::Type> for SmallVec<T, N> {
+    fn from(boxed: <Box<[T], Global> as Like>::Type) -> Self {
         boxed.into_vec().into()
     }
 }
