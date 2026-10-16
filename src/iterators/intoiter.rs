@@ -79,15 +79,8 @@ impl<Item, const INLINE: usize, Heap: Allocator> IntoIter<Item, INLINE, Heap> {
         note = "use `<IntoIter<Item, INLINE, Heap> as AsRef<[Item]>>::as_ref` instead"
     )]
     #[inline]
-    pub const fn as_slice(&self) -> &[Item] {
-        let (end, on_heap) = self.end.parts();
-        // SAFETY: `end` tells which buffer is active, and the members in
-        // `self.begin..end` are all initialized. So the pointer arithmetic is
-        // valid, and so is the construction of the slice
-        unsafe {
-            let ptr = self.raw.as_ptr(on_heap);
-            core::slice::from_raw_parts(ptr.add(self.begin), end - self.begin)
-        }
+    pub fn as_slice(&self) -> &[Item] {
+        self.as_ref()
     }
 
     #[deprecated(
@@ -95,13 +88,8 @@ impl<Item, const INLINE: usize, Heap: Allocator> IntoIter<Item, INLINE, Heap> {
         note = "use `<IntoIter<Item, INLINE, Heap> as AsMut<[Item]>>::as_mut` instead"
     )]
     #[inline]
-    pub const fn as_mut_slice(&mut self) -> &mut [Item] {
-        let (end, on_heap) = self.end.parts();
-        // SAFETY: see above
-        unsafe {
-            let ptr = self.raw.as_mut_ptr(on_heap);
-            core::slice::from_raw_parts_mut(ptr.add(self.begin), end - self.begin)
-        }
+    pub fn as_mut_slice(&mut self) -> &mut [Item] {
+        self.as_mut()
     }
 
     #[cfg(feature = "specialization")]
