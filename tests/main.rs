@@ -19,12 +19,21 @@ use {
             Hash,
             Hasher
         },
-        iter::FromIterator
+        iter::{
+            FromIterator,
+            repeat_n,
+            repeat_with
+        },
+        mem::forget
     },
     smallvec::SmallVec,
     std::{
         borrow::ToOwned,
         hash::DefaultHasher,
+        panic::{
+            AssertUnwindSafe,
+            catch_unwind
+        },
         rc::Rc
     }
 };
@@ -191,7 +200,7 @@ fn drain_rev() {
 #[test]
 fn drain_forget() {
     let mut v: SmallVec<u8, 1> = SmallVec::from([0, 1, 2, 3, 4, 5, 6, 7]);
-    std::mem::forget(v.drain(2..5));
+    forget(v.drain(2..5));
     assert_eq!(v.len(), 2);
 }
 
@@ -251,10 +260,10 @@ fn splice_reserve_panic() {
             let mut v: SmallVec<Box<CountDrop<'_>>, 4> = SmallVec::with_capacity(capacity);
             v.push(Box::new(CountDrop(&drops)));
 
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let result = catch_unwind(AssertUnwindSafe(|| {
                 drop(v.splice(
                     0..0,
-                    std::iter::repeat_with(|| Box::new(CountDrop(&drops))).take(additional)
+                    repeat_with(|| Box::new(CountDrop(&drops))).take(additional)
                 ));
             }));
 
@@ -1127,7 +1136,7 @@ fn collect_from_iter() {
     const ELEMENTS: usize = 1000;
     #[cfg(not(miri))]
     const ELEMENTS: usize = 1_000_000;
-    let iter = IterNoHint(std::iter::repeat_n(1u8, ELEMENTS));
+    let iter = IterNoHint(repeat_n(1u8, ELEMENTS));
 
     let _y: SmallVec<u8, 1> = SmallVec::from_iter(iter);
 }

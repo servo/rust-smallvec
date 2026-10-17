@@ -23,12 +23,6 @@ mod comparisons;
 mod conversions;
 mod errors;
 mod iterators;
-pub use iterators::{
-    drain::Drain,
-    extractif::ExtractIf,
-    intoiter::IntoIter,
-    splice::Splice
-};
 mod locatedlength;
 mod macros;
 #[cfg(feature = "malloc_size_of")]
@@ -41,8 +35,16 @@ mod serde;
 #[cfg(feature = "specialization")]
 mod specialization;
 
+#[cfg(feature = "arbitrary")]
+use arbitrary::{
+    Arbitrary,
+    Result as Random,
+    Unstructured,
+    size_hint::and
+};
 #[cfg(feature = "bytes")]
 use bytes::{
+    Buf,
     BufMut,
     buf::UninitSlice
 };
@@ -52,9 +54,34 @@ use defmt::{
     Formatter as DeFormatter,
     write as dewrite
 };
-pub use errors::SmallVecError;
+#[cfg(feature = "encase")]
+use encase::impl_rts_array;
+#[cfg(feature = "proptest")]
+use proptest::{
+    arbitrary::Arbitrary as Proptest,
+    collection::{
+        SizeRange,
+        VecStrategy,
+        vec as create_vec
+    },
+    strategy::{
+        Map as StrategyMap,
+        Strategy
+    }
+};
+#[cfg(feature = "specialization")]
+use specialization::{
+    SpecCloneFrom,
+    SpecExtend,
+    SpecExtendFromWithin,
+    SpecFromElem,
+    SpecFromIterator
+};
 #[cfg(feature = "std")]
-use std::io;
+use std::io::{
+    Result as IoResult,
+    Write
+};
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
 use {
@@ -69,25 +96,55 @@ use {
     },
     core::{
         alloc::Layout,
-        fmt::Debug,
+        fmt::{
+            Debug,
+            Formatter,
+            Result as Formatted
+        },
         hash::{
             Hash,
             Hasher
+        },
+        iter::{
+            repeat_n,
+            repeat_with
         },
         mem::{
             ManuallyDrop,
             MaybeUninit,
             align_of,
+            forget,
             size_of
+        },
+        ops::{
+            Range,
+            RangeBounds
         },
         ptr::{
             NonNull,
             copy,
             copy_nonoverlapping,
-            drop_in_place
+            drop_in_place,
+            slice_from_raw_parts_mut,
+            swap
+        },
+        slice::{
+            Iter,
+            IterMut,
+            from_raw_parts,
+            from_raw_parts_mut
         }
     },
     newrange::NewRange
+};
+pub use {
+    errors::SmallVecError,
+    iterators::{
+        drain::Drain,
+        extractif::ExtractIf,
+        intoiter::IntoIter,
+        splice::Splice
+    }
 };
 #[cfg(feature = "internals")]
 pub use {
@@ -157,7 +214,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
         }
 
         // `elements` have been moved into buf and will be dropped by SmallVec
-        core::mem::forget(elements);
+        forget(elements);
 
         // SAFETY: all the members in 0..S are initialized
         Self {
@@ -185,10 +242,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
 
             // SAFETY: the values are initialized, so dropping them here is
             // fine.
-            core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(
-                remainder_ptr,
-                remainder_len
-            ));
+            slice_from_raw_parts_mut(remainder_ptr, remainder_len).drop_in_place();
         }
 
         vec
@@ -430,19 +484,19 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     pub fn drain<R>(&mut self, range: R) -> Drain<'_, Item, INLINE, Heap>
-    where R: core::ops::RangeBounds<usize> {
+    where R: RangeBounds<usize> {
         let length = self.len();
-        let core::ops::Range {
+        let Range {
             start,
             end
-        } = core::ops::Range::new(range, length);
+        } = Range::new(range, length);
 
         unsafe {
             // SAFETY: `start <= length`
             self.set_len(start);
 
             // SAFETY: all the elements in `start..end` are initialized
-            let range_slice = core::slice::from_raw_parts(self.as_ptr().add(start), end - start);
+            let range_slice = from_raw_parts(self.as_ptr().add(start), end - start);
 
             // SAFETY: all the elements in `end..length` are initialized
             Drain {
@@ -451,7 +505,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
                 iter: range_slice.iter(),
                 // Since self is a &mut, passing it to a function would invalidate the slice
                 // iterator.
-                vec: core::ptr::NonNull::new_unchecked(self as *mut _)
+                vec: NonNull::new_unchecked(self as *mut _)
             }
         }
     }
@@ -543,13 +597,13 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> ExtractIf<'_, Item, INLINE, F, Heap>
     where
         F: FnMut(&mut Item) -> bool,
-        R: core::ops::RangeBounds<usize>
+        R: RangeBounds<usize>
     {
         let old_len = self.len();
-        let core::ops::Range {
+        let Range {
             start,
             end
-        } = core::ops::Range::new(range, old_len);
+        } = Range::new(range, old_len);
 
         // Guard against us getting leaked (leak amplification)
         unsafe {
@@ -572,7 +626,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         replace_with: I
     ) -> Splice<'_, I::IntoIter, INLINE, Heap>
     where
-        R: core::ops::RangeBounds<usize>,
+        R: RangeBounds<usize>,
         I: IntoIterator<Item = Item>
     {
         Splice::new(self.drain(range), replace_with.into_iter())
@@ -802,7 +856,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         // SAFETY: the vector is on the heap
         let capacity = unsafe { self.raw.heap.1 };
         if capacity > min_capacity {
-            let target = core::cmp::max(length, min_capacity);
+            let target = length.max(min_capacity);
             if target <= Self::inline_size() {
                 // SAFETY: on_heap is true, so we're on the heap
                 unsafe {
@@ -839,10 +893,8 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
             // then we drop the previously initialized elements
             unsafe {
                 self.set_len(length);
-                core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(
-                    self.as_mut_ptr().add(length),
-                    old_len - length
-                ))
+                slice_from_raw_parts_mut(self.as_mut_ptr().add(length), old_len - length)
+                    .drop_in_place();
             }
         }
     }
@@ -866,9 +918,9 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
             // We replace self[index] with the last element. Note that if the
             // bounds check above succeeds there must be a last element (which
             // can be self[index] itself).
-            let value = core::ptr::read(self.as_ptr().add(index));
+            let value = self.as_ptr().add(index).read();
             let base_ptr = self.as_mut_ptr();
-            core::ptr::copy(base_ptr.add(new_len), base_ptr.add(index), 1);
+            copy(base_ptr.add(new_len), base_ptr.add(index), 1);
             self.length.sub(1);
             value
         }
@@ -881,10 +933,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         unsafe {
             let old_len = self.len();
             self.set_len(0);
-            core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(
-                self.as_mut_ptr(),
-                old_len
-            ));
+            slice_from_raw_parts_mut(self.as_mut_ptr(), old_len).drop_in_place();
         }
     }
 
@@ -1139,7 +1188,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         // Commit the length change and forget the guard.
         // SAFETY: `write` is always less than or equal to original_len.
         unsafe { g.v.set_len(g.write) };
-        core::mem::forget(g);
+        forget(g);
     }
 
     #[inline]
@@ -1177,7 +1226,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
                 if !same_bucket(&mut *p_r, &mut *p_wm1) {
                     if r != w {
                         let p_w = p_wm1.add(1);
-                        core::ptr::swap(p_r, p_w);
+                        swap(p_r, p_w);
                     }
                     w += 1;
                 }
@@ -1191,7 +1240,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     where F: FnMut() -> Item {
         let old_len = self.len();
         if old_len < new_len {
-            self.extend(core::iter::repeat_with(f).take(new_len - old_len));
+            self.extend(repeat_with(f).take(new_len - old_len));
         } else if old_len > new_len {
             self.truncate(new_len);
         }
@@ -1205,7 +1254,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
             );
         }
         let mut me = ManuallyDrop::new(self);
-        unsafe { core::slice::from_raw_parts_mut(me.raw.as_mut_ptr(true), length) }
+        unsafe { from_raw_parts_mut(me.raw.as_mut_ptr(true), length) }
     }
 
     /// Returns the remaining spare capacity of the vector as a slice of
@@ -1219,7 +1268,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         let (length, on_heap) = self.length.parts();
         unsafe {
             let capacity = self.raw.capacity(on_heap);
-            core::slice::from_raw_parts_mut(
+            from_raw_parts_mut(
                 self.raw.as_mut_ptr(on_heap).add(length) as *mut MaybeUninit<Item>,
                 capacity - length
             )
@@ -1306,11 +1355,11 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
 
     pub fn extend_from_within_copy<R>(&mut self, source: R)
     where
-        R: core::ops::RangeBounds<usize>,
+        R: RangeBounds<usize>,
         Item: Copy
     {
-        let source = core::ops::Range::new(source, self.len());
-        let core::ops::Range {
+        let source = Range::new(source, self.len());
+        let Range {
             start,
             end
         } = source;
@@ -1382,7 +1431,7 @@ impl<Item: Clone, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, H
     pub fn resize(&mut self, length: usize, value: Item) {
         let old_len = self.len();
         if length > old_len {
-            self.extend(core::iter::repeat_n(value, length - old_len));
+            self.extend(repeat_n(value, length - old_len));
         } else {
             self.truncate(length);
         }
@@ -1394,8 +1443,8 @@ impl<Item: Clone, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, H
     }
 
     pub fn extend_from_within<R>(&mut self, source: R)
-    where R: core::ops::RangeBounds<usize> {
-        let source = core::ops::Range::new(source, self.len());
+    where R: RangeBounds<usize> {
+        let source = Range::new(source, self.len());
         self.reserve(source.len());
 
         // SAFETY: The call to `reserve` ensures that the capacity is large
@@ -1404,9 +1453,7 @@ impl<Item: Clone, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, H
         unsafe {
             #[cfg(feature = "specialization")]
             {
-                <Self as specialization::SpecExtendFromWithin<Item>>::spec_extend_from_within(
-                    self, source
-                );
+                <Self as SpecExtendFromWithin<Item>>::spec_extend_from_within(self, source);
             }
 
             #[cfg(not(feature = "specialization"))]
@@ -1458,7 +1505,7 @@ impl<Item, const INLINE: usize, Heap: Allocator + Clone> SmallVec<Item, INLINE, 
             self.set_len(at);
             other.set_len(other_len);
 
-            core::ptr::copy_nonoverlapping(self.as_ptr().add(at), other.as_mut_ptr(), other_len);
+            copy_nonoverlapping(self.as_ptr().add(at), other.as_mut_ptr(), other_len);
         }
         other
     }
@@ -1472,7 +1519,7 @@ impl<Item> Drop for DropGuard<Item> {
     #[inline]
     fn drop(&mut self) {
         unsafe {
-            core::ptr::slice_from_raw_parts_mut(self.ptr, self.length).drop_in_place();
+            slice_from_raw_parts_mut(self.ptr, self.length).drop_in_place();
         }
     }
 }
@@ -1516,7 +1563,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> Drop for SmallVec<Item, INLINE,
             } else {
                 None
             };
-            core::ptr::slice_from_raw_parts_mut(ptr, length).drop_in_place();
+            slice_from_raw_parts_mut(ptr, length).drop_in_place();
         }
     }
 }
@@ -1538,8 +1585,7 @@ pub fn from_elem<Item: Clone, const INLINE: usize>(
             // SAFETY: The precondition is checked in the initial comparison
             // above.
             unsafe {
-                <SmallVec<Item, INLINE, Global>
-                    as specialization::SpecFromElem<Item>>::spec_from_elem(elem, n)
+                <SmallVec<Item, INLINE, Global> as SpecFromElem<Item>>::spec_from_elem(elem, n)
             }
         }
 
@@ -1580,7 +1626,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
                     ptr.add(i).write(elem.clone());
                     guard.length += 1;
                 }
-                core::mem::forget(guard);
+                forget(guard);
                 ptr.add(n - 1).write(elem);
             }
         }
@@ -1628,7 +1674,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
                 destination.add(i).write(val);
                 guard.length += 1;
             }
-            core::mem::forget(guard);
+            forget(guard);
         }
 
         // SAFETY: The elements were initialized in the loop above.
@@ -1651,7 +1697,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
                 self.reserve(lower.saturating_add(1));
             }
             unsafe {
-                core::ptr::write(self.as_mut_ptr().add(length), element);
+                self.as_mut_ptr().add(length).write(element);
                 // Since next() executes user code which can panic we have to
                 // bump the length after each step.
                 // NB can't overflow since we would have had to alloc the
@@ -1670,7 +1716,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     ///   `source.len()`.
     ///
     /// [`extend_from_within`]: SmallVec::extend_from_within
-    unsafe fn extend_from_within_fallback(&mut self, source: core::ops::Range<usize>)
+    unsafe fn extend_from_within_fallback(&mut self, source: Range<usize>)
     where Item: Clone {
         let old_len = self.len();
 
@@ -1694,7 +1740,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
                 destination.add(i).write(val);
                 guard.length += 1;
             }
-            core::mem::forget(guard);
+            forget(guard);
         }
 
         // SAFETY: The elements were initialized in the loop above.
@@ -1740,7 +1786,7 @@ impl<Item: Clone, const INLINE: usize, Heap: Allocator + Clone> Clone
     fn clone_from(&mut self, source: &Self) {
         #[cfg(feature = "specialization")]
         {
-            <Self as specialization::SpecCloneFrom<Item>>::spec_clone_from(self, source);
+            <Self as SpecCloneFrom<Item>>::spec_clone_from(self, source);
         }
 
         #[cfg(not(feature = "specialization"))]
@@ -1755,7 +1801,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> Extend<Item> for SmallVec<Item,
     fn extend<I: IntoIterator<Item = Item>>(&mut self, iter: I) {
         #[cfg(feature = "specialization")]
         {
-            specialization::SpecExtend::<Item, _>::spec_extend(self, iter.into_iter());
+            SpecExtend::<Item, _>::spec_extend(self, iter.into_iter());
         }
 
         #[cfg(not(feature = "specialization"))]
@@ -1772,7 +1818,7 @@ impl<'valid, Item: Clone + 'valid, const INLINE: usize, Heap: Allocator> Extend<
     fn extend<I: IntoIterator<Item = &'valid Item>>(&mut self, iter: I) {
         #[cfg(feature = "specialization")]
         {
-            specialization::SpecExtend::<&'valid Item, _>::spec_extend(self, iter.into_iter());
+            SpecExtend::<&'valid Item, _>::spec_extend(self, iter.into_iter());
         }
 
         #[cfg(not(feature = "specialization"))]
@@ -1782,12 +1828,12 @@ impl<'valid, Item: Clone + 'valid, const INLINE: usize, Heap: Allocator> Extend<
     }
 }
 
-impl<Item, const INLINE: usize> core::iter::FromIterator<Item> for SmallVec<Item, INLINE, Global> {
+impl<Item, const INLINE: usize> FromIterator<Item> for SmallVec<Item, INLINE, Global> {
     #[inline]
     fn from_iter<I: IntoIterator<Item = Item>>(iter: I) -> Self {
         #[cfg(feature = "specialization")]
         {
-            specialization::SpecFromIterator::<Item, _>::spec_from_iter(iter.into_iter())
+            SpecFromIterator::<Item, _>::spec_from_iter(iter.into_iter())
         }
 
         #[cfg(not(feature = "specialization"))]
@@ -1800,7 +1846,7 @@ impl<Item, const INLINE: usize> core::iter::FromIterator<Item> for SmallVec<Item
 impl<'valid, Item, const INLINE: usize, Heap: Allocator> IntoIterator
     for &'valid SmallVec<Item, INLINE, Heap>
 {
-    type IntoIter = core::slice::Iter<'valid, Item>;
+    type IntoIter = Iter<'valid, Item>;
     type Item = &'valid Item;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -1811,7 +1857,7 @@ impl<'valid, Item, const INLINE: usize, Heap: Allocator> IntoIterator
 impl<'valid, Item, const INLINE: usize, Heap: Allocator> IntoIterator
     for &'valid mut SmallVec<Item, INLINE, Heap>
 {
-    type IntoIter = core::slice::IterMut<'valid, Item>;
+    type IntoIter = IterMut<'valid, Item>;
     type Item = &'valid mut Item;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -1826,7 +1872,7 @@ impl<Item: Hash, const INLINE: usize, Heap: Allocator> Hash for SmallVec<Item, I
 }
 
 impl<Item: Debug, const INLINE: usize, Heap: Allocator> Debug for SmallVec<Item, INLINE, Heap> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Formatted {
         f.debug_list().entries(self.iter()).finish()
     }
 }
@@ -1849,58 +1895,53 @@ impl<Item: Zeroize, const INLINE: usize, Heap: Allocator> Zeroize for SmallVec<I
 
 #[cfg(feature = "arbitrary")]
 #[cfg_attr(docsrs, doc(cfg(feature = "arbitrary")))]
-impl<'valid, Item, const INLINE: usize> arbitrary::Arbitrary<'valid>
-    for SmallVec<Item, INLINE, Global>
-where Item: arbitrary::Arbitrary<'valid>
+impl<'valid, Item, const INLINE: usize> Arbitrary<'valid> for SmallVec<Item, INLINE, Global>
+where Item: Arbitrary<'valid>
 {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'valid>) -> arbitrary::Result<Self> {
+    fn arbitrary(u: &mut Unstructured<'valid>) -> Random<Self> {
         u.arbitrary_iter()?.collect()
     }
 
-    fn arbitrary_take_rest(u: arbitrary::Unstructured<'valid>) -> arbitrary::Result<Self> {
+    fn arbitrary_take_rest(u: Unstructured<'valid>) -> Random<Self> {
         u.arbitrary_take_rest_iter()?.collect()
     }
 
     fn size_hint(depth: usize) -> (usize, Option<usize>) {
-        arbitrary::size_hint::and(<usize as arbitrary::Arbitrary>::size_hint(depth), (0, None))
+        and(<usize as Arbitrary>::size_hint(depth), (0, None))
     }
 }
 
-#[cfg(all(feature = "proptest", not(feature = "allocator-api2")))]
+#[cfg(feature = "proptest")]
 #[cfg_attr(docsrs, doc(cfg(feature = "proptest")))]
-impl<Item, const INLINE: usize> proptest::arbitrary::Arbitrary for SmallVec<Item, INLINE, Global>
-where Item: proptest::arbitrary::Arbitrary + Debug
+impl<Item, const INLINE: usize> Proptest for SmallVec<Item, INLINE, Global>
+where Item: Proptest + Debug
 {
-    type Parameters = proptest::collection::SizeRange;
-    type Strategy = proptest::strategy::Map<
-        proptest::collection::VecStrategy<Item::Strategy>,
-        fn(std::vec::Vec<Item>) -> Self
-    >;
+    type Parameters = SizeRange;
+    type Strategy = StrategyMap<VecStrategy<Item::Strategy>, fn(std::vec::Vec<Item>) -> Self>;
 
     fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
-        use proptest::strategy::Strategy;
-        proptest::collection::vec(Item::arbitrary(), args)
-            .prop_map(|v: std::vec::Vec<Item>| SmallVec::from(v))
+        create_vec(Item::arbitrary(), args)
+            .prop_map(|v: std::vec::Vec<Item>| SmallVec::from_iter(v.into_iter()))
     }
 }
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl<const INLINE: usize, Heap: Allocator> io::Write for SmallVec<u8, INLINE, Heap> {
+impl<const INLINE: usize, Heap: Allocator> Write for SmallVec<u8, INLINE, Heap> {
     #[inline]
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> IoResult<usize> {
         self.extend_from_slice(buf);
         Ok(buf.len())
     }
 
     #[inline]
-    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+    fn write_all(&mut self, buf: &[u8]) -> IoResult<()> {
         self.extend_from_slice(buf);
         Ok(())
     }
 
     #[inline]
-    fn flush(&mut self) -> io::Result<()> {
+    fn flush(&mut self) -> IoResult<()> {
         Ok(())
     }
 }
@@ -1945,7 +1986,7 @@ unsafe impl<const INLINE: usize, Heap: Allocator> BufMut for SmallVec<u8, INLINE
     // Specialize these methods so they can skip checking `remaining_mut`
     // and `advance_mut`.
     #[inline]
-    fn put<Item: bytes::Buf>(&mut self, mut source: Item)
+    fn put<Item: Buf>(&mut self, mut source: Item)
     where Self: Sized {
         // In case the source isn't contiguous, reserve upfront.
         self.reserve(source.remaining());
@@ -1980,7 +2021,7 @@ impl<Item: Format, const INLINE: usize, Heap: Allocator> Format for SmallVec<Ite
 
 #[cfg(feature = "encase")]
 // The encase macro requires the element type parameter to be named `T`.
-encase::rts_array::impl_rts_array!(
+impl_rts_array!(
     SmallVec<T, INLINE, Heap>;
     (T, const INLINE: usize, Heap: Allocator);
     using len truncate

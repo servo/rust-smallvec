@@ -1,7 +1,7 @@
 use {
     super::{
-        Allocator,
-        SmallVec
+        SmallVec,
+        allocator::Allocator
     },
     core::{
         borrow::{
@@ -11,6 +11,10 @@ use {
         ops::{
             Deref,
             DerefMut
+        },
+        slice::{
+            from_raw_parts,
+            from_raw_parts_mut
         }
     }
 };
@@ -36,7 +40,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> AsRef<[Item]> for SmallVec<Item
     fn as_ref(&self) -> &[Item] {
         let (length, on_heap) = self.length.parts();
         // SAFETY: all the elements in `..length` are initialized
-        unsafe { core::slice::from_raw_parts(self.raw.as_ptr(on_heap), length) }
+        unsafe { from_raw_parts(self.raw.as_ptr(on_heap), length) }
     }
 }
 
@@ -45,7 +49,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> AsMut<[Item]> for SmallVec<Item
     fn as_mut(&mut self) -> &mut [Item] {
         let (length, on_heap) = self.length.parts();
         // SAFETY: see above
-        unsafe { core::slice::from_raw_parts_mut(self.raw.as_mut_ptr(on_heap), length) }
+        unsafe { from_raw_parts_mut(self.raw.as_mut_ptr(on_heap), length) }
     }
 }
 

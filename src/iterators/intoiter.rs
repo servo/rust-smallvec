@@ -1,20 +1,34 @@
 use {
-    crate::{
-        Allocator,
+    super::super::{
         DropDealloc,
-        Global,
-        LocatedLength,
-        RawSmallVec,
-        SmallVec
+        SmallVec,
+        allocator::{
+            Allocator,
+            global::Global
+        },
+        locatedlength::LocatedLength,
+        rawsmallvec::RawSmallVec
     },
     core::{
-        fmt::Debug,
+        fmt::{
+            Debug,
+            Formatter,
+            Result as Format
+        },
+        iter::FusedIterator,
         mem::{
             ManuallyDrop,
             align_of,
             size_of
         },
-        ptr::NonNull
+        ptr::{
+            NonNull,
+            slice_from_raw_parts_mut
+        },
+        slice::{
+            from_raw_parts,
+            from_raw_parts_mut
+        }
     }
 };
 
@@ -56,7 +70,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> AsRef<[Item]> for IntoIter<Item
         // valid, and so is the construction of the slice
         unsafe {
             let ptr = self.raw.as_ptr(on_heap);
-            core::slice::from_raw_parts(ptr.add(self.begin), end - self.begin)
+            from_raw_parts(ptr.add(self.begin), end - self.begin)
         }
     }
 }
@@ -68,7 +82,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> AsMut<[Item]> for IntoIter<Item
         // SAFETY: see above
         unsafe {
             let ptr = self.raw.as_mut_ptr(on_heap);
-            core::slice::from_raw_parts_mut(ptr.add(self.begin), end - self.begin)
+            from_raw_parts_mut(ptr.add(self.begin), end - self.begin)
         }
     }
 }
@@ -148,10 +162,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> ExactSizeIterator
     for IntoIter<Item, INLINE, Heap>
 {
 }
-impl<Item, const INLINE: usize, Heap: Allocator> core::iter::FusedIterator
-    for IntoIter<Item, INLINE, Heap>
-{
-}
+impl<Item, const INLINE: usize, Heap: Allocator> FusedIterator for IntoIter<Item, INLINE, Heap> {}
 
 impl<Item, const INLINE: usize, Heap: Allocator> Drop for IntoIter<Item, INLINE, Heap> {
     fn drop(&mut self) {
@@ -171,7 +182,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> Drop for IntoIter<Item, INLINE,
             } else {
                 None
             };
-            core::ptr::slice_from_raw_parts_mut(ptr.add(begin), end - begin).drop_in_place();
+            slice_from_raw_parts_mut(ptr.add(begin), end - begin).drop_in_place();
         }
     }
 }
@@ -215,7 +226,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> IntoIterator for SmallVec<Item,
 }
 
 impl<Item: Debug, const INLINE: usize, Heap: Allocator> Debug for IntoIter<Item, INLINE, Heap> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Format {
         f.debug_tuple("IntoIter").field(&self.as_ref()).finish()
     }
 }
