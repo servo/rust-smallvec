@@ -1,15 +1,15 @@
 use {
+    core::{
+        hint::black_box,
+        time::Duration
+    },
     criterion::{
         Bencher,
         Criterion,
         criterion_group,
         criterion_main
     },
-    smallvec::SmallVec,
-    core::{
-        hint::black_box,
-        time::Duration
-    }
+    smallvec::SmallVec
 };
 
 const VEC_SIZE: usize = 16;

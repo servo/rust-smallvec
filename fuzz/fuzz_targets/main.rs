@@ -4,9 +4,9 @@
 
 use {
     arbitrary::Arbitrary,
+    core::fmt::Debug,
     libfuzzer_sys::fuzz_target,
-    smallvec::SmallVec,
-    core::fmt::Debug
+    smallvec::SmallVec
 };
 
 // Upper bound on the harness's test vectors's capacity.
