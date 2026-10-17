@@ -207,8 +207,8 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     /// };
     ///
     /// let buf = [1, 2, 3, 4, 5, 0, 0, 0];
-    /// let small_vec = unsafe { 
-    ///     SmallVec::from_buf_and_len_unchecked(buf.map(MaybeUninit::new), 5) 
+    /// let small_vec = unsafe {
+    ///     SmallVec::from_buf_and_len_unchecked(buf.map(MaybeUninit::new), 5);
     /// };
     ///
     /// assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
