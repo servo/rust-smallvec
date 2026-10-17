@@ -1,13 +1,13 @@
 use {
     super::super::{
-        SmallVec,
         DropDealloc,
-        locatedlength::LocatedLength,
-        rawsmallvec::RawSmallVec,
+        SmallVec,
         allocator::{
             Allocator,
             global::Global
-        }
+        },
+        locatedlength::LocatedLength,
+        rawsmallvec::RawSmallVec
     },
     core::{
         fmt::Debug,

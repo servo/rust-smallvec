@@ -1,10 +1,10 @@
 use {
     super::{
+        SmallVec,
         allocator::{
             Allocator,
             global::Global
-        },
-        SmallVec
+        }
     },
     core::marker::PhantomData,
     serde_core::{

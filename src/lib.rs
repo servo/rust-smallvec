@@ -82,6 +82,15 @@ use {
     },
     newrange::NewRange
 };
+pub use {
+    errors::SmallVecError,
+    iterators::{
+        drain::Drain,
+        extractif::ExtractIf,
+        intoiter::IntoIter,
+        splice::Splice
+    }
+};
 #[cfg(feature = "internals")]
 pub use {
     locatedlength::LocatedLength,
@@ -91,15 +100,6 @@ pub use {
 use {
     locatedlength::LocatedLength,
     rawsmallvec::RawSmallVec
-};
-pub use {
-    iterators::{
-        drain::Drain,
-        extractif::ExtractIf,
-        intoiter::IntoIter,
-        splice::Splice
-    },
-    errors::SmallVecError
 };
 
 #[repr(C)]

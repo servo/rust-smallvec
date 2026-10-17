@@ -1,12 +1,10 @@
-use {
-    super::super::{
-        allocator::{
-            Allocator,
-            global::Global
-        },
-        SmallVec,
-        errors::SmallVecError
-    }
+use super::super::{
+    SmallVec,
+    allocator::{
+        Allocator,
+        global::Global
+    },
+    errors::SmallVecError
 };
 
 /// An iterator that removes the items from a `SmallVec` and yields them by

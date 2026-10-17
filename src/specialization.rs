@@ -1,12 +1,12 @@
 use {
     super::{
+        DropGuard,
+        SmallVec,
         allocator::{
             Allocator,
             global::Global
         },
-        iterators::intoiter::IntoIter,
-        DropGuard,
-        SmallVec
+        iterators::intoiter::IntoIter
     },
     core::ptr::copy_nonoverlapping
 };

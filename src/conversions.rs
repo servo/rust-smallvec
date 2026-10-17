@@ -3,8 +3,8 @@ use {
         SmallVec,
         allocator::{
             Allocator,
-            global::Global,
             boxed::Box,
+            global::Global,
             vec::Vec
         }
     },
