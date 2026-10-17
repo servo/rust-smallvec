@@ -21,7 +21,7 @@ mod allocator;
 mod borsh;
 mod comparisons;
 mod conversions;
-mod errors;
+mod error;
 mod iterators;
 pub use iterators::{
     drain::Drain,
@@ -52,7 +52,7 @@ use defmt::{
     Formatter as DeFormatter,
     write as dewrite
 };
-pub use errors::SmallVecError;
+pub use error::SmallVecError;
 #[cfg(feature = "std")]
 use std::io;
 #[cfg(feature = "zeroize")]
