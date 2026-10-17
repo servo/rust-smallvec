@@ -19,3 +19,24 @@ macro_rules! smallvec_inline {
         $crate::SmallVec::from_buf([$($($x),+)?])
     });
 }
+
+macro_rules! public {
+    (#[cfg($($cond:tt)*)] $(#[$attr:meta])* const fn $($rest:tt)*) => {
+        #[cfg($($cond)*)]
+        $(#[$attr])*
+        pub const fn $($rest)*
+
+        #[cfg(not($($cond)*))]
+        $(#[$attr])*
+        const fn $($rest)*
+    };
+    (#[cfg($($cond:tt)*)] $(#[$attr:meta])* fn $($rest:tt)*) => {
+        #[cfg($($cond)*)]
+        $(#[$attr])*
+        pub fn $($rest)*
+
+        #[cfg(not($($cond)*))]
+        $(#[$attr])*
+        fn $($rest)*
+    };
+}
