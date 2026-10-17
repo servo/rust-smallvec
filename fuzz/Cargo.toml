@@ -1,9 +1,12 @@
 [package]
-name = "smallvec-fuzz"
+name = "fuzzer"
 version = "0.0.0"
-authors = ["The Servo Project Developers"]
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Fuzzer for SmallVec"
 publish = false
-edition = "2024"
 
 [package.metadata]
 cargo-fuzz = true

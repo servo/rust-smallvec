@@ -87,14 +87,10 @@ use {
             drop_in_place
         }
     },
-    newrange::NewRange
+    newrange::NewRange,
+    syntax::syntax
 };
-#[cfg(feature = "internals")]
-pub use {
-    locatedlength::LocatedLength,
-    rawsmallvec::RawSmallVec
-};
-#[cfg(not(feature = "internals"))]
+#[cfg_attr(feature = "internals", syntax(pub))]
 use {
     locatedlength::LocatedLength,
     rawsmallvec::RawSmallVec
