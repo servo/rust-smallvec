@@ -19,7 +19,7 @@ use {
 
 #[repr(C)]
 pub union RawSmallVec<Item, const INLINE: usize> {
-    pub inline: ManuallyDrop<MaybeUninit<[Item; INLINE]>>,
+    pub inline: ManuallyDrop<[MaybeUninit<Item>; INLINE]>,
     pub heap: (NonNull<Item>, usize)
 }
 
@@ -29,18 +29,18 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
 
     #[inline]
     pub const fn new() -> Self {
-        Self::new_inline(MaybeUninit::uninit())
+        Self::inline([const { MaybeUninit::uninit() }; INLINE])
     }
 
     #[inline]
-    pub const fn new_inline(inline: MaybeUninit<[Item; INLINE]>) -> Self {
+    pub const fn inline(inline: [MaybeUninit<Item>; INLINE]) -> Self {
         Self {
             inline: ManuallyDrop::new(inline)
         }
     }
 
     #[inline]
-    pub const fn new_heap(ptr: NonNull<Item>, capacity: usize) -> Self {
+    pub const fn heap(ptr: NonNull<Item>, capacity: usize) -> Self {
         Self {
             heap: (ptr, capacity)
         }
