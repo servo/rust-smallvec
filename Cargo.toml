@@ -32,6 +32,7 @@ strip = false
 allocator-api = []
 allocator-api2 = ["dep:allocator-api2", "allocator-api"]
 internals = []
+may_dangle = []
 proptest = ["dep:proptest", "std"]
 rayon = ["std", "dep:rayon"]
 serde = ["dep:serde_core"]
