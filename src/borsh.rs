@@ -17,6 +17,7 @@ use {
         io::{
             Error,
             ErrorKind,
+            Read,
             Result as Serial,
             Write
         },
@@ -44,7 +45,7 @@ impl<Item: BorshSerialize, const INLINE: usize, Heap: Allocator> BorshSerialize
 impl<Item: BorshDeserialize, const INLINE: usize> BorshDeserialize
     for SmallVec<Item, INLINE, Global>
 {
-    fn deserialize_reader<R: borsh::io::Read>(reader: &mut R) -> Serial<Self> {
+    fn deserialize_reader<R: Read>(reader: &mut R) -> Serial<Self> {
         let length = u64::deserialize_reader(reader)?;
         repeat_with(|| Item::deserialize_reader(reader))
             .take(length.try_into().map_err(|_| Error::new(

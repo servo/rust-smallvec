@@ -1,8 +1,18 @@
-use super::super::{
-    SmallVec,
-    allocator::{
-        Allocator,
-        global::Global
+use {
+    super::super::{
+        SmallVec,
+        allocator::{
+            Allocator,
+            global::Global
+        }
+    },
+    core::{
+        fmt::{
+            Debug,
+            Formatter,
+            Result as Format
+        },
+        ptr::copy_nonoverlapping
     }
 };
 
@@ -29,13 +39,12 @@ where F: FnMut(&mut Item) -> bool
     pub(crate) pred: F
 }
 
-impl<Item, const INLINE: usize, Heap: Allocator, F> core::fmt::Debug
-    for ExtractIf<'_, Item, INLINE, F, Heap>
+impl<Item, const INLINE: usize, Heap: Allocator, F> Debug for ExtractIf<'_, Item, INLINE, F, Heap>
 where
     F: FnMut(&mut Item) -> bool,
-    Item: core::fmt::Debug
+    Item: Debug
 {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Format {
         f.debug_tuple("ExtractIf")
             .field(&self.vec.as_ref())
             .finish()
@@ -62,10 +71,10 @@ where F: FnMut(&mut Item) -> bool
                 self.idx += 1;
                 if drained {
                     self.del += 1;
-                    return Some(core::ptr::read(cur));
+                    return Some(cur.read());
                 } else if self.del > 0 {
                     // SAFETY: `self.del <= i` therefore `i - self.del` is valid
-                    core::ptr::copy_nonoverlapping(cur, cur.sub(self.del), 1);
+                    copy_nonoverlapping(cur, cur.sub(self.del), 1);
                 }
             }
             None

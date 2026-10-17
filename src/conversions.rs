@@ -1,3 +1,5 @@
+#[cfg(feature = "specialization")]
+use super::specialization::SpecFromSlice;
 use {
     super::{
         SmallVec,
@@ -26,7 +28,7 @@ impl<Item: Clone, const INLINE: usize> From<&[Item]> for SmallVec<Item, INLINE, 
             unsafe {
                 #[cfg(feature = "specialization")]
                 {
-                    <Self as crate::specialization::SpecFromSlice<Item>>::spec_from(slice)
+                    <Self as SpecFromSlice<Item>>::spec_from(slice)
                 }
 
                 #[cfg(not(feature = "specialization"))]
