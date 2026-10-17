@@ -1,7 +1,9 @@
-use crate::{
-    Allocator,
-    Global,
-    SmallVec
+use super::super::{
+    SmallVec,
+    allocator::{
+        Allocator,
+        global::Global
+    }
 };
 
 /// An iterator which uses a closure to determine if an element should be

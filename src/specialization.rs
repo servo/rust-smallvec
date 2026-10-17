@@ -1,9 +1,11 @@
 use {
-    crate::{
-        Allocator,
+    super::{
+        allocator::{
+            Allocator,
+            global::Global
+        },
+        iterators::intoiter::IntoIter,
         DropGuard,
-        Global,
-        IntoIter,
         SmallVec
     },
     core::ptr::copy_nonoverlapping

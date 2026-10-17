@@ -1,10 +1,12 @@
 use {
-    crate::{
-        Allocator,
-        Box,
-        Global,
+    super::{
         SmallVec,
-        Vec
+        allocator::{
+            Allocator,
+            global::Global,
+            boxed::Box,
+            vec::Vec
+        }
     },
     core::{
         mem::ManuallyDrop,

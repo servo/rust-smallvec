@@ -1,7 +1,9 @@
 use {
     super::{
-        Allocator,
-        Global,
+        allocator::{
+            Allocator,
+            global::Global
+        },
         SmallVec
     },
     core::marker::PhantomData,

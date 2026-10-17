@@ -23,12 +23,6 @@ mod comparisons;
 mod conversions;
 mod errors;
 mod iterators;
-pub use iterators::{
-    drain::Drain,
-    extractif::ExtractIf,
-    intoiter::IntoIter,
-    splice::Splice
-};
 mod locatedlength;
 mod macros;
 #[cfg(feature = "malloc_size_of")]
@@ -52,7 +46,6 @@ use defmt::{
     Formatter as DeFormatter,
     write as dewrite
 };
-pub use errors::SmallVecError;
 #[cfg(feature = "std")]
 use std::io;
 #[cfg(feature = "zeroize")]
@@ -98,6 +91,15 @@ pub use {
 use {
     locatedlength::LocatedLength,
     rawsmallvec::RawSmallVec
+};
+pub use {
+    iterators::{
+        drain::Drain,
+        extractif::ExtractIf,
+        intoiter::IntoIter,
+        splice::Splice
+    },
+    errors::SmallVecError
 };
 
 #[repr(C)]

@@ -1,8 +1,12 @@
-use crate::{
-    Allocator,
-    Global,
-    SmallVec,
-    SmallVecError
+use {
+    super::super::{
+        allocator::{
+            Allocator,
+            global::Global
+        },
+        SmallVec,
+        errors::SmallVecError
+    }
 };
 
 /// An iterator that removes the items from a `SmallVec` and yields them by

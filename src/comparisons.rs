@@ -1,7 +1,7 @@
 use {
-    crate::{
-        Allocator,
-        SmallVec
+    super::{
+        SmallVec,
+        allocator::Allocator
     },
     alloc::{
         borrow::Cow,

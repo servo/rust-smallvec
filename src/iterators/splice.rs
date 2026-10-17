@@ -1,9 +1,11 @@
 use super::{
     super::{
-        Allocator,
-        Global,
-        SmallVec,
-        allocator::proxy::Proxy
+        allocator::{
+            Allocator,
+            global::Global,
+            proxy::Proxy
+        },
+        SmallVec
     },
     drain::Drain
 };

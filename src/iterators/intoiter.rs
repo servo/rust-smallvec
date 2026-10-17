@@ -1,11 +1,13 @@
 use {
-    crate::{
-        Allocator,
+    super::super::{
+        SmallVec,
         DropDealloc,
-        Global,
-        LocatedLength,
-        RawSmallVec,
-        SmallVec
+        locatedlength::LocatedLength,
+        rawsmallvec::RawSmallVec,
+        allocator::{
+            Allocator,
+            global::Global
+        }
     },
     core::{
         fmt::Debug,

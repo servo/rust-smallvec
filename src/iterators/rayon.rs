@@ -2,9 +2,9 @@
 //! need, except it's all private
 
 use {
-    crate::{
-        Allocator,
-        SmallVec
+    super::super::{
+        SmallVec,
+        allocator::Allocator
     },
     core::{
         mem::take,

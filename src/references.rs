@@ -1,6 +1,6 @@
 use {
     super::{
-        Allocator,
+        allocator::Allocator,
         SmallVec
     },
     core::{
