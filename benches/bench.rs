@@ -6,7 +6,7 @@ use {
         criterion_main
     },
     smallvec::SmallVec,
-    std::{
+    core::{
         hint::black_box,
         time::Duration
     }

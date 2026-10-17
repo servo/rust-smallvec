@@ -5,7 +5,7 @@ use {
         main
     },
     smallvec::SmallVec,
-    std::hint::black_box
+    core::hint::black_box
 };
 
 const INLINE_CAP: usize = 16;
