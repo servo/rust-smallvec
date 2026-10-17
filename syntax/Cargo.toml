@@ -1,0 +1,16 @@
+[package]
+name = "syntax"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Syntax macro for SmallVec"
+publish = false
+
+[lib]
+proc-macro = true
+path = "./lib.rs"
+
+[dependencies]
