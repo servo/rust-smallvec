@@ -71,5 +71,5 @@ v.sort();
 >
 > - SmallVec without any features enabled does not make use of the standard library.
 > - The `rayon` and `proptest` features implicitly require `std`.
-> - The `allocator-api2` feature requires `allocator-api`, though it does not 
+> - The `allocator-api2` feature requires `allocator-api`, though it does not
     require `nightly`
