@@ -141,7 +141,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
         // Although we create a new buffer, since S and INLINE are known at
         // compile time, even with `-C opt-level=1`, it gets optimized
         // as best as it could be. (Checked with <godbolt.org>)
-        let mut buf: MaybeUninit<[Item; INLINE]> = MaybeUninit::uninit();
+        let mut buf: [MaybeUninit<Item>; INLINE] = [const { MaybeUninit::uninit() }; INLINE];
 
         // SAFETY: buf and elements do not overlap, are aligned and have space
         // for at least S elements since S <= INLINE.
@@ -156,7 +156,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
         // SAFETY: all the members in 0..S are initialized
         Self {
             length: LocatedLength::new(S, false),
-            raw: RawSmallVec::new_inline(buf),
+            raw: RawSmallVec::inline(buf),
             allocator: Global
         }
     }
@@ -167,7 +167,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
         // SAFETY: all the members in 0..length are initialized
         let mut vec = Self {
             length: LocatedLength::new(length, false),
-            raw: RawSmallVec::new_inline(MaybeUninit::new(buf)),
+            raw: RawSmallVec::inline(buf.map(MaybeUninit::new)),
             allocator: Global
         };
         // Deallocate the remaining elements so no memory is leaked.
@@ -201,9 +201,9 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     /// };
     ///
     /// let buf = [1, 2, 3, 4, 5, 0, 0, 0];
-    /// let small_vec = unsafe { SmallVec::from_buf_and_len_unchecked(MaybeUninit::new(buf), 5) };
+    /// let sv = unsafe { SmallVec::from_buf_and_len_unchecked(buf.map(MaybeUninit::new), 5) };
     ///
-    /// assert_eq!(&*small_vec, &[1, 2, 3, 4, 5]);
+    /// assert_eq!(&*sv, &[1, 2, 3, 4, 5]);
     /// ```
     ///
     /// # Safety
@@ -212,13 +212,13 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     /// initialized
     #[inline]
     pub const unsafe fn from_buf_and_len_unchecked(
-        buf: MaybeUninit<[Item; INLINE]>,
+        buf: [MaybeUninit<Item>; INLINE],
         length: usize
     ) -> Self {
         debug_assert!(length <= INLINE);
         Self {
             length: LocatedLength::new(length, false),
-            raw: RawSmallVec::new_inline(buf),
+            raw: RawSmallVec::inline(buf),
             allocator: Global
         }
     }
@@ -264,7 +264,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
 
             Self {
                 length: LocatedLength::new(length, true),
-                raw: RawSmallVec::new_heap(ptr, cap),
+                raw: RawSmallVec::heap(ptr, cap),
                 allocator: Global
             }
         }
@@ -350,7 +350,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
 
         SmallVec {
             length: LocatedLength::new(length, true),
-            raw: RawSmallVec::new_heap(ptr, capacity),
+            raw: RawSmallVec::heap(ptr, capacity),
             allocator: Global
         }
     }
