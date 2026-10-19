@@ -1,8 +1,27 @@
-use crate::{
-    Allocator,
-    Global,
-    SmallVec,
-    SmallVecError
+use {
+    super::super::{
+        SmallVec,
+        allocator::{
+            Allocator,
+            global::Global
+        },
+        error::SmallVecError
+    },
+    core::{
+        fmt::{
+            Debug,
+            Formatter,
+            Result as Format
+        },
+        iter::FusedIterator,
+        mem::take,
+        ptr::{
+            NonNull,
+            copy,
+            slice_from_raw_parts_mut
+        },
+        slice::Iter
+    }
 };
 
 /// An iterator that removes the items from a `SmallVec` and yields them by
@@ -21,8 +40,8 @@ pub struct Drain<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator = Gl
     // even though vec has length < tail_start
     pub(crate) tail_start: usize,
     pub(crate) tail_len: usize,
-    pub(crate) iter: core::slice::Iter<'valid, Item>,
-    pub(crate) vec: core::ptr::NonNull<SmallVec<Item, INLINE, Heap>>
+    pub(crate) iter: Iter<'valid, Item>,
+    pub(crate) vec: NonNull<SmallVec<Item, INLINE, Heap>>
 }
 
 impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> Iterator
@@ -36,7 +55,7 @@ impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> Iterator
         // items, and we can take ownership of them.
         self.iter
             .next()
-            .map(|reference| unsafe { core::ptr::read(reference) })
+            .map(|reference| unsafe { (&raw const *reference).read() })
     }
 
     #[inline]
@@ -53,7 +72,7 @@ impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> DoubleEndedIter
         // SAFETY: see above
         self.iter
             .next_back()
-            .map(|reference| unsafe { core::ptr::read(reference) })
+            .map(|reference| unsafe { (&raw const *reference).read() })
     }
 }
 
@@ -66,10 +85,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> ExactSizeIterator
     }
 }
 
-impl<Item, const INLINE: usize, Heap: Allocator> core::iter::FusedIterator
-    for Drain<'_, Item, INLINE, Heap>
-{
-}
+impl<Item, const INLINE: usize, Heap: Allocator> FusedIterator for Drain<'_, Item, INLINE, Heap> {}
 
 impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> Drop
     for Drain<'valid, Item, INLINE, Heap>
@@ -94,7 +110,7 @@ impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> Drop
                             let ptr = source_vec.as_mut_ptr();
                             let source = ptr.add(tail);
                             let destination = ptr.add(start);
-                            core::ptr::copy(source, destination, self.0.tail_len);
+                            copy(source, destination, self.0.tail_len);
                         }
                         source_vec.length.add(self.0.tail_len);
                     }
@@ -102,7 +118,7 @@ impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> Drop
             }
         }
 
-        let iter = core::mem::take(&mut self.iter);
+        let iter = take(&mut self.iter);
         let drop_len = iter.len();
 
         let mut vec = self.vec;
@@ -150,8 +166,8 @@ impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> Drop
             // is >= 1.87. let drop_offset =
             // drop_ptr.offset_from_unsigned(vec_ptr);
             let drop_offset = drop_ptr.offset_from(vec_ptr) as usize;
-            let to_drop = core::ptr::slice_from_raw_parts_mut(vec_ptr.add(drop_offset), drop_len);
-            core::ptr::drop_in_place(to_drop);
+            let to_drop = slice_from_raw_parts_mut(vec_ptr.add(drop_offset), drop_len);
+            to_drop.drop_in_place();
         }
     }
 }
@@ -215,7 +231,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> Drain<'_, Item, INLINE, Heap> {
         let new_tail_start = self.tail_start + additional;
         unsafe {
             let ptr = vec.as_mut_ptr();
-            core::ptr::copy(
+            copy(
                 ptr.add(self.tail_start),
                 ptr.add(new_tail_start),
                 self.tail_len
@@ -225,10 +241,8 @@ impl<Item, const INLINE: usize, Heap: Allocator> Drain<'_, Item, INLINE, Heap> {
     }
 }
 
-impl<Item: core::fmt::Debug, const INLINE: usize, Heap: Allocator> core::fmt::Debug
-    for Drain<'_, Item, INLINE, Heap>
-{
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl<Item: Debug, const INLINE: usize, Heap: Allocator> Debug for Drain<'_, Item, INLINE, Heap> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Format {
         f.debug_tuple("Drain").field(&self.iter.as_slice()).finish()
     }
 }
