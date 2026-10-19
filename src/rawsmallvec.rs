@@ -1,7 +1,7 @@
 use {
     super::{
         allocator::Allocator,
-        errors::SmallVecError,
+        error::SmallVecError,
         locatedlength::LocatedLength
     },
     core::{

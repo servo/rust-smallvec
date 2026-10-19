@@ -5,7 +5,7 @@ use {
             Allocator,
             global::Global
         },
-        errors::SmallVecError
+        error::SmallVecError
     },
     core::{
         fmt::{
