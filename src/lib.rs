@@ -132,7 +132,7 @@ use {
     newrange::NewRange
 };
 pub use {
-    errors::SmallVecError,
+    error::SmallVecError,
     iterators::{
         drain::Drain,
         extractif::ExtractIf,
