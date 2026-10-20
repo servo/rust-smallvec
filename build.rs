@@ -5,7 +5,7 @@ use std::{
 };
 
 fn main() {
-    println!("cargo:rerun-if-changed=syntax_macro.rs");
+    println!("cargo:rerun-if-changed=syntax.rs");
 
     // Compile the bundled macro directly so it does not need to be published
     // as a separate Cargo package.
@@ -18,7 +18,7 @@ fn main() {
             "--crate-type=proc-macro",
             "--edition=2024",
             "--extern=proc_macro",
-            "syntax_macro.rs",
+            "syntax.rs",
             "--out-dir"
         ])
         .arg(&out_dir)
