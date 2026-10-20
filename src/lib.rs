@@ -132,11 +132,6 @@ use {
     newrange::NewRange,
     syntax::syntax
 };
-#[cfg_attr(feature = "internals", syntax(pub))]
-use {
-    locatedlength::LocatedLength,
-    rawsmallvec::RawSmallVec
-};
 pub use {
     error::SmallVecError,
     iterators::{
@@ -145,6 +140,11 @@ pub use {
         intoiter::IntoIter,
         splice::Splice
     }
+};
+#[cfg_attr(feature = "internals", syntax(pub))]
+use {
+    locatedlength::LocatedLength,
+    rawsmallvec::RawSmallVec
 };
 
 #[repr(C)]
