@@ -16,8 +16,7 @@ pub fn syntax(attr: TokenStream, item: TokenStream) -> TokenStream {
                 element.extend([p.into(), g.into()]);
             }
             mut trees => {
-                let trees = trees.iter_mut().flat_map(Option::take);
-                element.extend(attr.into_iter().chain(trees).chain(iterator));
+                element.extend(attr.into_iter().chain(trees.iter_mut().flat_map(Option::take)).chain(iterator));
                 return element.into_iter().collect();
             }
         };
