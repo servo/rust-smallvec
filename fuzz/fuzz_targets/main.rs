@@ -162,7 +162,7 @@ fn test_with_inline_cap<const N: usize>(
                 std_vec = Vec::with_capacity(cap.0);
             }
             Op::FromVec => {
-                small_vec = SmallVec::from_vec(small_vec.into());
+                small_vec = SmallVec::from(Into::<Vec<_>>::into(small_vec));
                 // No-op on `Vec`
             }
             Op::FromSlice(data) => {
