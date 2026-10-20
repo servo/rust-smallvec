@@ -9,6 +9,10 @@
 )]
 
 extern crate alloc;
+#[cfg(feature = "internals")]
+extern crate syntax;
+#[cfg(feature = "internals")]
+use syntax::syntax;
 
 mod allocator;
 #[cfg(feature = "borsh")]
@@ -129,8 +133,7 @@ use {
             from_raw_parts_mut
         }
     },
-    newrange::NewRange,
-    syntax::syntax
+    newrange::NewRange
 };
 pub use {
     error::SmallVecError,

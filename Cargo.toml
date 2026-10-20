@@ -9,7 +9,7 @@ repository = "https://github.com/servo/rust-smallvec"
 description = "'Small vector' optimization: store up to a small number of items on the stack"
 keywords = ["small", "vec", "vector", "stack", "no_std"]
 categories = ["data-structures"]
-exclude = [".gitignore", "tests/", "fuzz/", "benches/", ".github/"]
+include = ["src/**", "syntax_macro.rs", "build.rs", "LICENSE-*"]
 
 [profile.bench]
 lto = "fat"
@@ -44,7 +44,6 @@ malloc_size_of = { version = "0.1", optional = true, default-features = false }
 proptest = { version = "1.11", optional = true, features = ["std"], default-features = false }
 rayon = { version = "1.12", optional = true, default-features = false }
 serde_core = { version = "1.0", optional = true, default-features = false }
-syntax = { path = "./syntax" }
 zeroize = { version = "1.9", optional = true, default-features = false }
 
 [dev-dependencies]

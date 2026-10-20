@@ -909,7 +909,6 @@ dependencies = [
  "rayon",
  "serde_core",
  "serde_test",
- "syntax",
  "zeroize",
 ]
 
