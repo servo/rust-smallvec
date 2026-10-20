@@ -7,8 +7,11 @@ use {
             Allocator,
             boxed::Box,
             global::Global,
+            like::Like,
             vec::Vec
-        }
+        },
+        locatedlength::LocatedLength,
+        rawsmallvec::RawSmallVec
     },
     core::{
         mem::ManuallyDrop,
@@ -154,7 +157,7 @@ impl<Item, const INLINE: usize> From<<Vec<Item, Global> as Like>::Type>
 
             Self {
                 length: LocatedLength::new(length, true),
-                raw: RawSmallVec::new_heap(ptr, cap),
+                raw: RawSmallVec::heap(ptr, cap),
                 allocator: Global
             }
         }
