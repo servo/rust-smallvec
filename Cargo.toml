@@ -9,7 +9,7 @@ repository = "https://github.com/servo/rust-smallvec"
 description = "'Small vector' optimization: store up to a small number of items on the stack"
 keywords = ["small", "vec", "vector", "stack", "no_std"]
 categories = ["data-structures"]
-include = ["src/**", "syntax_macro.rs", "build.rs", "LICENSE-*"]
+include = ["src/**", "syntax.rs", "build.rs", "LICENSE-*"]
 
 [profile.bench]
 lto = "fat"
