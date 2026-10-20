@@ -106,6 +106,5 @@ package.rust-version = "1.86"
 resolver = "3"
 members = [
     ".",
-    "fuzz",
-    "syntax"
+    "fuzz"
 ]
