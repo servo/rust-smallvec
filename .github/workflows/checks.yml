@@ -63,8 +63,8 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v7
-      - name: install rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - name: install rust nightly
+        uses: dtolnay/rust-toolchain@nightly
       - name: default features
         run: cargo package
       - name: all features
