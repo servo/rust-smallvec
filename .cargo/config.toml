@@ -1,2 +1,2 @@
 [build]
-rustdoc = "rustdoc.sh"
+rustdoc = "./rustdoc.sh"
