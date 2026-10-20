@@ -130,7 +130,8 @@ use {
             from_raw_parts_mut
         }
     },
-    newrange::NewRange
+    newrange::NewRange,
+    smallvec_macro::syntax
 };
 pub use {
     error::SmallVecError,
@@ -141,12 +142,7 @@ pub use {
         splice::Splice
     }
 };
-#[cfg(feature = "internals")]
-pub use {
-    locatedlength::LocatedLength,
-    rawsmallvec::RawSmallVec
-};
-#[cfg(not(feature = "internals"))]
+#[cfg_attr(feature = "internals", syntax(pub))]
 use {
     locatedlength::LocatedLength,
     rawsmallvec::RawSmallVec

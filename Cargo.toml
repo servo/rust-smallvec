@@ -1,15 +1,15 @@
 [package]
 name = "smallvec"
 version = "2.0.0-beta.3"
-edition = "2024"
-rust-version = "1.86"
-authors = ["The Servo Project Developers"]
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/servo/rust-smallvec"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
 description = "'Small vector' optimization: store up to a small number of items on the stack"
 keywords = ["small", "vec", "vector", "stack", "no_std"]
 categories = ["data-structures"]
-exclude = [".gitignore", "tests/", "fuzz/", "benches/", ".github/"]
+exclude = [".gitignore", "tests/", "fuzz/", "benches/", ".github/", "rustfmt.toml", ".vscode/"]
 
 [profile.bench]
 lto = "fat"
@@ -18,26 +18,20 @@ opt-level = 3
 debug = false
 strip = true
 
-# Dedicated profile for the iai-callgrind benchmarks. Callgrind needs the
-# function symbols in the binary to attribute event counts, so we disable
-# stripping (and keep debug info for line-level detail). Without symbols the
-# runner collects zero events for every benchmark. LTO is left on (inherited)
-# since it does not affect collection and keeps the run representative.
 [profile.callgrind]
 inherits = "bench"
-debug = 1
+debug = true
 strip = false
 
 [features]
 allocator-api = []
-allocator-api2 = ["dep:allocator-api2", "allocator-api"]
+allocator-api2 = ["allocator-api", "dep:allocator-api2"]
 internals = []
 proptest = ["dep:proptest", "std"]
-rayon = ["std", "dep:rayon"]
+rayon = ["dep:rayon", "std"]
 serde = ["dep:serde_core"]
 specialization = []
 std = []
-zeroize = ["dep:zeroize"]
 
 [dependencies]
 allocator-api2 = { version = "0.4", optional = true, features = [
@@ -58,12 +52,13 @@ proptest = { version = "1", optional = true, features = [
 ], default-features = false }
 rayon = { version = "1", optional = true, default-features = false }
 serde_core = { version = "1", optional = true, default-features = false }
+smallvec-macro = { version = "0.0.0", path = "./macro", default-features = false }
 zeroize = { version = "1", optional = true, default-features = false }
 
 [dev-dependencies]
 serde_test = "1"
 criterion = "0.8"
-iai-callgrind = "0.14"
+iai-callgrind = "0.16"
 
 [[test]]
 name = "arbitrary"
@@ -116,4 +111,13 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [workspace]
-members = [".", "fuzz"]
+package.edition = "2024"
+package.authors = ["The Servo Project Developers"]
+package.license = "MIT OR Apache-2.0"
+package.repository = "https://github.com/servo/rust-smallvec"
+package.rust-version = "1.86"
+resolver = "3"
+members = [
+    ".",
+    "fuzz"
+]
