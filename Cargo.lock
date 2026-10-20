@@ -903,6 +903,7 @@ dependencies = [
  "criterion",
  "defmt",
  "encase",
+ "equivalent",
  "iai-callgrind",
  "malloc_size_of",
  "proptest",

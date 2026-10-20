@@ -58,6 +58,7 @@ v.sort();
 - `bytes`: implements `BufMut` for SmallVec
 - `defmt`: implements `defmt::Format` for SmallVec
 - `encase`: implements encasing as a runtime-sized array
+- `equivalent`: implements `equivalent::Equivalent` for `SmallVec`
 - `internals`: exports through the public API `LocatedLength` and `RawSmallVec`
 - `malloc_size_of`: implements `MallocSizeOf` and `MallocShallowSizeOf`
 - `rayon`: implements parallel iteration
