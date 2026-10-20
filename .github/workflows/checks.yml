@@ -57,6 +57,18 @@ jobs:
       - name: markdownlint
         run: |
           git ls-files '*.md' -z | xargs -0 docker run --rm -v "$PWD:/work" -w /work ghcr.io/igorshubovych/markdownlint-cli:v0.41.0
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+      - name: install rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+      - name: default features
+        run: cargo package
+      - name: all features
+        run: cargo package --all-features
   miri:
     name: Miri
     runs-on: ubuntu-latest
