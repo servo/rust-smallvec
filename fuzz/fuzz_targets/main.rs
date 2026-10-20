@@ -4,9 +4,9 @@
 
 use {
     arbitrary::Arbitrary,
+    core::fmt::Debug,
     libfuzzer_sys::fuzz_target,
-    smallvec::SmallVec,
-    std::fmt::Debug
+    smallvec::SmallVec
 };
 
 // Upper bound on the harness's test vectors's capacity.
@@ -18,18 +18,18 @@ const MAX_CAP: usize = 1024;
 pub struct Bounded<T, const CAP: usize = 255>(pub T);
 
 // Bounded `usize` between `0..=CAP`
-impl<'a, const CAP: usize> Arbitrary<'a> for Bounded<usize, CAP> {
+impl<'valid, const CAP: usize> Arbitrary<'valid> for Bounded<usize, CAP> {
     #[inline]
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'valid>) -> arbitrary::Result<Self> {
         Ok(Bounded(u.int_in_range(0..=CAP)?))
     }
 }
 
 // Bounded `Vec<T>` whose length is between `0..=CAP`
-impl<'a, T, const CAP: usize> Arbitrary<'a> for Bounded<Vec<T>, CAP>
-where T: Arbitrary<'a>
+impl<'valid, T, const CAP: usize> Arbitrary<'valid> for Bounded<Vec<T>, CAP>
+where T: Arbitrary<'valid>
 {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'valid>) -> arbitrary::Result<Self> {
         let len = u.int_in_range(0..=CAP)?;
         let vec = u
             .arbitrary_iter()?
@@ -89,9 +89,9 @@ fn assert_invariants<T: Copy + PartialEq + Debug, const N: usize>(
         "`is_empty()` mismatch"
     );
     assert_eq!(
-        small_vec.as_slice(),
+        small_vec.as_ref(),
         std_vec.as_slice(),
-        "`as_slice()` mismatch"
+        "`as_ref()` mismatch"
     );
 
     // Capacity & spilling invariants

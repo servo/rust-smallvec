@@ -19,12 +19,21 @@ use {
             Hash,
             Hasher
         },
-        iter::FromIterator
+        iter::{
+            FromIterator,
+            repeat_n,
+            repeat_with
+        },
+        mem::forget
     },
     smallvec::SmallVec,
     std::{
         borrow::ToOwned,
         hash::DefaultHasher,
+        panic::{
+            AssertUnwindSafe,
+            catch_unwind
+        },
         rc::Rc
     }
 };
@@ -191,7 +200,7 @@ fn drain_rev() {
 #[test]
 fn drain_forget() {
     let mut v: SmallVec<u8, 1> = SmallVec::from([0, 1, 2, 3, 4, 5, 6, 7]);
-    std::mem::forget(v.drain(2..5));
+    forget(v.drain(2..5));
     assert_eq!(v.len(), 2);
 }
 
@@ -237,7 +246,7 @@ fn splice_inline_fill_then_move_tail_ub_test() {
 
 #[test]
 fn splice_reserve_panic() {
-    struct CountDrop<'a>(&'a Cell<usize>);
+    struct CountDrop<'valid>(&'valid Cell<usize>);
 
     impl Drop for CountDrop<'_> {
         fn drop(&mut self) {
@@ -251,10 +260,10 @@ fn splice_reserve_panic() {
             let mut v: SmallVec<Box<CountDrop<'_>>, 4> = SmallVec::with_capacity(capacity);
             v.push(Box::new(CountDrop(&drops)));
 
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let result = catch_unwind(AssertUnwindSafe(|| {
                 drop(v.splice(
                     0..0,
-                    std::iter::repeat_with(|| Box::new(CountDrop(&drops))).take(additional)
+                    repeat_with(|| Box::new(CountDrop(&drops))).take(additional)
                 ));
             }));
 
@@ -311,9 +320,9 @@ fn into_iter_rev() {
 
 #[test]
 fn into_iter_drop() {
-    struct DropCounter<'a>(&'a Cell<i32>);
+    struct DropCounter<'valid>(&'valid Cell<i32>);
 
-    impl<'a> Drop for DropCounter<'a> {
+    impl<'valid> Drop for DropCounter<'valid> {
         fn drop(&mut self) {
             self.0.set(self.0.get() + 1);
         }
@@ -710,6 +719,7 @@ fn exact_size_iterator() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn into_iter_as_slice() {
     let vec = SmallVec::<u32, 2>::from(&[1, 2, 3][..]);
     let mut iter = vec.clone().into_iter();
@@ -721,6 +731,27 @@ fn into_iter_as_slice() {
     iter.next_back();
     assert_eq!(iter.as_slice(), &[2]);
     assert_eq!(iter.as_mut_slice(), &[2]);
+}
+
+#[test]
+fn into_iter_as_ref() {
+    let vec = SmallVec::<u32, 2>::from(&[1, 2, 3][..]);
+    let mut iter = vec.clone().into_iter();
+    assert_eq!(iter.as_ref(), &[1, 2, 3]);
+    assert_eq!(iter.as_mut(), &[1, 2, 3]);
+    iter.next();
+    assert_eq!(iter.as_ref(), &[2, 3]);
+    assert_eq!(iter.as_mut(), &[2, 3]);
+    iter.next_back();
+    assert_eq!(iter.as_ref(), &[2]);
+    assert_eq!(iter.as_mut(), &[2]);
+}
+
+#[test]
+fn drain_as_ref() {
+    let mut vec = SmallVec::<u32, 4>::from(&[1, 2, 3, 4][..]);
+    let drain = vec.drain(1..3);
+    assert_eq!(drain.as_ref(), &[2, 3]);
 }
 
 #[test]
@@ -1105,7 +1136,7 @@ fn collect_from_iter() {
     const ELEMENTS: usize = 1000;
     #[cfg(not(miri))]
     const ELEMENTS: usize = 1_000_000;
-    let iter = IterNoHint(std::iter::repeat_n(1u8, ELEMENTS));
+    let iter = IterNoHint(repeat_n(1u8, ELEMENTS));
 
     let _y: SmallVec<u8, 1> = SmallVec::from_iter(iter);
 }
