@@ -1871,6 +1871,17 @@ impl<Item: Debug, const INLINE: usize, Heap: Allocator> Debug for SmallVec<Item,
     }
 }
 
+#[cfg(feature = "equivalent")]
+#[cfg_attr(docsrs, doc(cfg(feature = "equivalent")))]
+impl<Item, Other, const INLINE: usize, Heap: Allocator> equivalent::Equivalent<[Other]>
+    for SmallVec<Item, INLINE, Heap>
+where Item: equivalent::Equivalent<Other>
+{
+    fn equivalent(&self, key: &[Other]) -> bool {
+        self.len() == key.len() && self.iter().zip(key).all(|(item, key)| item.equivalent(key))
+    }
+}
+
 #[cfg(feature = "zeroize")]
 impl<Item: Zeroize, const INLINE: usize, Heap: Allocator> Zeroize for SmallVec<Item, INLINE, Heap> {
     fn zeroize(&mut self) {
