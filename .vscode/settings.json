@@ -1,0 +1,3 @@
+{
+    "rust-analyzer.diagnostics.disabled": ["unresolved-extern-crate"]
+}
