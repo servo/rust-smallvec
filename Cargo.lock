@@ -909,8 +909,13 @@ dependencies = [
  "rayon",
  "serde_core",
  "serde_test",
+ "smallvec-macro",
  "zeroize",
 ]
+
+[[package]]
+name = "smallvec-macro"
+version = "0.0.0"
 
 [[package]]
 name = "syn"

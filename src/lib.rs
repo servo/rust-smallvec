@@ -9,7 +9,6 @@
 )]
 
 extern crate alloc;
-extern crate syntax;
 
 mod allocator;
 #[cfg(feature = "borsh")]
@@ -131,7 +130,7 @@ use {
         }
     },
     newrange::NewRange,
-    syntax::syntax
+    smallvec_macro::syntax
 };
 pub use {
     error::SmallVecError,
