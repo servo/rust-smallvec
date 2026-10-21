@@ -1349,9 +1349,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
             self.length.add(length);
         }
     }
-}
 
-impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     #[cfg_attr(feature = "allocator-api", syntax(pub))]
     const fn new_in(allocator: Heap) -> SmallVec<Item, INLINE, Heap> {
         Self {
