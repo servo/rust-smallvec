@@ -3,19 +3,20 @@ on:
   schedule:
     - cron: '0 2 * * 5'
   workflow_dispatch:
-permissions:
-  contents: write
 jobs:
-  release:
-    name: Release
+  check:
+    name: Check for new commits
     runs-on: ubuntu-latest
+    if: github.repository == 'servo/rust-smallvec'
+    outputs:
+      count: ${{ steps.commits.outputs.count }}
     steps:
       - name: checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: check for new commits
+      - name: count commits since last tag
         id: commits
         run: |
           if last_tag=$(git describe --tags --abbrev=0 HEAD 2>/dev/null); then
@@ -24,11 +25,23 @@ jobs:
             count=$(git rev-list --count HEAD)
           fi
           echo "count=$count" >> "$GITHUB_OUTPUT"
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: check
+    if: needs.check.outputs.count != '0'
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - name: install rust nightly
-        if: steps.commits.outputs.count != '0'
         uses: dtolnay/rust-toolchain@nightly
       - name: release-plz
-        if: steps.commits.outputs.count != '0'
         uses: release-plz/action@v0.5
         with:
           command: release
