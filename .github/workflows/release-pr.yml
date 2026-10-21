@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 jobs:
   release-pr:
-    name: Release PR
+    name: Release
     runs-on: ubuntu-latest
     if: github.repository == 'servo/rust-smallvec'
     permissions:
