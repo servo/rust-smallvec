@@ -1,20 +1,18 @@
 name: release
 on:
   schedule:
-    # Every Friday at 12:00 UTC
-    - cron: '0 12 * * 5'
+    - cron: '0 2 * * 5'
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: checkout
         uses: actions/checkout@v7
         with:
-          ref: v2
           fetch-depth: 0
           persist-credentials: false
       - name: check for new commits
@@ -22,9 +20,9 @@ jobs:
         run: |
           count=$(git rev-list --count --since="7 days ago" HEAD)
           echo "count=$count" >> "$GITHUB_OUTPUT"
-      - name: install rust stable
+      - name: install rust nightly
         if: steps.commits.outputs.count != '0' || github.event_name == 'workflow_dispatch'
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@nightly
       - name: release-plz
         if: steps.commits.outputs.count != '0' || github.event_name == 'workflow_dispatch'
         uses: release-plz/action@v0.5
