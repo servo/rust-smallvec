@@ -77,7 +77,6 @@ use {
             size_of
         },
         ptr::{
-            self,
             NonNull,
             copy,
             copy_nonoverlapping,
@@ -1450,7 +1449,7 @@ impl<T, const N: usize, A: Allocator> SmallVec<T, N, A> {
                 NonNull::new_unchecked(me.as_mut_ptr()),
                 me.len(),
                 me.capacity(),
-                ptr::read(&me.allocator)
+                (&raw const me.allocator).read()
             )
         }
     }
