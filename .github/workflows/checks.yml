@@ -83,8 +83,8 @@ jobs:
           cargo miri test
       - name: all features
         run: cargo miri test --all-features
-  nightly:
-    name: Nightly
+  tests:
+    name: Tests
     runs-on: ubuntu-latest
     steps:
       - name: checkout
