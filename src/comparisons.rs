@@ -1,7 +1,7 @@
 #[cfg(feature = "equivalent")]
 use equivalent::{
-    Equivalent,
-    Comparable
+    Comparable,
+    Equivalent
 };
 use {
     super::{
@@ -18,7 +18,13 @@ use {
 
 macro_rules! implementation {
     ([$($generics:tt)*] for $left:ty =? $right:ty $(where $typename:ty: $bound:ident)?) => {
-        impl<Item: PartialEq<Other>, Other, Heap: Allocator, const INLINE: usize, $($generics)*> PartialEq<$right> for $left $(where $typename: $bound)? {
+        impl<
+            Item: PartialEq<Other>,
+            Other,
+            Heap: Allocator,
+            const INLINE: usize,
+            $($generics)*
+        > PartialEq<$right> for $left $(where $typename: $bound)? {
             #[inline]
             fn eq(&self, other: &$right) -> bool {
                 *AsRef::<[Item]>::as_ref(self) == *AsRef::<[Other]>::as_ref(other)
@@ -26,7 +32,13 @@ macro_rules! implementation {
         }
     };
     ([$($generics:tt)*] for $left:ty =<> $right:ty $(where $typename:ty: $bound:ident)?) => {
-        impl<Item: PartialOrd<Other>, Other, Heap: Allocator, const INLINE: usize, $($generics)*> PartialOrd<$right> for $left $(where $typename: $bound)? {
+        impl<
+            Item: PartialOrd<Other>,
+            Other,
+            Heap: Allocator,
+            const INLINE: usize,
+            $($generics)*
+        > PartialOrd<$right> for $left $(where $typename: $bound)? {
             #[inline]
             fn partial_cmp(&self, other: &$right) -> Option<Ordering> {
                 AsRef::<[Item]>::as_ref(self).iter().partial_cmp(AsRef::<[Other]>::as_ref(other))
@@ -35,16 +47,30 @@ macro_rules! implementation {
     };
     ([$($generics:tt)*] for $left:ty =?+ $right:ty $(where $typename:ty: $bound:ident)?) => {
         #[cfg(feature = "equivalent")]
-        impl<Item: Equivalent<Other>, Other, Heap: Allocator, const INLINE: usize, $($generics)*> Equivalent<$right> for $left $(where $typename: $bound)? {
+        impl<
+            Item: Equivalent<Other>,
+            Other,
+            Heap: Allocator,
+            const INLINE: usize,
+            $($generics)*
+        > Equivalent<$right> for $left $(where $typename: $bound)? {
             #[inline]
             fn equivalent(&self, key: &$right) -> bool {
-                self.len() == key.len() && self.iter().zip(AsRef::<[Other]>::as_ref(key)).all(|(item, key)| item.equivalent(key))
+                self.len() == key.len() && self.iter()
+                    .zip(AsRef::<[Other]>::as_ref(key))
+                    .all(|(item, key)| item.equivalent(key))
             }
         }
     };
     ([$($generics:tt)*] for $left:ty =<>+ $right:ty $(where $typename:ty: $bound:ident)?) => {
         #[cfg(feature = "equivalent")]
-        impl<Item: Comparable<Other>, Other, Heap: Allocator, const INLINE: usize, $($generics)*> Comparable<$right> for $left $(where $typename: $bound)? {
+        impl<
+            Item: Comparable<Other>,
+            Other,
+            Heap: Allocator,
+            const INLINE: usize,
+            $($generics)*
+        > Comparable<$right> for $left $(where $typename: $bound)? {
             fn compare(&self, other: &$right) -> Ordering {
                 self.iter()
                     .zip(AsRef::<[Other]>::as_ref(other))
@@ -136,60 +162,99 @@ implementation!([] for Cow<'_, [Item]> =<> SmallVec<Other, INLINE, Heap> where I
 implementation!([] for SmallVec<Item, INLINE, Heap> =<>+ Cow<'_, [Other]> where Other: Clone);
 implementation!([] for Cow<'_, [Item]> =<>+ SmallVec<Other, INLINE, Heap> where Item: Clone);
 
-impl<Item: PartialEq<Other>, Other, const INLINE: usize, Heap: Allocator> PartialEq<SmallVec<Other, INLINE, Heap>> for VecDeque<Item> {
+impl<Item: PartialEq<Other>, Other, const INLINE: usize, Heap: Allocator>
+    PartialEq<SmallVec<Other, INLINE, Heap>> for VecDeque<Item>
+{
     #[inline]
     fn eq(&self, other: &SmallVec<Other, INLINE, Heap>) -> bool {
         let (first, second) = self.as_slices();
-        let Some((before, after)) = other.split_at_checked(first.len()) else {return false};
+        let Some((before, after)) = other.split_at_checked(first.len()) else {
+            return false;
+        };
         first == before && second == after
     }
 }
-impl<Item: PartialEq<Other>, Other, const INLINE: usize, Heap: Allocator> PartialEq<VecDeque<Other>> for SmallVec<Item, INLINE, Heap> {
+impl<Item: PartialEq<Other>, Other, const INLINE: usize, Heap: Allocator> PartialEq<VecDeque<Other>>
+    for SmallVec<Item, INLINE, Heap>
+{
     #[inline]
     fn eq(&self, other: &VecDeque<Other>) -> bool {
         let (first, second) = other.as_slices();
-        let Some((before, after)) = self.split_at_checked(first.len()) else {return false};
+        let Some((before, after)) = self.split_at_checked(first.len()) else {
+            return false;
+        };
         before == first && after == second
     }
 }
 #[cfg(feature = "equivalent")]
-impl<Item: Equivalent<Other>, Other, const INLINE: usize, Heap: Allocator> Equivalent<SmallVec<Other, INLINE, Heap>> for VecDeque<Item> {
+impl<Item: Equivalent<Other>, Other, const INLINE: usize, Heap: Allocator>
+    Equivalent<SmallVec<Other, INLINE, Heap>> for VecDeque<Item>
+{
     #[inline]
     fn equivalent(&self, key: &SmallVec<Other, INLINE, Heap>) -> bool {
         let (first, second) = self.as_slices();
-        let Some((before, after)) = key.split_at_checked(first.len()) else {return false};
-        first.len() == before.len() && first.iter().zip(before).all(|(item, key)| item.equivalent(key))
-            && second.len() == after.len() && second.iter().zip(after).all(|(item, key)| item.equivalent(key))
+        let Some((before, after)) = key.split_at_checked(first.len()) else {
+            return false;
+        };
+        first.len() == before.len()
+            && first
+                .iter()
+                .zip(before)
+                .all(|(item, key)| item.equivalent(key))
+            && second.len() == after.len()
+            && second
+                .iter()
+                .zip(after)
+                .all(|(item, key)| item.equivalent(key))
     }
 }
 #[cfg(feature = "equivalent")]
-impl<Item: Equivalent<Other>, Other, const INLINE: usize, Heap: Allocator> Equivalent<VecDeque<Other>> for SmallVec<Item, INLINE, Heap> {
+impl<Item: Equivalent<Other>, Other, const INLINE: usize, Heap: Allocator>
+    Equivalent<VecDeque<Other>> for SmallVec<Item, INLINE, Heap>
+{
     #[inline]
     fn equivalent(&self, key: &VecDeque<Other>) -> bool {
         let (first, second) = key.as_slices();
-        let Some((before, after)) = self.split_at_checked(first.len()) else {return false};
-        first.len() == before.len() && first.iter().zip(before).all(|(item, key)| key.equivalent(item))
-            && second.len() == after.len() && second.iter().zip(after).all(|(item, key)| key.equivalent(item))
+        let Some((before, after)) = self.split_at_checked(first.len()) else {
+            return false;
+        };
+        first.len() == before.len()
+            && first
+                .iter()
+                .zip(before)
+                .all(|(item, key)| key.equivalent(item))
+            && second.len() == after.len()
+            && second
+                .iter()
+                .zip(after)
+                .all(|(item, key)| key.equivalent(item))
     }
 }
-impl<Item: PartialOrd<Other>, Other, const INLINE: usize, Heap: Allocator> PartialOrd<SmallVec<Other, INLINE, Heap>> for VecDeque<Item> {
+impl<Item: PartialOrd<Other>, Other, const INLINE: usize, Heap: Allocator>
+    PartialOrd<SmallVec<Other, INLINE, Heap>> for VecDeque<Item>
+{
     #[inline]
     fn partial_cmp(&self, other: &SmallVec<Other, INLINE, Heap>) -> Option<Ordering> {
         self.iter().partial_cmp(other.iter())
     }
 }
-impl<Item: PartialOrd<Other>, Other, const INLINE: usize, Heap: Allocator> PartialOrd<VecDeque<Other>> for SmallVec<Item, INLINE, Heap> {
+impl<Item: PartialOrd<Other>, Other, const INLINE: usize, Heap: Allocator>
+    PartialOrd<VecDeque<Other>> for SmallVec<Item, INLINE, Heap>
+{
     #[inline]
     fn partial_cmp(&self, other: &VecDeque<Other>) -> Option<Ordering> {
         self.iter().partial_cmp(other.iter())
     }
 }
 #[cfg(feature = "equivalent")]
-impl<Item: Comparable<Other>, Other, const INLINE: usize, Heap: Allocator> Comparable<SmallVec<Other, INLINE, Heap>> for VecDeque<Item> {
+impl<Item: Comparable<Other>, Other, const INLINE: usize, Heap: Allocator>
+    Comparable<SmallVec<Other, INLINE, Heap>> for VecDeque<Item>
+{
     #[inline]
     fn compare(&self, key: &SmallVec<Other, INLINE, Heap>) -> Ordering {
         let (first, second) = self.as_slices();
-        first.iter()
+        first
+            .iter()
             .chain(second.iter())
             .map(|item| item)
             .zip(key.iter())
@@ -199,7 +264,9 @@ impl<Item: Comparable<Other>, Other, const INLINE: usize, Heap: Allocator> Compa
     }
 }
 #[cfg(feature = "equivalent")]
-impl<Item: Comparable<Other>, Other, const INLINE: usize, Heap: Allocator> Comparable<VecDeque<Other>> for SmallVec<Item, INLINE, Heap> {
+impl<Item: Comparable<Other>, Other, const INLINE: usize, Heap: Allocator>
+    Comparable<VecDeque<Other>> for SmallVec<Item, INLINE, Heap>
+{
     #[inline]
     fn compare(&self, key: &VecDeque<Other>) -> Ordering {
         let (first, second) = key.as_slices();
