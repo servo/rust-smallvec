@@ -102,7 +102,7 @@ jobs:
         - name: checkout
           uses: actions/checkout@v7
         - name: install rust stable
-          uses: dtolnay/rust-toolchain@stable
+          uses: dtolnay/rust-toolchain@nightly
           with:
             target: thumbv7m-none-eabi
         - name: test default features
