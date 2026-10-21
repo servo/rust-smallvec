@@ -1350,7 +1350,8 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         }
     }
 
-    pub const fn new_in(allocator: Heap) -> SmallVec<Item, INLINE, Heap> {
+    #[cfg_attr(feature = "allocator-api", syntax(pub))]
+    const fn new_in(allocator: Heap) -> SmallVec<Item, INLINE, Heap> {
         Self {
             length: LocatedLength::new(0, false),
             raw: RawSmallVec::new(),
@@ -1358,7 +1359,8 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         }
     }
 
-    pub fn try_with_capacity_in(capacity: usize, allocator: Heap) -> Result<Self, SmallVecError> {
+    #[cfg_attr(feature = "allocator-api", syntax(pub))]
+    fn try_with_capacity_in(capacity: usize, allocator: Heap) -> Result<Self, SmallVecError> {
         let mut this = Self::new_in(allocator);
         if capacity > Self::inline_size() && !Self::IS_ZST {
             // SAFETY: we checked all the preconditions
@@ -1373,7 +1375,8 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         Ok(this)
     }
 
-    pub fn with_capacity_in(capacity: usize, allocator: Heap) -> Self {
+    #[cfg_attr(feature = "allocator-api", syntax(pub))]
+    fn with_capacity_in(capacity: usize, allocator: Heap) -> Self {
         Self::try_with_capacity_in(capacity, allocator).unwrap_or_else(SmallVecError::handle)
     }
 }
