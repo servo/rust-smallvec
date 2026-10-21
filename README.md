@@ -58,6 +58,7 @@ v.sort();
 - `bytes`: implements `BufMut` for SmallVec
 - `defmt`: implements `defmt::Format` for SmallVec
 - `encase`: implements encasing as a runtime-sized array
+- `equivalent`: implements `equivalent::Equivalent` for `SmallVec`
 - `internals`: exports through the public API `LocatedLength` and `RawSmallVec`
 - `malloc_size_of`: implements `MallocSizeOf` and `MallocShallowSizeOf`
 - `rayon`: implements parallel iteration
@@ -70,5 +71,6 @@ v.sort();
 > [!NOTE]
 >
 > - SmallVec without any features enabled does not make use of the standard library.
-> - The `rayon` feature implicitly requires `std`.
-> - The `allocator-api2` feature requires `allocator-api`
+> - The `rayon` and `proptest` features implicitly require `std`.
+> - The `allocator-api2` feature requires `allocator-api`, though it does not
+    require `nightly`

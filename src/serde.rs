@@ -1,14 +1,23 @@
 use {
     super::{
-        Allocator,
-        Global,
-        SmallVec
+        SmallVec,
+        allocator::{
+            Allocator,
+            global::Global
+        }
     },
-    core::marker::PhantomData,
+    core::{
+        fmt::{
+            Formatter,
+            Result as Format
+        },
+        marker::PhantomData
+    },
     serde_core::{
         de::{
             Deserialize,
             Deserializer,
+            Error,
             SeqAccess,
             Visitor
         },
@@ -51,12 +60,11 @@ impl<'de, Item: Deserialize<'de>, const INLINE: usize> Visitor<'de>
 {
     type Value = SmallVec<Item, INLINE, Global>;
 
-    fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn expecting(&self, formatter: &mut Formatter<'_>) -> Format {
         formatter.write_str("a sequence")
     }
 
     fn visit_seq<B: SeqAccess<'de>>(self, mut seq: B) -> Result<Self::Value, B::Error> {
-        use serde_core::de::Error;
         let length = seq.size_hint().unwrap_or(0);
         let mut values = SmallVec::new();
         values.try_reserve(length).map_err(B::Error::custom)?;
