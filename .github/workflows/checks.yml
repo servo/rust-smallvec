@@ -101,7 +101,7 @@ jobs:
       steps:
         - name: checkout
           uses: actions/checkout@v7
-        - name: install rust stable
+        - name: install rust nighlty
           uses: dtolnay/rust-toolchain@nightly
           with:
             target: thumbv7m-none-eabi
