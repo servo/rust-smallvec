@@ -21,10 +21,10 @@ jobs:
           count=$(git rev-list --count --since="7 days ago" HEAD)
           echo "count=$count" >> "$GITHUB_OUTPUT"
       - name: install rust nightly
-        if: steps.commits.outputs.count != '0' || github.event_name == 'workflow_dispatch'
+        if: steps.commits.outputs.count != '0'
         uses: dtolnay/rust-toolchain@nightly
       - name: release-plz
-        if: steps.commits.outputs.count != '0' || github.event_name == 'workflow_dispatch'
+        if: steps.commits.outputs.count != '0'
         uses: release-plz/action@v0.5
         with:
           command: release
