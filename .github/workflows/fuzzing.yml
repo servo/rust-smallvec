@@ -23,7 +23,7 @@ jobs:
       - name: fuzz
         run: |
           cargo install cargo-fuzz
-          cargo fuzz run main -- -max_total_time=1800 -rss_limit_mb=4096
+          cargo fuzz run main -- -max_total_time=3600 -rss_limit_mb=4096
       - name: minimize corpus
         if: always()
         run: cargo fuzz cmin main
