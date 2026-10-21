@@ -18,7 +18,11 @@ jobs:
       - name: check for new commits
         id: commits
         run: |
-          count=$(git rev-list --count --since="7 days ago" HEAD)
+          if last_tag=$(git describe --tags --abbrev=0 HEAD 2>/dev/null); then
+            count=$(git rev-list --count "$last_tag..HEAD")
+          else
+            count=$(git rev-list --count HEAD)
+          fi
           echo "count=$count" >> "$GITHUB_OUTPUT"
       - name: install rust nightly
         if: steps.commits.outputs.count != '0'
