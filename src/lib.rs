@@ -18,7 +18,6 @@ mod conversions;
 mod error;
 mod iterators;
 mod locatedlength;
-#[macro_use]
 mod macros;
 #[cfg(feature = "malloc_size_of")]
 mod mallocsizeof;
@@ -1353,43 +1352,34 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
 }
 
 impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
-    public! {
-        #[cfg(feature = "allocator-api")]
-        const fn new_in(allocator: Heap) -> SmallVec<Item, INLINE, Heap> {
-            Self {
-                length: LocatedLength::new(0, false),
-                raw: RawSmallVec::new(),
-                allocator
-            }
+    #[cfg_attr(feature = "allocator-api", syntax(pub))]
+    const fn new_in(allocator: Heap) -> SmallVec<Item, INLINE, Heap> {
+        Self {
+            length: LocatedLength::new(0, false),
+            raw: RawSmallVec::new(),
+            allocator
         }
     }
 
-    public! {
-        #[cfg(feature = "allocator-api")]
-        fn try_with_capacity_in(
-            capacity: usize,
-            allocator: Heap
-        ) -> Result<Self, SmallVecError> {
-            let mut this = Self::new_in(allocator);
-            if capacity > Self::inline_size() && !Self::IS_ZST {
-                // SAFETY: we checked all the preconditions
-                unsafe {
-                    this.raw
-                        .try_grow_raw(LocatedLength::new(0, false), capacity, &this.allocator)
-                }?;
+    #[cfg_attr(feature = "allocator-api", syntax(pub))]
+    fn try_with_capacity_in(capacity: usize, allocator: Heap) -> Result<Self, SmallVecError> {
+        let mut this = Self::new_in(allocator);
+        if capacity > Self::inline_size() && !Self::IS_ZST {
+            // SAFETY: we checked all the preconditions
+            unsafe {
+                this.raw
+                    .try_grow_raw(LocatedLength::new(0, false), capacity, &this.allocator)
+            }?;
 
-                // SAFETY: the allocation succeeded, so self.raw.heap is now active
-                this.length.set_location::<true>();
-            }
-            Ok(this)
+            // SAFETY: the allocation succeeded, so self.raw.heap is now active
+            this.length.set_location::<true>();
         }
+        Ok(this)
     }
 
-    public! {
-        #[cfg(feature = "allocator-api")]
-        fn with_capacity_in(capacity: usize, allocator: Heap) -> Self {
-            Self::try_with_capacity_in(capacity, allocator).unwrap_or_else(SmallVecError::handle)
-        }
+    #[cfg_attr(feature = "allocator-api", syntax(pub))]
+    fn with_capacity_in(capacity: usize, allocator: Heap) -> Self {
+        Self::try_with_capacity_in(capacity, allocator).unwrap_or_else(SmallVecError::handle)
     }
 }
 
