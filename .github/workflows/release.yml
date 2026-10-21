@@ -1,0 +1,35 @@
+name: release
+on:
+  schedule:
+    # Every Friday at 12:00 UTC
+    - cron: '0 12 * * 5'
+  workflow_dispatch:
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+        with:
+          ref: v2
+          fetch-depth: 0
+          persist-credentials: false
+      - name: check for new commits
+        id: commits
+        run: |
+          count=$(git rev-list --count --since="7 days ago" HEAD)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+      - name: install rust stable
+        if: steps.commits.outputs.count != '0' || github.event_name == 'workflow_dispatch'
+        uses: dtolnay/rust-toolchain@stable
+      - name: release-plz
+        if: steps.commits.outputs.count != '0' || github.event_name == 'workflow_dispatch'
+        uses: release-plz/action@v0.5
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
