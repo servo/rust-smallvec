@@ -46,7 +46,6 @@ macro_rules! implementation {
         }
     };
     ([$($generics:tt)*] for $left:ty =?+ $right:ty $(where $typename:ty: $bound:ident)?) => {
-        #[cfg(feature = "equivalent")]
         impl<
             Item: Equivalent<Other>,
             Other,
@@ -63,7 +62,6 @@ macro_rules! implementation {
         }
     };
     ([$($generics:tt)*] for $left:ty =<>+ $right:ty $(where $typename:ty: $bound:ident)?) => {
-        #[cfg(feature = "equivalent")]
         impl<
             Item: Comparable<Other>,
             Other,
@@ -94,72 +92,102 @@ impl<Item: Ord, const INLINE: usize, Heap: Allocator> Ord for SmallVec<Item, INL
 
 implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =? [Other; LENGTH]);
 implementation!([const LENGTH: usize] for [Item; INLINE] =? SmallVec<Other, LENGTH, Heap>);
+#[cfg(feature = "equivalent")]
 implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =?+ [Other; LENGTH]);
+#[cfg(feature = "equivalent")]
 implementation!([const LENGTH: usize] for [Item; INLINE] =?+ SmallVec<Other, LENGTH, Heap>);
 implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =<> [Other; LENGTH]);
 implementation!([const LENGTH: usize] for [Item; INLINE] =<> SmallVec<Other, LENGTH, Heap>);
+#[cfg(feature = "equivalent")]
 implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =<>+ [Other; LENGTH]);
+#[cfg(feature = "equivalent")]
 implementation!([const LENGTH: usize] for [Item; INLINE] =<>+ SmallVec<Other, LENGTH, Heap>);
 
 implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =? &[Other; LENGTH]);
 implementation!([const LENGTH: usize] for &[Item; INLINE] =? SmallVec<Other, LENGTH, Heap>);
+#[cfg(feature = "equivalent")]
 implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =?+ &[Other; LENGTH]);
+#[cfg(feature = "equivalent")]
 implementation!([const LENGTH: usize] for &[Item; INLINE] =?+ SmallVec<Other, LENGTH, Heap>);
 implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =<> &[Other; LENGTH]);
 implementation!([const LENGTH: usize] for &[Item; INLINE] =<> SmallVec<Other, LENGTH, Heap>);
+#[cfg(feature = "equivalent")]
 implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =<>+ &[Other; LENGTH]);
+#[cfg(feature = "equivalent")]
 implementation!([const LENGTH: usize] for &[Item; INLINE] =<>+ SmallVec<Other, LENGTH, Heap>);
 
 implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =? &mut [Other; LENGTH]);
 implementation!([const LENGTH: usize] for &mut [Item; INLINE] =? SmallVec<Other, LENGTH, Heap>);
+#[cfg(feature = "equivalent")]
 implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =?+ &mut [Other; LENGTH]);
+#[cfg(feature = "equivalent")]
 implementation!([const LENGTH: usize] for &mut [Item; INLINE] =?+ SmallVec<Other, LENGTH, Heap>);
 implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =<> &mut [Other; LENGTH]);
 implementation!([const LENGTH: usize] for &mut [Item; INLINE] =<> SmallVec<Other, LENGTH, Heap>);
+#[cfg(feature = "equivalent")]
 implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =<>+ &mut [Other; LENGTH]);
+#[cfg(feature = "equivalent")]
 implementation!([const LENGTH: usize] for &mut [Item; INLINE] =<>+ SmallVec<Other, LENGTH, Heap>);
 
 implementation!([] for SmallVec<Item, INLINE, Heap> =? [Other]);
 implementation!([] for [Item] =? SmallVec<Other, INLINE, Heap>);
+#[cfg(feature = "equivalent")]
 implementation!([] for SmallVec<Item, INLINE, Heap> =?+ [Other]);
 implementation!([] for SmallVec<Item, INLINE, Heap> =<> [Other]);
 implementation!([] for [Item] =<> SmallVec<Other, INLINE, Heap>);
+#[cfg(feature = "equivalent")]
 implementation!([] for SmallVec<Item, INLINE, Heap> =<>+ [Other]);
 
 implementation!([] for SmallVec<Item, INLINE, Heap> =? &[Other]);
 implementation!([] for &[Item] =? SmallVec<Other, INLINE, Heap>);
+#[cfg(feature = "equivalent")]
 implementation!([] for SmallVec<Item, INLINE, Heap> =?+ &[Other]);
+#[cfg(feature = "equivalent")]
 implementation!([] for &[Item] =?+ SmallVec<Other, INLINE, Heap>);
 implementation!([] for SmallVec<Item, INLINE, Heap> =<> &[Other]);
 implementation!([] for &[Item] =<> SmallVec<Other, INLINE, Heap>);
+#[cfg(feature = "equivalent")]
 implementation!([] for SmallVec<Item, INLINE, Heap> =<>+ &[Other]);
+#[cfg(feature = "equivalent")]
 implementation!([] for &[Item] =<>+ SmallVec<Other, INLINE, Heap>);
 
 implementation!([] for SmallVec<Item, INLINE, Heap> =? &mut [Other]);
 implementation!([] for &mut [Item] =? SmallVec<Other, INLINE, Heap>);
+#[cfg(feature = "equivalent")]
 implementation!([] for SmallVec<Item, INLINE, Heap> =?+ &mut [Other]);
+#[cfg(feature = "equivalent")]
 implementation!([] for &mut [Item] =?+ SmallVec<Other, INLINE, Heap>);
 implementation!([] for SmallVec<Item, INLINE, Heap> =<> &mut [Other]);
 implementation!([] for &mut [Item] =<> SmallVec<Other, INLINE, Heap>);
+#[cfg(feature = "equivalent")]
 implementation!([] for SmallVec<Item, INLINE, Heap> =<>+ &mut [Other]);
+#[cfg(feature = "equivalent")]
 implementation!([] for &mut [Item] =<>+ SmallVec<Other, INLINE, Heap>);
 
 implementation!([] for SmallVec<Item, INLINE, Heap> =? Vec<Other>);
 implementation!([] for Vec<Item> =? SmallVec<Other, INLINE, Heap>);
+#[cfg(feature = "equivalent")]
 implementation!([] for SmallVec<Item, INLINE, Heap> =?+ Vec<Other>);
+#[cfg(feature = "equivalent")]
 implementation!([] for Vec<Item> =?+ SmallVec<Other, INLINE, Heap>);
 implementation!([] for SmallVec<Item, INLINE, Heap> =<> Vec<Other>);
 implementation!([] for Vec<Item> =<> SmallVec<Other, INLINE, Heap>);
+#[cfg(feature = "equivalent")]
 implementation!([] for SmallVec<Item, INLINE, Heap> =<>+ Vec<Other>);
+#[cfg(feature = "equivalent")]
 implementation!([] for Vec<Item> =<>+ SmallVec<Other, INLINE, Heap>);
 
 implementation!([] for SmallVec<Item, INLINE, Heap> =? Cow<'_, [Other]> where Other: Clone);
 implementation!([] for Cow<'_, [Item]> =? SmallVec<Other, INLINE, Heap> where Item: Clone);
+#[cfg(feature = "equivalent")]
 implementation!([] for SmallVec<Item, INLINE, Heap> =?+ Cow<'_, [Other]> where Other: Clone);
+#[cfg(feature = "equivalent")]
 implementation!([] for Cow<'_, [Item]> =?+ SmallVec<Other, INLINE, Heap> where Item: Clone);
 implementation!([] for SmallVec<Item, INLINE, Heap> =<> Cow<'_, [Other]> where Other: Clone);
 implementation!([] for Cow<'_, [Item]> =<> SmallVec<Other, INLINE, Heap> where Item: Clone);
+#[cfg(feature = "equivalent")]
 implementation!([] for SmallVec<Item, INLINE, Heap> =<>+ Cow<'_, [Other]> where Other: Clone);
+#[cfg(feature = "equivalent")]
 implementation!([] for Cow<'_, [Item]> =<>+ SmallVec<Other, INLINE, Heap> where Item: Clone);
 
 impl<Item: PartialEq<Other>, Other, const INLINE: usize, Heap: Allocator>
