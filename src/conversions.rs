@@ -114,19 +114,19 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<<Vec<Item, Heap> as Like>:
             Self {
                 length: LocatedLength::new(length, false),
                 raw: RawSmallVec::new(),
-                allocator: allocator
+                allocator
             }
         } else if let Some(pointer) = pointer {
             Self {
                 length: LocatedLength::new(length, true),
                 raw: RawSmallVec::heap(pointer.cast(), pointer.len()),
-                allocator: allocator
+                allocator
             }
         } else {
             Self {
                 length: LocatedLength::new(0, false),
                 raw: RawSmallVec::new(),
-                allocator: allocator
+                allocator
             }
         }
     }

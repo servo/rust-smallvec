@@ -43,6 +43,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
         (
             NonNull::new(slice_from_raw_parts_mut(pointer.cast(), capacity)),
             length,
+            #[allow(clippy::uninit_assumed_init)]
             unsafe { MaybeUninit::uninit().assume_init() }
         )
     }
