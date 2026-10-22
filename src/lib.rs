@@ -1003,13 +1003,13 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
 
     #[inline]
     #[deprecated(since = "2.0.0", note = "use `Into::<Vec<Item>>::into` instead")]
-    pub fn into_vec(self) -> <Vec<Item, Global> as Like>::Type {
+    pub fn into_vec(self) -> <Vec<Item, Heap> as Like>::Type {
         self.into()
     }
 
     #[inline]
     #[deprecated(since = "2.0.0", note = "use `Into::<Box<[Item]>>::into` instead")]
-    pub fn into_boxed_slice(self) -> <Box<[Item], Global> as Like>::Type {
+    pub fn into_boxed_slice(self) -> <Box<[Item], Heap> as Like>::Type {
         self.into()
     }
 
