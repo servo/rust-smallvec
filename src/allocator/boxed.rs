@@ -6,7 +6,10 @@ use {
     },
     core::{
         marker::PhantomData,
-        mem::MaybeUninit,
+        mem::{
+            MaybeUninit,
+            ManuallyDrop
+        },
         ptr::NonNull
     }
 };
@@ -22,17 +25,15 @@ impl<Item, Heap: Allocator> Like for Box<[Item], Heap> {
     type Type = alloc::boxed::Box<[Item], Heap>;
     #[cfg(feature = "allocator-api2")]
     type Type = allocator_api2::boxed::Box<[Item], Heap>;
-
     fn destruct(
-        value: Self::Type
+        value: ManuallyDrop<Self::Type>
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
         usize,
         Self::Heap
     ) {
-        <Vec<Item, Heap> as Like>::destruct(value.into_vec())
+        <Vec<Item, Heap> as Like>::destruct(ManuallyDrop::new(ManuallyDrop::into_inner(value).into_vec()))
     }
-
     fn construct(
         pointer: Option<NonNull<[MaybeUninit<Self::Item>]>>,
         length: usize,

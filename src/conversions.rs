@@ -109,7 +109,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<<Vec<Item, Heap> as Like>:
     for SmallVec<Item, INLINE, Heap>
 {
     fn from(vec: <Vec<Item, Heap> as Like>::Type) -> Self {
-        let (pointer, length, allocator) = <Vec<Item, Heap> as Like>::destruct(vec);
+        let (pointer, length, allocator) = <Vec<Item, Heap> as Like>::destruct(ManuallyDrop::new(vec));
         if Self::IS_ZST {
             Self {
                 length: LocatedLength::new(length, false),
@@ -124,7 +124,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<<Vec<Item, Heap> as Like>:
             }
         } else {
             Self {
-                length: LocatedLength::new(length, false),
+                length: LocatedLength::new(0, false),
                 raw: RawSmallVec::new(),
                 allocator
             }
@@ -141,6 +141,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
             let mut vector = <Vec<Item, Heap> as Like>::construct(None, 0, unsafe {
                 (&raw const smallvec.allocator).read()
             });
+            vector.reserve(length);
             // SAFETY: we create a new vector with sufficient capacity, copy our
             // elements into it to transfer ownership and then set
             // the length we don't drop the elements we previously

@@ -9,11 +9,15 @@ use {
     },
     core::{
         marker::PhantomData,
-        mem::MaybeUninit,
+        mem::{
+            MaybeUninit,
+            ManuallyDrop
+        },
         ptr::{
             NonNull,
             slice_from_raw_parts_mut
-        }
+        },
+        num::NonZero
     }
 };
 
@@ -31,18 +35,15 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
 
     #[cfg(not(feature = "allocator-api"))]
     fn destruct(
-        mut value: Self::Type
+        mut value: ManuallyDrop<Self::Type>
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
         usize,
         Self::Heap
     ) {
-        let pointer = value.as_mut_ptr();
-        let length = value.len();
-        let capacity = value.capacity();
         (
-            NonNull::new(slice_from_raw_parts_mut(pointer.cast(), capacity)),
-            length,
+            NonZero::new(value.capacity()).and_then(|capacity| NonNull::new(slice_from_raw_parts_mut(value.as_mut_ptr().cast(), capacity.get()))),
+            value.len(),
             #[allow(clippy::uninit_assumed_init)]
             unsafe { MaybeUninit::uninit().assume_init() }
         )
@@ -50,7 +51,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
 
     #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
     fn destruct(
-        value: Self::Type
+        value: ManuallyDrop<Self::Type>
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
         usize,
@@ -58,7 +59,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
     ) {
         let (pointer, length, capacity, allocator) = value.into_raw_parts_with_allocator();
         (
-            NonNull::new(slice_from_raw_parts_mut(pointer.cast(), capacity)),
+            NonZero::new(value.capacity()).and_then(|capacity| NonNull::new(slice_from_raw_parts_mut(value.as_mut_ptr().cast(), capacity.get()))),
             length,
             allocator
         )
@@ -66,7 +67,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
 
     #[cfg(feature = "allocator-api2")]
     fn destruct(
-        value: Self::Type
+        value: ManuallyDrop<Self::Type>
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
         usize,
@@ -74,7 +75,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
     ) {
         let (pointer, length, capacity, allocator) = value.into_raw_parts_with_alloc();
         (
-            NonNull::new(slice_from_raw_parts_mut(pointer.cast(), capacity)),
+            NonZero::new(value.capacity()).and_then(|capacity| NonNull::new(slice_from_raw_parts_mut(value.as_mut_ptr().cast(), capacity.get()))),
             length,
             allocator
         )
