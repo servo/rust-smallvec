@@ -2,15 +2,14 @@
 use alloc::alloc::AllocError;
 #[cfg(feature = "allocator-api2")]
 use allocator_api2::alloc::AllocError;
-use {
-    super::{
-        Allocator,
-        requirement::Requirement
-    },
-    core::{
-        alloc::Layout,
-        ptr::NonNull
-    }
+#[cfg(feature = "allocator-api")]
+use core::{
+    alloc::Layout,
+    ptr::NonNull
+};
+use super::{
+    Allocator,
+    requirement::Requirement
 };
 
 #[repr(transparent)]

@@ -1,7 +1,8 @@
 use {
     super::super::{
         Allocator,
-        global::Global
+        global::Global,
+        requirement::Requirement
     },
     alloc::alloc::{
         alloc,
@@ -14,7 +15,9 @@ use {
     }
 };
 
-impl Allocator for Global {
+impl Requirement for Global {}
+
+impl<Type: Requirement> Allocator for Type {
     #[inline]
     fn allocate(&self, layout: Layout) -> Option<NonNull<[u8]>> {
         Some(NonNull::slice_from_raw_parts(
