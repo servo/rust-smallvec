@@ -16,8 +16,8 @@ use {
     core::{
         mem::ManuallyDrop,
         ptr::{
-            copy_nonoverlapping,
-            NonNull
+            NonNull,
+            copy_nonoverlapping
         }
     }
 };
@@ -68,7 +68,9 @@ impl<Item: Clone, const INLINE: usize, const LENGTH: usize> From<&mut [Item; LEN
     }
 }
 
-impl<Item, const INLINE: usize, const LENGTH: usize> From<[Item; LENGTH]> for SmallVec<Item, INLINE, Global> {
+impl<Item, const INLINE: usize, const LENGTH: usize> From<[Item; LENGTH]>
+    for SmallVec<Item, INLINE, Global>
+{
     fn from(array: [Item; LENGTH]) -> Self {
         if const { LENGTH > INLINE } {
             <Vec<Item, Global> as Like>::Type::from(array).into()
@@ -94,10 +96,12 @@ impl<Item, const INLINE: usize, const LENGTH: usize, Heap: Allocator>
         mut smallvec: SmallVec<Item, INLINE, Heap>
     ) -> Result<[Item; LENGTH], SmallVec<Item, INLINE, Heap>> {
         // SAFETY: we release ownership of the elements we hold
-        (smallvec.len() == LENGTH).then(|| unsafe {
-            smallvec.set_len(0);
-            smallvec.as_ptr().cast::<[Item; LENGTH]>().read()
-        }).ok_or(smallvec)
+        (smallvec.len() == LENGTH)
+            .then(|| unsafe {
+                smallvec.set_len(0);
+                smallvec.as_ptr().cast::<[Item; LENGTH]>().read()
+            })
+            .ok_or(smallvec)
     }
 }
 
@@ -134,7 +138,9 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
         let (length, on_heap) = smallvec.length.parts();
         let smallvec = ManuallyDrop::new(smallvec);
         if !on_heap {
-            let mut vector = <Vec<Item, Heap> as Like>::construct(None, 0, unsafe { (&raw const smallvec.allocator).read() });
+            let mut vector = <Vec<Item, Heap> as Like>::construct(None, 0, unsafe {
+                (&raw const smallvec.allocator).read()
+            });
             // SAFETY: we create a new vector with sufficient capacity, copy our
             // elements into it to transfer ownership and then set
             // the length we don't drop the elements we previously
@@ -154,7 +160,11 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
             // - the allocation is not larger than `isize::MAX`
             unsafe {
                 let (ptr, cap) = smallvec.raw.heap;
-                Vec::construct(Some(NonNull::slice_from_raw_parts(ptr.cast(), cap)), length, (&raw const smallvec.allocator).read())
+                Vec::construct(
+                    Some(NonNull::slice_from_raw_parts(ptr.cast(), cap)),
+                    length,
+                    (&raw const smallvec.allocator).read()
+                )
             }
         }
     }
@@ -167,7 +177,9 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
         <Vec<Item, Heap> as Like>::Type::from(smallvec).into_boxed_slice()
     }
 }
-impl<Item, const INLINE: usize, Heap: Allocator> From<<Box<[Item], Heap> as Like>::Type> for SmallVec<Item, INLINE, Heap> {
+impl<Item, const INLINE: usize, Heap: Allocator> From<<Box<[Item], Heap> as Like>::Type>
+    for SmallVec<Item, INLINE, Heap>
+{
     fn from(boxed: <Box<[Item], Heap> as Like>::Type) -> Self {
         boxed.into_vec().into()
     }

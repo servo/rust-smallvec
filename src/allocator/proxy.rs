@@ -1,7 +1,7 @@
-#[cfg(feature = "allocator-api2")]
-use allocator_api2::alloc::AllocError;
 #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
 use alloc::alloc::AllocError;
+#[cfg(feature = "allocator-api2")]
+use allocator_api2::alloc::AllocError;
 use {
     super::{
         Allocator,
@@ -27,7 +27,9 @@ unsafe impl<'valid, Heap: Allocator> Requirement for Proxy<'valid, Heap> {
 
     #[inline]
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-        unsafe { Requirement::deallocate(&self, ptr, layout); }
+        unsafe {
+            Requirement::deallocate(&self, ptr, layout);
+        }
     }
 
     #[inline]
@@ -35,7 +37,7 @@ unsafe impl<'valid, Heap: Allocator> Requirement for Proxy<'valid, Heap> {
         &self,
         ptr: NonNull<u8>,
         old_layout: Layout,
-        new_layout: Layout,
+        new_layout: Layout
     ) -> Result<NonNull<[u8]>, AllocError> {
         unsafe { Requirement::grow(&self, ptr, old_layout, new_layout) }
     }
@@ -45,7 +47,7 @@ unsafe impl<'valid, Heap: Allocator> Requirement for Proxy<'valid, Heap> {
         &self,
         ptr: NonNull<u8>,
         old_layout: Layout,
-        new_layout: Layout,
+        new_layout: Layout
     ) -> Result<NonNull<[u8]>, AllocError> {
         unsafe { Requirement::shrink(&self, ptr, old_layout, new_layout) }
     }
@@ -59,7 +61,9 @@ unsafe impl<'valid, Heap: Allocator> Requirement for Proxy<'valid, Heap> {
 
     #[inline]
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-        unsafe { Requirement::deallocate(&self, ptr, layout); }
+        unsafe {
+            Requirement::deallocate(&self, ptr, layout);
+        }
     }
 
     #[inline]
@@ -67,7 +71,7 @@ unsafe impl<'valid, Heap: Allocator> Requirement for Proxy<'valid, Heap> {
         &self,
         ptr: NonNull<u8>,
         old_layout: Layout,
-        new_layout: Layout,
+        new_layout: Layout
     ) -> Result<NonNull<[u8]>, AllocError> {
         unsafe { Requirement::grow(&self, ptr, old_layout, new_layout) }
     }
@@ -77,7 +81,7 @@ unsafe impl<'valid, Heap: Allocator> Requirement for Proxy<'valid, Heap> {
         &self,
         ptr: NonNull<u8>,
         old_layout: Layout,
-        new_layout: Layout,
+        new_layout: Layout
     ) -> Result<NonNull<[u8]>, AllocError> {
         unsafe { Requirement::shrink(&self, ptr, old_layout, new_layout) }
     }
