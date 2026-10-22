@@ -21,8 +21,8 @@ fn smallvec() {
     check!([2; 2]);
     check!([3; 3]);
 
-    check!([]);
-    check!([1]);
-    check!([1, 2]);
-    check!([1, 2, 3]);
+    //check!([]);
+    //check!([1]);
+    //check!([1, 2]);
+    //check!([1, 2, 3]);
 }

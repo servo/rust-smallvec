@@ -124,7 +124,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<<Vec<Item, Heap> as Like>:
             }
         } else {
             Self {
-                length: LocatedLength::new(0, false),
+                length: LocatedLength::new(length, false),
                 raw: RawSmallVec::new(),
                 allocator
             }
