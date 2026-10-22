@@ -63,6 +63,8 @@ use proptest::{
         Strategy
     }
 };
+#[cfg(any(feature = "allocator-api", feature = "internals"))]
+use smallvec_macro::syntax;
 #[cfg(feature = "specialization")]
 use specialization::{
     SpecCloneFrom,
@@ -78,8 +80,6 @@ use std::io::{
 };
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
-#[cfg(any(feature = "allocator-api", feature = "internals"))]
-use smallvec_macro::syntax;
 use {
     allocator::{
         Allocator,

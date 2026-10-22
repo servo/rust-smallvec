@@ -1,9 +1,9 @@
 #[cfg(not(feature = "allocator-api2"))]
-use core::mem::ManuallyDrop;
-#[cfg(not(feature = "allocator-api2"))]
 pub use alloc::vec;
 #[cfg(feature = "allocator-api2")]
 pub use allocator_api2::vec;
+#[cfg(not(feature = "allocator-api2"))]
+use core::mem::ManuallyDrop;
 use {
     super::{
         Allocator,
