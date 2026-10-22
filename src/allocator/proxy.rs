@@ -1,3 +1,7 @@
+use super::{
+    Allocator,
+    requirement::Requirement
+};
 #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
 use alloc::alloc::AllocError;
 #[cfg(feature = "allocator-api2")]
@@ -6,10 +10,6 @@ use allocator_api2::alloc::AllocError;
 use core::{
     alloc::Layout,
     ptr::NonNull
-};
-use super::{
-    Allocator,
-    requirement::Requirement
 };
 
 #[repr(transparent)]

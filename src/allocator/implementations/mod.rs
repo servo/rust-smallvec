@@ -1,17 +1,17 @@
 use {
     super::{
+        Allocator,
         global::Global,
-        requirement::Requirement,
-        Allocator
-    },
-    core::{
-        alloc::Layout,
-        ptr::NonNull
+        requirement::Requirement
     },
     alloc::alloc::{
         alloc,
         dealloc,
         realloc
+    },
+    core::{
+        alloc::Layout,
+        ptr::NonNull
     }
 };
 
