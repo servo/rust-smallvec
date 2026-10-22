@@ -31,13 +31,15 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
 
     #[cfg(not(feature = "allocator-api"))]
     fn destruct(
-        value: Self::Type
+        mut value: Self::Type
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
         usize,
         Self::Heap
     ) {
-        let (pointer, length, capacity) = value.into_raw_parts();
+        let pointer = value.as_mut_ptr();
+        let length = value.len();
+        let capacity = value.capacity();
         (
             NonNull::new(slice_from_raw_parts_mut(pointer.cast(), capacity)),
             length,
