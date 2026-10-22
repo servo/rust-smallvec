@@ -58,13 +58,13 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
 
     #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
     fn destruct(
-        value: ManuallyDrop<Self::Type>
+        mut value: ManuallyDrop<Self::Type>
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
         usize,
         Self::Heap
     ) {
-        let (pointer, length, capacity, allocator) = value.into_raw_parts_with_allocator();
+        let (pointer, length, capacity, allocator) = ManuallyDrop::into_inner(value).into_raw_parts_with_allocator();
         (
             NonZero::new(value.capacity()).and_then(|capacity| {
                 NonNull::new(slice_from_raw_parts_mut(
@@ -79,13 +79,13 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
 
     #[cfg(feature = "allocator-api2")]
     fn destruct(
-        value: ManuallyDrop<Self::Type>
+        mut value: ManuallyDrop<Self::Type>
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
         usize,
         Self::Heap
     ) {
-        let (pointer, length, capacity, allocator) = value.into_raw_parts_with_alloc();
+        let (pointer, length, capacity, allocator) = ManuallyDrop::into_inner(value).into_raw_parts_with_alloc();
         (
             NonZero::new(value.capacity()).and_then(|capacity| {
                 NonNull::new(slice_from_raw_parts_mut(
