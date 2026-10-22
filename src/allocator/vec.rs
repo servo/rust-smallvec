@@ -35,20 +35,21 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
 
     #[cfg(not(feature = "allocator-api"))]
     fn destruct(
-        mut value: ManuallyDrop<Self::Type>
+        value: Self::Type
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
         usize,
         Self::Heap
     ) {
+        let mut data = ManuallyDrop::new(value);
         (
-            NonZero::new(value.capacity()).and_then(|capacity| {
+            NonZero::new(data.capacity()).and_then(|capacity| {
                 NonNull::new(slice_from_raw_parts_mut(
-                    value.as_mut_ptr().cast(),
+                    data.as_mut_ptr().cast(),
                     capacity.get()
                 ))
             }),
-            value.len(),
+            data.len(),
             #[allow(clippy::uninit_assumed_init)]
             unsafe {
                 MaybeUninit::uninit().assume_init()
@@ -58,20 +59,16 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
 
     #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
     fn destruct(
-        mut value: ManuallyDrop<Self::Type>
+        mut value: Self::Type
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
         usize,
         Self::Heap
     ) {
-        let (pointer, length, capacity, allocator) =
-            ManuallyDrop::into_inner(value).into_raw_parts_with_allocator();
+        let (pointer, length, capacity, allocator) = value.into_raw_parts_with_allocator();
         (
-            NonZero::new(value.capacity()).and_then(|capacity| {
-                NonNull::new(slice_from_raw_parts_mut(
-                    value.as_mut_ptr().cast(),
-                    capacity.get()
-                ))
+            NonZero::new(capacity).and_then(|capacity| {
+                NonNull::new(slice_from_raw_parts_mut(pointer.cast(), capacity.get()))
             }),
             length,
             allocator
@@ -80,20 +77,16 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
 
     #[cfg(feature = "allocator-api2")]
     fn destruct(
-        mut value: ManuallyDrop<Self::Type>
+        mut value: Self::Type
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
         usize,
         Self::Heap
     ) {
-        let (pointer, length, capacity, allocator) =
-            ManuallyDrop::into_inner(value).into_raw_parts_with_alloc();
+        let (pointer, length, capacity, allocator) = value.into_raw_parts_with_alloc();
         (
-            NonZero::new(value.capacity()).and_then(|capacity| {
-                NonNull::new(slice_from_raw_parts_mut(
-                    value.as_mut_ptr().cast(),
-                    capacity.get()
-                ))
+            NonZero::new(value).and_then(|capacity| {
+                NonNull::new(slice_from_raw_parts_mut(pointer.cast(), capacity.get()))
             }),
             length,
             allocator

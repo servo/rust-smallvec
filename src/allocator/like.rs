@@ -1,10 +1,7 @@
 use {
     super::Allocator,
     core::{
-        mem::{
-            ManuallyDrop,
-            MaybeUninit
-        },
+        mem::MaybeUninit,
         ptr::NonNull
     }
 };
@@ -14,7 +11,7 @@ pub trait Like {
     type Item;
     type Heap: Allocator;
     fn destruct(
-        value: ManuallyDrop<Self::Type>
+        value: Self::Type
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
         usize,

@@ -109,8 +109,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<<Vec<Item, Heap> as Like>:
     for SmallVec<Item, INLINE, Heap>
 {
     fn from(vec: <Vec<Item, Heap> as Like>::Type) -> Self {
-        let (pointer, length, allocator) =
-            <Vec<Item, Heap> as Like>::destruct(ManuallyDrop::new(vec));
+        let (pointer, length, allocator) = <Vec<Item, Heap> as Like>::destruct(vec);
         if Self::IS_ZST {
             Self {
                 length: LocatedLength::new(length, false),
