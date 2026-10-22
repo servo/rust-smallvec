@@ -10,14 +10,14 @@ use {
     core::{
         marker::PhantomData,
         mem::{
-            MaybeUninit,
-            ManuallyDrop
+            ManuallyDrop,
+            MaybeUninit
         },
+        num::NonZero,
         ptr::{
             NonNull,
             slice_from_raw_parts_mut
-        },
-        num::NonZero
+        }
     }
 };
 
@@ -42,10 +42,17 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
         Self::Heap
     ) {
         (
-            NonZero::new(value.capacity()).and_then(|capacity| NonNull::new(slice_from_raw_parts_mut(value.as_mut_ptr().cast(), capacity.get()))),
+            NonZero::new(value.capacity()).and_then(|capacity| {
+                NonNull::new(slice_from_raw_parts_mut(
+                    value.as_mut_ptr().cast(),
+                    capacity.get()
+                ))
+            }),
             value.len(),
             #[allow(clippy::uninit_assumed_init)]
-            unsafe { MaybeUninit::uninit().assume_init() }
+            unsafe {
+                MaybeUninit::uninit().assume_init()
+            }
         )
     }
 
@@ -59,7 +66,12 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
     ) {
         let (pointer, length, capacity, allocator) = value.into_raw_parts_with_allocator();
         (
-            NonZero::new(value.capacity()).and_then(|capacity| NonNull::new(slice_from_raw_parts_mut(value.as_mut_ptr().cast(), capacity.get()))),
+            NonZero::new(value.capacity()).and_then(|capacity| {
+                NonNull::new(slice_from_raw_parts_mut(
+                    value.as_mut_ptr().cast(),
+                    capacity.get()
+                ))
+            }),
             length,
             allocator
         )
@@ -75,7 +87,12 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
     ) {
         let (pointer, length, capacity, allocator) = value.into_raw_parts_with_alloc();
         (
-            NonZero::new(value.capacity()).and_then(|capacity| NonNull::new(slice_from_raw_parts_mut(value.as_mut_ptr().cast(), capacity.get()))),
+            NonZero::new(value.capacity()).and_then(|capacity| {
+                NonNull::new(slice_from_raw_parts_mut(
+                    value.as_mut_ptr().cast(),
+                    capacity.get()
+                ))
+            }),
             length,
             allocator
         )

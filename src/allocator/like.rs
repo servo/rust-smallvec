@@ -2,8 +2,8 @@ use {
     super::Allocator,
     core::{
         mem::{
-            MaybeUninit,
-            ManuallyDrop
+            ManuallyDrop,
+            MaybeUninit
         },
         ptr::NonNull
     }
