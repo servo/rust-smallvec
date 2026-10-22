@@ -1,4 +1,6 @@
 #[cfg(not(feature = "allocator-api2"))]
+use core::mem::ManuallyDrop;
+#[cfg(not(feature = "allocator-api2"))]
 pub use alloc::vec;
 #[cfg(feature = "allocator-api2")]
 pub use allocator_api2::vec;
@@ -9,10 +11,7 @@ use {
     },
     core::{
         marker::PhantomData,
-        mem::{
-            ManuallyDrop,
-            MaybeUninit
-        },
+        mem::MaybeUninit,
         num::NonZero,
         ptr::{
             NonNull,
@@ -77,7 +76,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
 
     #[cfg(feature = "allocator-api2")]
     fn destruct(
-        mut value: Self::Type
+        value: Self::Type
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
         usize,

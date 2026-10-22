@@ -1,13 +1,16 @@
+#[cfg(not(feature = "allocator-api"))]
 use {
-    super::{
-        Allocator,
-        global::Global,
-        requirement::Requirement
-    },
+    super::global::Global,
     alloc::alloc::{
         alloc,
         dealloc,
         realloc
+    }
+};
+use {
+    super::{
+        Allocator,
+        requirement::Requirement
     },
     core::{
         alloc::Layout,

@@ -78,6 +78,8 @@ use std::io::{
 };
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
+#[cfg(any(feature = "allocator-api", feature = "internals"))]
+use smallvec_macro::syntax;
 use {
     allocator::{
         Allocator,
@@ -130,8 +132,7 @@ use {
             from_raw_parts_mut
         }
     },
-    newrange::NewRange,
-    smallvec_macro::syntax
+    newrange::NewRange
 };
 pub use {
     error::SmallVecError,
