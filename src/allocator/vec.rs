@@ -85,7 +85,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
     ) {
         let (pointer, length, capacity, allocator) = value.into_raw_parts_with_alloc();
         (
-            NonZero::new(value).and_then(|capacity| {
+            NonZero::new(capacity).and_then(|capacity| {
                 NonNull::new(slice_from_raw_parts_mut(pointer.cast(), capacity.get()))
             }),
             length,
