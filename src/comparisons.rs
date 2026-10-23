@@ -11,6 +11,8 @@ use {
     core::cmp::Ordering
 };
 
+use crate::Global;
+
 macro_rules! __impl_slice_eq1 {
     ([$($vars:tt)*] $lhs:ty, $rhs:ty $(where $ty:ty: $bound:ident)?) => {
         impl<Item, U, Heap: Allocator, const INLINE: usize, $($vars)*> PartialEq<$rhs> for $lhs
@@ -40,6 +42,18 @@ __impl_slice_eq1! { [] Vec<Item>, SmallVec<U, INLINE, Heap> }
 __impl_slice_eq1! { [] SmallVec<Item, INLINE, Heap>, Vec<U> }
 __impl_slice_eq1! { [] Cow<'_, [Item]>, SmallVec<U, INLINE, Heap> where Item: Clone }
 __impl_slice_eq1! { [] SmallVec<Item, INLINE, Heap>, Cow<'_, [U]> where U: Clone }
+
+#[cfg(feature = "arrayvec")]
+impl<Item, const INLINE: usize> PartialEq<arrayvec::ArrayVec<Item, INLINE>>
+    for SmallVec<Item, INLINE, Global>
+where
+    Item: PartialEq<Item>,
+{
+    #[inline]
+    fn eq(&self, other: &arrayvec::ArrayVec<Item, INLINE>) -> bool {
+        self.as_ref() == other.as_ref()
+    }
+}
 
 impl<Item, U, const INLINE: usize, Heap: Allocator> PartialEq<SmallVec<U, INLINE, Heap>>
     for VecDeque<Item>
@@ -74,5 +88,17 @@ where Item: Ord
     #[inline]
     fn cmp(&self, other: &SmallVec<Item, INLINE, Heap>) -> Ordering {
         self.as_ref().cmp(other.as_ref())
+    }
+}
+
+#[cfg(feature = "arrayvec")]
+impl<Item, const INLINE: usize> PartialOrd<arrayvec::ArrayVec<Item, INLINE>>
+    for SmallVec<Item, INLINE, Global>
+where
+    Item: PartialOrd
+{
+    #[inline]
+    fn partial_cmp(&self, other: &arrayvec::ArrayVec<Item, INLINE>) -> Option<Ordering> {
+        self.as_ref().partial_cmp(other.as_ref())
     }
 }

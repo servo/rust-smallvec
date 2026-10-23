@@ -19,7 +19,7 @@ use {
             NonNull,
             copy_nonoverlapping
         }
-    }
+    },
 };
 
 impl<Item: Clone, const INLINE: usize> From<&[Item]> for SmallVec<Item, INLINE, Global> {
@@ -209,5 +209,15 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
 impl<T, const N: usize> From<<Box<[T], Global> as Like>::Type> for SmallVec<T, N> {
     fn from(boxed: <Box<[T], Global> as Like>::Type) -> Self {
         boxed.into_vec().into()
+    }
+}
+
+#[cfg(feature = "arrayvec")]
+impl<Item, const M: usize, const INLINE: usize> From<SmallVec<Item, INLINE, Global>>
+    for arrayvec::ArrayVec<Item, M>
+{
+    fn from(this: SmallVec<Item, INLINE, Global>) -> Self {
+        // SAFETY: caller ensures length matches M
+        <arrayvec::ArrayVec<Item, M> as TryFrom<SmallVec<Item, INLINE, Global>>>::try_from(this).unwrap()
     }
 }
