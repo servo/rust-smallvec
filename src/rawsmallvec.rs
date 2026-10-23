@@ -1,7 +1,7 @@
 use {
     super::{
-        Allocator,
-        SmallVecError,
+        allocator::Allocator,
+        error::SmallVecError,
         locatedlength::LocatedLength
     },
     core::{
@@ -19,7 +19,7 @@ use {
 
 #[repr(C)]
 pub union RawSmallVec<Item, const INLINE: usize> {
-    pub inline: ManuallyDrop<MaybeUninit<[Item; INLINE]>>,
+    pub inline: ManuallyDrop<[MaybeUninit<Item>; INLINE]>,
     pub heap: (NonNull<Item>, usize)
 }
 
@@ -29,18 +29,18 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
 
     #[inline]
     pub const fn new() -> Self {
-        Self::new_inline(MaybeUninit::uninit())
+        Self::inline([const { MaybeUninit::uninit() }; INLINE])
     }
 
     #[inline]
-    pub const fn new_inline(inline: MaybeUninit<[Item; INLINE]>) -> Self {
+    pub const fn inline(inline: [MaybeUninit<Item>; INLINE]) -> Self {
         Self {
             inline: ManuallyDrop::new(inline)
         }
     }
 
     #[inline]
-    pub const fn new_heap(ptr: NonNull<Item>, capacity: usize) -> Self {
+    pub const fn heap(ptr: NonNull<Item>, capacity: usize) -> Self {
         Self {
             heap: (ptr, capacity)
         }
@@ -126,8 +126,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
         let new_ptr = if !was_on_heap {
             // get a fresh allocation
             // `new_layout` has nonzero size.
-            let new_ptr = allocator
-                .allocate(new_layout)
+            let new_ptr = Allocator::allocate(allocator, new_layout)
                 .ok_or(SmallVecError::AllocationError(new_layout))?
                 .cast();
             unsafe { copy_nonoverlapping(ptr, new_ptr.as_ptr(), length) };
@@ -152,9 +151,9 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
             // with Layout::array
             unsafe {
                 (if self.heap.1 < new_capacity {
-                    Heap::grow
+                    <Heap as Allocator>::grow
                 } else {
-                    Heap::shrink
+                    <Heap as Allocator>::shrink
                 })(
                     allocator,
                     NonNull::new(ptr as *mut u8).unwrap(),

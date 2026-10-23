@@ -57,6 +57,18 @@ jobs:
       - name: markdownlint
         run: |
           git ls-files '*.md' -z | xargs -0 docker run --rm -v "$PWD:/work" -w /work ghcr.io/igorshubovych/markdownlint-cli:v0.41.0
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+      - name: install rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+      - name: default features
+        run: cargo package
+      - name: all features
+        run: cargo package --all-features
   miri:
     name: Miri
     runs-on: ubuntu-latest
@@ -71,18 +83,8 @@ jobs:
           cargo miri test
       - name: all features
         run: cargo miri test --all-features
-  stable:
-    name: Stable
-    runs-on: ubuntu-latest
-    steps:
-      - name: checkout
-        uses: actions/checkout@v7
-      - name: install rust nightly
-        uses: dtolnay/rust-toolchain@stable
-      - name: test default features
-        run: cargo test
-  nightly:
-    name: Nightly
+  tests:
+    name: Tests
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -99,8 +101,8 @@ jobs:
       steps:
         - name: checkout
           uses: actions/checkout@v7
-        - name: install rust stable
-          uses: dtolnay/rust-toolchain@stable
+        - name: install rust nighlty
+          uses: dtolnay/rust-toolchain@nightly
           with:
             target: thumbv7m-none-eabi
         - name: test default features

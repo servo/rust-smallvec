@@ -1,12 +1,20 @@
 use {
-    crate::{
-        Allocator,
+    super::{
         DropGuard,
-        Global,
-        IntoIter,
-        SmallVec
+        SmallVec,
+        allocator::{
+            Allocator,
+            global::Global
+        },
+        iterators::intoiter::IntoIter
     },
-    core::ptr::copy_nonoverlapping
+    core::{
+        iter::TrustedLen,
+        mem::forget,
+        ops::Range,
+        ptr::copy_nonoverlapping,
+        slice::Iter
+    }
 };
 
 /// A trait for specializing the implementation of [`from_elem`].
@@ -76,7 +84,7 @@ where I: Iterator<Item = Item>
 
 impl<Item, I, const INLINE: usize, Heap: Allocator> SpecExtend<Item, I>
     for SmallVec<Item, INLINE, Heap>
-where I: core::iter::TrustedLen<Item = Item>
+where I: TrustedLen<Item = Item>
 {
     fn spec_extend(&mut self, iter: I) {
         let (_, Some(additional)) = iter.size_hint() else {
@@ -103,7 +111,7 @@ where I: core::iter::TrustedLen<Item = Item>
 
             // The elements have been initialized in the loop above.
             self.set_len(length + guard.length);
-            core::mem::forget(guard);
+            forget(guard);
         }
     }
 }
@@ -112,7 +120,7 @@ impl<Item, const INLINE: usize, const M: usize, Heap: Allocator>
     SpecExtend<Item, IntoIter<Item, M, Heap>> for SmallVec<Item, INLINE, Heap>
 {
     fn spec_extend(&mut self, mut iter: IntoIter<Item, M, Heap>) {
-        let slice = iter.as_slice();
+        let slice = iter.as_ref();
         let length = slice.len();
         let old_len = self.len();
 
@@ -136,10 +144,10 @@ impl<Item, const INLINE: usize, const M: usize, Heap: Allocator>
     }
 }
 
-impl<'a, Item: 'a, const INLINE: usize, I, Heap: Allocator> SpecExtend<&'a Item, I>
+impl<'valid, Item: 'valid, const INLINE: usize, I, Heap: Allocator> SpecExtend<&'valid Item, I>
     for SmallVec<Item, INLINE, Heap>
 where
-    I: Iterator<Item = &'a Item>,
+    I: Iterator<Item = &'valid Item>,
     Item: Clone
 {
     #[inline]
@@ -148,11 +156,11 @@ where
     }
 }
 
-impl<'a, Item: 'a, const INLINE: usize, Heap: Allocator>
-    SpecExtend<&'a Item, core::slice::Iter<'a, Item>> for SmallVec<Item, INLINE, Heap>
+impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator>
+    SpecExtend<&'valid Item, Iter<'valid, Item>> for SmallVec<Item, INLINE, Heap>
 where Item: Copy
 {
-    fn spec_extend(&mut self, iter: core::slice::Iter<'a, Item>) {
+    fn spec_extend(&mut self, iter: Iter<'valid, Item>) {
         let slice = iter.as_slice();
         let length = slice.len();
         let old_len = self.len();
@@ -187,13 +195,13 @@ pub trait SpecExtendFromWithin<Item> {
     ///   `source.len()`.
     ///
     /// [`extend_from_within`]: SmallVec::extend_from_within
-    unsafe fn spec_extend_from_within(&mut self, source: core::ops::Range<usize>);
+    unsafe fn spec_extend_from_within(&mut self, source: Range<usize>);
 }
 
 impl<Item: Clone, const INLINE: usize, Heap: Allocator> SpecExtendFromWithin<Item>
     for SmallVec<Item, INLINE, Heap>
 {
-    default unsafe fn spec_extend_from_within(&mut self, source: core::ops::Range<usize>) {
+    default unsafe fn spec_extend_from_within(&mut self, source: Range<usize>) {
         // SAFETY: Safety conditions are identical.
         unsafe {
             self.extend_from_within_fallback(source);
@@ -204,7 +212,7 @@ impl<Item: Clone, const INLINE: usize, Heap: Allocator> SpecExtendFromWithin<Ite
 impl<Item: Copy, const INLINE: usize, Heap: Allocator> SpecExtendFromWithin<Item>
     for SmallVec<Item, INLINE, Heap>
 {
-    unsafe fn spec_extend_from_within(&mut self, source: core::ops::Range<usize>) {
+    unsafe fn spec_extend_from_within(&mut self, source: Range<usize>) {
         let old_len = self.len();
 
         let start = source.start;
@@ -244,7 +252,7 @@ where I: Iterator<Item = Item>
 }
 
 impl<Item, I, const INLINE: usize> SpecFromIterator<Item, I> for SmallVec<Item, INLINE, Global>
-where I: core::iter::TrustedLen<Item = Item>
+where I: TrustedLen<Item = Item>
 {
     fn spec_from_iter(iter: I) -> Self {
         let mut v = match iter.size_hint() {

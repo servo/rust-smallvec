@@ -1,0 +1,15 @@
+[package]
+name = "smallvec-macro"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "proc-macro crate for SmallVec"
+keywords = []
+categories = []
+
+[lib]
+proc-macro = true
+path = "./lib.rs"

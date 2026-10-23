@@ -1,20 +1,31 @@
-use super::{
+use {
     super::{
-        Allocator,
-        Global,
-        SmallVec,
-        allocator::proxy::Proxy
+        super::{
+            SmallVec,
+            allocator::{
+                Allocator,
+                global::Global,
+                proxy::Proxy
+            }
+        },
+        drain::Drain
     },
-    drain::Drain
+    core::fmt::{
+        Debug,
+        Formatter,
+        Result as Format
+    }
 };
 
-pub struct Splice<'a, I: Iterator + 'a, const INLINE: usize, Heap: Allocator = Global> {
-    drain: Drain<'a, I::Item, INLINE, Heap>,
+pub struct Splice<'valid, I: Iterator + 'valid, const INLINE: usize, Heap: Allocator = Global> {
+    drain: Drain<'valid, I::Item, INLINE, Heap>,
     replace_with: I
 }
 
-impl<'a, I: Iterator + 'a, const INLINE: usize, Heap: Allocator> Splice<'a, I, INLINE, Heap> {
-    pub(crate) fn new(drain: Drain<'a, I::Item, INLINE, Heap>, replace_with: I) -> Self {
+impl<'valid, I: Iterator + 'valid, const INLINE: usize, Heap: Allocator>
+    Splice<'valid, I, INLINE, Heap>
+{
+    pub(crate) fn new(drain: Drain<'valid, I::Item, INLINE, Heap>, replace_with: I) -> Self {
         Self {
             drain,
             replace_with
@@ -22,12 +33,12 @@ impl<'a, I: Iterator + 'a, const INLINE: usize, Heap: Allocator> Splice<'a, I, I
     }
 }
 
-impl<'a, I, const INLINE: usize, Heap: Allocator> core::fmt::Debug for Splice<'a, I, INLINE, Heap>
+impl<'valid, I, const INLINE: usize, Heap: Allocator> Debug for Splice<'valid, I, INLINE, Heap>
 where
-    I: core::fmt::Debug + Iterator + 'a,
-    <I as Iterator>::Item: core::fmt::Debug
+    I: Debug + Iterator + 'valid,
+    <I as Iterator>::Item: Debug
 {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Format {
         f.debug_tuple("Splice").field(&self.drain).finish()
     }
 }

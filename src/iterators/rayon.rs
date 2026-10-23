@@ -2,17 +2,17 @@
 //! need, except it's all private
 
 use {
-    crate::{
-        Allocator,
-        SmallVec
+    super::super::{
+        SmallVec,
+        allocator::Allocator
     },
     core::{
         mem::take,
-        ptr::{
-            self,
-            drop_in_place
-        },
-        slice
+        ptr::drop_in_place,
+        slice::{
+            IterMut,
+            from_raw_parts_mut
+        }
     },
     rayon::{
         iter::plumbing::{
@@ -24,19 +24,21 @@ use {
     }
 };
 
-struct SliceDrain<'a, Item>(slice::IterMut<'a, Item>);
+struct SliceDrain<'valid, Item>(IterMut<'valid, Item>);
 
 impl<Item> Iterator for SliceDrain<'_, Item> {
     type Item = Item;
 
     fn next(&mut self) -> Option<Item> {
-        self.0.next().map(|val| unsafe { ptr::read(val) })
+        self.0.next().map(|val| unsafe { (&raw const *val).read() })
     }
 }
 
 impl<Item> DoubleEndedIterator for SliceDrain<'_, Item> {
     fn next_back(&mut self) -> Option<Item> {
-        self.0.next_back().map(|val| unsafe { ptr::read(val) })
+        self.0
+            .next_back()
+            .map(|val| unsafe { (&raw const *val).read() })
     }
 }
 
@@ -52,13 +54,13 @@ impl<Item> Drop for SliceDrain<'_, Item> {
     }
 }
 
-struct DrainProducer<'a, Item>(&'a mut [Item]);
+struct DrainProducer<'valid, Item>(&'valid mut [Item]);
 
-impl<'a, Item: Send> Producer for DrainProducer<'a, Item> {
-    type IntoIter = SliceDrain<'a, Item>;
+impl<'valid, Item: Send> Producer for DrainProducer<'valid, Item> {
+    type IntoIter = SliceDrain<'valid, Item>;
     type Item = Item;
 
-    fn into_iter(mut self) -> SliceDrain<'a, Item> {
+    fn into_iter(mut self) -> SliceDrain<'valid, Item> {
         SliceDrain(take(&mut self.0).iter_mut())
     }
 
@@ -94,7 +96,7 @@ impl<Item: Send, const INLINE: usize, Heap: Allocator + Send> ParallelIterator
 
                 // SAFETY: set_len didn't deallocate/drop the elements, so they
                 // are still valid.
-                slice::from_raw_parts_mut(self.as_mut_ptr(), length)
+                from_raw_parts_mut(self.as_mut_ptr(), length)
             }),
             consumer
         )

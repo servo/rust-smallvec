@@ -1,11 +1,14 @@
-use smallvec::SmallVec;
+use {
+    encase::StorageBuffer,
+    smallvec::SmallVec
+};
 
 #[test]
 fn test_encase() {
     let v = SmallVec::<f32, 3>::from([1.43_f32, 4.05, 4.55]);
 
     let mut buf = [255u8; 12];
-    let mut s_buf = encase::StorageBuffer::new(&mut buf);
+    let mut s_buf = StorageBuffer::new(&mut buf);
 
     s_buf.write(&v).unwrap();
     assert_eq!(&s_buf.as_ref()[0..][..4], &v[0].to_le_bytes());

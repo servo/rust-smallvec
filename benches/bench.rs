@@ -1,21 +1,21 @@
 use {
+    core::{
+        hint::black_box,
+        time::Duration
+    },
     criterion::{
         Bencher,
         Criterion,
         criterion_group,
         criterion_main
     },
-    smallvec::SmallVec,
-    std::{
-        hint::black_box,
-        time::Duration
-    }
+    smallvec::SmallVec
 };
 
 const VEC_SIZE: usize = 16;
 const SPILLED_SIZE: usize = 100;
 
-trait Vector<T>: for<'a> From<&'a [T]> + Extend<T> + FromIterator<T> {
+trait Vector<T>: for<'valid> From<&'valid [T]> + Extend<T> + FromIterator<T> {
     fn new() -> Self;
     fn push(&mut self, val: T);
     fn pop(&mut self) -> Option<T>;
