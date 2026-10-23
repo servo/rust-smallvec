@@ -2,21 +2,22 @@ name: release
 on:
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: write
+
 jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
     if: github.repository == 'servo/rust-smallvec'
-    permissions:
-      id-token: write
-      contents: write
     steps:
       - name: checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: publish to crates.io
+      - name: publish
         run: cargo publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
