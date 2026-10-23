@@ -454,8 +454,8 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
                 tail_start: end,
                 tail_len: length - end,
                 iter: range_slice.iter(),
-                // Since self is a &mut, passing it to a function would invalidate the slice
-                // iterator.
+                // Since self is a &mut, passing it to a function would
+                // invalidate the slice iterator.
                 vec: NonNull::new_unchecked(self as *mut _)
             }
         }
