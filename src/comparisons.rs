@@ -3,6 +3,7 @@ use {
         SmallVec,
         allocator::Allocator
     },
+    crate::Global,
     alloc::{
         borrow::Cow,
         collections::VecDeque,
@@ -10,8 +11,6 @@ use {
     },
     core::cmp::Ordering
 };
-
-use crate::Global;
 
 macro_rules! __impl_slice_eq1 {
     ([$($vars:tt)*] $lhs:ty, $rhs:ty $(where $ty:ty: $bound:ident)?) => {
@@ -46,8 +45,7 @@ __impl_slice_eq1! { [] SmallVec<Item, INLINE, Heap>, Cow<'_, [U]> where U: Clone
 #[cfg(feature = "arrayvec")]
 impl<Item, const INLINE: usize> PartialEq<arrayvec::ArrayVec<Item, INLINE>>
     for SmallVec<Item, INLINE, Global>
-where
-    Item: PartialEq<Item>,
+where Item: PartialEq<Item>
 {
     #[inline]
     fn eq(&self, other: &arrayvec::ArrayVec<Item, INLINE>) -> bool {
@@ -94,8 +92,7 @@ where Item: Ord
 #[cfg(feature = "arrayvec")]
 impl<Item, const INLINE: usize> PartialOrd<arrayvec::ArrayVec<Item, INLINE>>
     for SmallVec<Item, INLINE, Global>
-where
-    Item: PartialOrd
+where Item: PartialOrd
 {
     #[inline]
     fn partial_cmp(&self, other: &arrayvec::ArrayVec<Item, INLINE>) -> Option<Ordering> {

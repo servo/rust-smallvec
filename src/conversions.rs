@@ -19,7 +19,7 @@ use {
             NonNull,
             copy_nonoverlapping
         }
-    },
+    }
 };
 
 impl<Item: Clone, const INLINE: usize> From<&[Item]> for SmallVec<Item, INLINE, Global> {
@@ -218,6 +218,7 @@ impl<Item, const M: usize, const INLINE: usize> From<SmallVec<Item, INLINE, Glob
 {
     fn from(this: SmallVec<Item, INLINE, Global>) -> Self {
         // SAFETY: caller ensures length matches M
-        <arrayvec::ArrayVec<Item, M> as TryFrom<SmallVec<Item, INLINE, Global>>>::try_from(this).unwrap()
+        <arrayvec::ArrayVec<Item, M> as TryFrom<SmallVec<Item, INLINE, Global>>>::try_from(this)
+            .unwrap()
     }
 }
