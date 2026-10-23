@@ -64,7 +64,7 @@ use proptest::{
         Strategy
     }
 };
-#[cfg(any(feature = "allocator-api", feature = "internals"))]
+#[cfg(any(feature = "allocator-api", feature = "internals", feature = "may-dangle"))]
 use smallvec_macro::syntax;
 #[cfg(feature = "specialization")]
 use specialization::{
