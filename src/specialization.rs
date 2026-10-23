@@ -257,10 +257,10 @@ where I: TrustedLen<Item = Item>
     fn spec_from_iter(iter: I) -> Self {
         let mut v = match iter.size_hint() {
             (_, Some(upper)) => SmallVec::with_capacity(upper),
-            // TrustedLen contract guarantees that `size_hint() == (_, None)` means that there
-            // are more than `usize::MAX` elements.
-            // Since the previous branch would eagerly panic if the capacity is too large
-            // (via `with_capacity`) we do the same here.
+            // TrustedLen contract guarantees that `size_hint() == (_, None)`
+            // means that there are more than `usize::MAX` elements.
+            // Since the previous branch would eagerly panic if the capacity is
+            // too large (via `with_capacity`) we do the same here.
             _ => panic!("capacity overflow")
         };
         // Reuse the extend specialization for TrustedLen.
