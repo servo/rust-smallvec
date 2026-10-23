@@ -1,5 +1,3 @@
-#![cfg(feature = "may_dangle")]
-
 use smallvec::SmallVec;
 
 #[derive(Default)]
