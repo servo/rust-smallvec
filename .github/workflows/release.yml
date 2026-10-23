@@ -1,11 +1,9 @@
 name: release
 on:
   workflow_dispatch:
-
 permissions:
   id-token: write
   contents: write
-
 jobs:
   release:
     name: Release
