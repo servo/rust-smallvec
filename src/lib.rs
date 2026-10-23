@@ -3,6 +3,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization, trusted_len))]
+#![cfg_attr(feature = "may-dangle", feature(dropck_eyepatch))]
 #![cfg_attr(
     all(feature = "allocator-api", not(feature = "allocator-api2")),
     feature(allocator_api)
@@ -454,8 +455,8 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
                 tail_start: end,
                 tail_len: length - end,
                 iter: range_slice.iter(),
-                // Since self is a &mut, passing it to a function would invalidate the slice
-                // iterator.
+                // Since self is a &mut, passing it to a function would
+                // invalidate the slice iterator.
                 vec: NonNull::new_unchecked(self as *mut _)
             }
         }
@@ -1502,7 +1503,10 @@ impl<Heap: Allocator> Drop for DropDealloc<'_, Heap> {
     }
 }
 
-impl<Item, const INLINE: usize, Heap: Allocator> Drop for SmallVec<Item, INLINE, Heap> {
+#[cfg_attr(feature = "may-dangle", syntax(unsafe))]
+impl<#[cfg_attr(feature = "may-dangle", may_dangle)] Item, const INLINE: usize, Heap: Allocator>
+    Drop for SmallVec<Item, INLINE, Heap>
+{
     fn drop(&mut self) {
         let (length, on_heap) = self.length.parts();
         // SAFETY: the tag tells which member is active
