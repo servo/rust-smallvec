@@ -82,6 +82,10 @@ name = "equivalent"
 required-features = ["equivalent"]
 
 [[test]]
+name = "maydangle"
+required-features = ["may-dangle"]
+
+[[test]]
 name = "rayon"
 required-features = ["rayon"]
 
