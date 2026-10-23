@@ -1,0 +1,18 @@
+name: release
+on:
+  workflow_dispatch:
+permissions:
+  id-token: write
+  contents: write
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: github.repository == 'servo/rust-smallvec'
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+      - name: publish
+        run: cargo publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
