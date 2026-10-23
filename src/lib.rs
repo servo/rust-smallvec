@@ -3,7 +3,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
 #![cfg_attr(feature = "specialization", feature(specialization, trusted_len))]
-#![cfg_attr(feature = "may_dangle", feature(dropck_eyepatch))]
+#![cfg_attr(feature = "may-dangle", feature(dropck_eyepatch))]
 #![cfg_attr(
     all(feature = "allocator-api", not(feature = "allocator-api2")),
     feature(allocator_api)
