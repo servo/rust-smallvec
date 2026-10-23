@@ -14,9 +14,6 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
       - name: publish
         run: cargo publish
         env:
