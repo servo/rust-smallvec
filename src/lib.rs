@@ -1503,7 +1503,9 @@ impl<Heap: Allocator> Drop for DropDealloc<'_, Heap> {
 }
 
 #[cfg_attr(feature = "may-dangle", syntax(unsafe))]
-impl<#[cfg_attr(feature = "may-dangle", may_dangle)] Item, const INLINE: usize, Heap: Allocator> Drop for SmallVec<Item, INLINE, Heap> {
+impl<#[cfg_attr(feature = "may-dangle", may_dangle)] Item, const INLINE: usize, Heap: Allocator> 
+    Drop for SmallVec<Item, INLINE, Heap> 
+{
     fn drop(&mut self) {
         let (length, on_heap) = self.length.parts();
         // SAFETY: the tag tells which member is active
