@@ -211,3 +211,14 @@ impl<T, const N: usize> From<<Box<[T], Global> as Like>::Type> for SmallVec<T, N
         boxed.into_vec().into()
     }
 }
+
+#[cfg(feature = "arrayvec")]
+impl<Item, const M: usize, const INLINE: usize> From<SmallVec<Item, INLINE, Global>>
+    for arrayvec::ArrayVec<Item, M>
+{
+    fn from(this: SmallVec<Item, INLINE, Global>) -> Self {
+        // SAFETY: caller ensures length matches M
+        <arrayvec::ArrayVec<Item, M> as TryFrom<SmallVec<Item, INLINE, Global>>>::try_from(this)
+            .unwrap()
+    }
+}

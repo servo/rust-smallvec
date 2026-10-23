@@ -26,6 +26,7 @@ strip = false
 [features]
 allocator-api = []
 allocator-api2 = ["allocator-api", "dep:allocator-api2"]
+arrayvec = ["dep:arrayvec"]
 internals = []
 may-dangle = []
 proptest = ["dep:proptest", "std"]
@@ -47,6 +48,7 @@ bytes = { version = "1", optional = true, default-features = false }
 defmt = { version = "1", optional = true, default-features = false }
 encase = { version = "0.13", optional = true, default-features = false }
 equivalent = { version = "1", optional = true, default-features = false }
+arrayvec = { version = "0.7", optional = true, default-features = false }
 malloc_size_of = { version = "0.1", optional = true, default-features = false }
 proptest = { version = "1", optional = true, features = [
     "std",
