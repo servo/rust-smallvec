@@ -1502,34 +1502,8 @@ impl<Heap: Allocator> Drop for DropDealloc<'_, Heap> {
     }
 }
 
-#[cfg(feature = "may_dangle")]
-unsafe impl<#[may_dangle] Item, const INLINE: usize, Heap: Allocator> Drop
-    for SmallVec<Item, INLINE, Heap>
-{
-    fn drop(&mut self) {
-        let (length, on_heap) = self.length.parts();
-        // SAFETY: the tag tells which member is active
-        let ptr = unsafe { self.raw.as_mut_ptr(on_heap) };
-        // SAFETY: see above
-        unsafe {
-            let _drop_dealloc = if on_heap {
-                let capacity = self.raw.heap.1;
-                Some(DropDealloc {
-                    ptr: NonNull::new_unchecked(ptr as *mut u8),
-                    size_bytes: capacity * size_of::<Item>(),
-                    align: align_of::<Item>(),
-                    allocator: &self.allocator
-                })
-            } else {
-                None
-            };
-            core::ptr::slice_from_raw_parts_mut(ptr, length).drop_in_place();
-        }
-    }
-}
-
-#[cfg(not(feature = "may_dangle"))]
-impl<Item, const INLINE: usize, Heap: Allocator> Drop for SmallVec<Item, INLINE, Heap> {
+#[cfg_attr(feature = "may-dangle", syntax(unsafe))]
+impl<#[cfg_attr(feature = "may-dangle", may_dangle)] Item, const INLINE: usize, Heap: Allocator> Drop for SmallVec<Item, INLINE, Heap> {
     fn drop(&mut self) {
         let (length, on_heap) = self.length.parts();
         // SAFETY: the tag tells which member is active
