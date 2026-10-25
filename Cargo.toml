@@ -27,6 +27,7 @@ strip = false
 allocator-api = []
 allocator-api2 = ["allocator-api", "dep:allocator-api2"]
 internals = []
+malloc-size-of = ["dep:malloc_size_of"]
 may-dangle = []
 proptest = ["dep:proptest", "std"]
 rayon = ["dep:rayon", "std"]

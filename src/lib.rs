@@ -20,7 +20,7 @@ mod error;
 mod iterators;
 mod locatedlength;
 mod macros;
-#[cfg(feature = "malloc_size_of")]
+#[cfg(feature = "malloc-size-of")]
 mod mallocsizeof;
 mod newrange;
 mod rawsmallvec;
