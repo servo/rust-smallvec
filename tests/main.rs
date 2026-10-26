@@ -1174,3 +1174,18 @@ fn spare_capacity_mut() {
     assert!(!spare.is_empty());
     assert_eq!(spare.as_ptr().cast::<u8>(), unsafe { v.as_ptr().add(3) });
 }
+
+#[test]
+#[allow(deprecated)]
+fn from_slice_copy_matches_from_slice() {
+    let inline = [1u8, 2, 3];
+    let spilled = [1u8, 2, 3, 4, 5, 6];
+
+    let a = SmallVec::<u8, 4>::from_slice_copy(&inline);
+    assert_eq!(a, SmallVec::<u8, 4>::from(&inline[..]));
+    assert!(!a.spilled());
+
+    let b = SmallVec::<u8, 4>::from_slice_copy(&spilled);
+    assert_eq!(b, SmallVec::<u8, 4>::from(&spilled[..]));
+    assert!(b.spilled());
+}

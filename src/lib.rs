@@ -281,6 +281,26 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
         vec.into()
     }
 
+    /// A function for creating [`SmallVec`] values out of slices
+    /// for types with the [`Copy`] trait.
+    #[deprecated(since = "2.0.0-beta.3", note = "use `From::<&[Item]>::from` instead")]
+    pub fn from_slice_copy(slice: &[Item]) -> Self
+    where Item: Clone + Copy {
+        let source = slice.as_ptr();
+        let length = slice.len();
+        let mut result = Self::with_capacity(length);
+
+        // SAFETY: By using `with_capacity`, the pointer will point to valid
+        // memory.
+        unsafe {
+            let destination = result.as_mut_ptr();
+            copy_nonoverlapping(source, destination, length);
+            result.set_len(length);
+        }
+
+        result
+    }
+
     /// Creates a `SmallVec` directly from the raw components of another
     /// `SmallVec`.
     ///
@@ -364,27 +384,6 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
             raw: RawSmallVec::heap(ptr, capacity),
             allocator: Global
         }
-    }
-}
-
-impl<Item: Clone, const INLINE: usize> SmallVec<Item, INLINE, Global> {
-    /// A function for creating [`SmallVec`] values out of slices
-    /// for types with the [`Copy`] trait.
-    pub fn from_slice_copy(slice: &[Item]) -> Self
-    where Item: Copy {
-        let source = slice.as_ptr();
-        let length = slice.len();
-        let mut result = Self::with_capacity(length);
-
-        // SAFETY: By using `with_capacity`, the pointer will point to valid
-        // memory.
-        unsafe {
-            let destination = result.as_mut_ptr();
-            copy_nonoverlapping(source, destination, length);
-            result.set_len(length);
-        }
-
-        result
     }
 }
 
