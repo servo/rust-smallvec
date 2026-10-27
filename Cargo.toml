@@ -27,6 +27,8 @@ strip = false
 allocator-api = []
 allocator-api2 = ["allocator-api", "dep:allocator-api2"]
 internals = []
+malloc-size-of = ["dep:malloc_size_of"]
+may-dangle = []
 proptest = ["dep:proptest", "std"]
 rayon = ["dep:rayon", "std"]
 serde = ["dep:serde_core"]
@@ -79,6 +81,10 @@ required-features = ["encase"]
 [[test]]
 name = "equivalent"
 required-features = ["equivalent"]
+
+[[test]]
+name = "maydangle"
+required-features = ["may-dangle"]
 
 [[test]]
 name = "rayon"
