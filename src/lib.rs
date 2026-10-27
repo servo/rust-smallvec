@@ -20,7 +20,7 @@ mod error;
 mod iterators;
 mod locatedlength;
 mod macros;
-#[cfg(feature = "malloc_size_of")]
+#[cfg(feature = "malloc-size-of")]
 mod mallocsizeof;
 mod newrange;
 mod rawsmallvec;
@@ -1839,17 +1839,6 @@ impl<Item: Hash, const INLINE: usize, Heap: Allocator> Hash for SmallVec<Item, I
 impl<Item: Debug, const INLINE: usize, Heap: Allocator> Debug for SmallVec<Item, INLINE, Heap> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Formatted {
         f.debug_list().entries(self.iter()).finish()
-    }
-}
-
-#[cfg(feature = "equivalent")]
-#[cfg_attr(docsrs, doc(cfg(feature = "equivalent")))]
-impl<Item, Other, const INLINE: usize, Heap: Allocator> equivalent::Equivalent<[Other]>
-    for SmallVec<Item, INLINE, Heap>
-where Item: equivalent::Equivalent<Other>
-{
-    fn equivalent(&self, key: &[Other]) -> bool {
-        self.len() == key.len() && self.iter().zip(key).all(|(item, key)| item.equivalent(key))
     }
 }
 
