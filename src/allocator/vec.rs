@@ -33,6 +33,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
     type Type = allocator_api2::vec::Vec<Item, Heap>;
 
     #[cfg(not(feature = "allocator-api"))]
+    #[inline]
     fn destruct(
         value: Self::Type
     ) -> (
@@ -57,6 +58,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
     }
 
     #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
+    #[inline]
     fn destruct(
         mut value: Self::Type
     ) -> (
@@ -75,6 +77,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
     }
 
     #[cfg(feature = "allocator-api2")]
+    #[inline]
     fn destruct(
         value: Self::Type
     ) -> (
@@ -93,6 +96,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
     }
 
     #[cfg(not(feature = "allocator-api"))]
+    #[inline]
     fn construct(
         pointer: Option<NonNull<[MaybeUninit<Self::Item>]>>,
         length: usize,
@@ -112,6 +116,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
     }
 
     #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
+    #[inline]
     fn construct(
         pointer: Option<NonNull<[MaybeUninit<Self::Item>]>>,
         length: usize,
@@ -138,6 +143,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
     }
 
     #[cfg(feature = "allocator-api2")]
+    #[inline]
     fn construct(
         pointer: Option<NonNull<[MaybeUninit<Self::Item>]>>,
         length: usize,

@@ -23,6 +23,7 @@ impl<Item, Heap: Allocator> Like for Box<[Item], Heap> {
     #[cfg(feature = "allocator-api2")]
     type Type = allocator_api2::boxed::Box<[Item], Heap>;
 
+    #[inline]
     fn destruct(
         value: Self::Type
     ) -> (
@@ -33,6 +34,7 @@ impl<Item, Heap: Allocator> Like for Box<[Item], Heap> {
         <Vec<Item, Heap> as Like>::destruct(value.into_vec())
     }
 
+    #[inline]
     fn construct(
         pointer: Option<NonNull<[MaybeUninit<Self::Item>]>>,
         length: usize,
