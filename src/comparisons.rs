@@ -69,6 +69,7 @@ macro_rules! implementation {
             const INLINE: usize,
             $($generics)*
         > Comparable<$right> for $left $(where $typename: $bound)? {
+            #[inline]
             fn compare(&self, other: &$right) -> Ordering {
                 self.iter()
                     .zip(AsRef::<[Other]>::as_ref(other))
