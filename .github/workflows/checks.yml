@@ -57,6 +57,9 @@ jobs:
       - name: markdownlint
         run: |
           git ls-files '*.md' -z | xargs -0 docker run --rm -v "$PWD:/work" -w /work ghcr.io/igorshubovych/markdownlint-cli:v0.41.0
+      - name: yamllint
+        run: |
+          git ls-files '*.yaml' '*.yml' | xargs docker run --rm -v "$PWD:/work" -w /work cytopia/yamllint
   package:
     name: Package
     runs-on: ubuntu-latest
