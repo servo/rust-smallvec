@@ -46,6 +46,7 @@ borsh = { version = "1", optional = true, features = [
     "derive",
     "unstable__schema",
 ], default-features = false }
+bytemuck = { version = "1", optional = true, default-features = false }
 bytes = { version = "1", optional = true, default-features = false }
 defmt = { version = "1", optional = true, default-features = false }
 encase = { version = "0.13", optional = true, default-features = false }
@@ -73,6 +74,10 @@ required-features = ["arbitrary"]
 [[test]]
 name = "borsh"
 required-features = ["borsh"]
+
+[[test]]
+name = "bytemuck"
+required-features = ["bytemuck"]
 
 [[test]]
 name = "bytes"
