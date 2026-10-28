@@ -264,7 +264,7 @@ fn test_with_inline_cap<const N: usize>(
                 std_vec.dedup();
             }
             Op::ExtendFromSlice(items) => {
-                small_vec.extend_from_slice(&items.0);
+                small_vec.extend(&items.0);
                 std_vec.extend_from_slice(&items.0);
             }
             Op::ExtendFromWithin => {
