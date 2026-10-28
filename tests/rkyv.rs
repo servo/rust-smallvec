@@ -1,4 +1,4 @@
-#!cfg(not(miri))
+#![cfg(not(miri))]
 
 use {
     rkyv::{
