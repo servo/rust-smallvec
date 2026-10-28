@@ -198,3 +198,10 @@ impl<Item: Clone, const INLINE: usize> From<Cow<'_, [Item]>> for SmallVec<Item, 
         }
     }
 }
+impl<Item: Clone, const INLINE: usize> From<SmallVec<Item, INLINE, Global>> for Cow<'_, [Item]> {
+    #[inline]
+    fn from(value: SmallVec<Item, INLINE, Global>) -> Self {
+        let (pointer, length, capacity) = value.into_raw_parts();
+        Cow::Owned(unsafe { <[Item] as ToOwned>::Owned::from_raw_parts(pointer, length, capacity) })
+    }
+}
