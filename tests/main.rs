@@ -494,6 +494,7 @@ fn drain_overflow() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn extend_from_slice() {
     let mut v: SmallVec<u8, 8> = SmallVec::new();
     for x in 0..4 {

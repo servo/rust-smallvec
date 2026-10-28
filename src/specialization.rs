@@ -64,10 +64,7 @@ impl<Item: Copy, const INLINE: usize> SpecFromElem<Item> for SmallVec<Item, INLI
     }
 }
 
-/// A trait for specializing the implementations of [`Extend`] and
-/// [`extend_from_slice`].
-///
-/// [`extend_from_slice`]: crate::SmallVec::extend_from_slice
+/// A trait for specializing the implementations of [`Extend`]
 pub trait SpecExtend<Item, I> {
     fn spec_extend(&mut self, iter: I);
 }
@@ -290,7 +287,7 @@ impl<Item: Copy, const INLINE: usize, Heap: Allocator> SpecCloneFrom<Item>
 {
     fn spec_clone_from(&mut self, source: &[Item]) {
         self.clear();
-        self.extend_from_slice(source);
+        self.extend(source);
     }
 }
 

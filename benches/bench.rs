@@ -97,7 +97,7 @@ impl<T: Copy> Vector<T> for SmallVec<T, VEC_SIZE> {
     }
 
     fn extend_from_slice(&mut self, other: &[T]) {
-        SmallVec::extend_from_slice(self, other)
+        SmallVec::extend(self, other)
     }
 
     fn retain_mut<F>(&mut self, f: F)

@@ -1380,6 +1380,7 @@ impl<Item: Clone, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, H
     }
 
     #[inline]
+    #[deprecated(since = "2.0.0-beta.3", note = "use `Extend::<&Item>::extend` instead")]
     pub fn extend_from_slice(&mut self, other: &[Item]) {
         self.extend(other.iter())
     }
@@ -1876,13 +1877,13 @@ where Item: Proptest + Debug
 impl<const INLINE: usize, Heap: Allocator> Write for SmallVec<u8, INLINE, Heap> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> IoResult<usize> {
-        self.extend_from_slice(buf);
+        self.extend(buf);
         Ok(buf.len())
     }
 
     #[inline]
     fn write_all(&mut self, buf: &[u8]) -> IoResult<()> {
-        self.extend_from_slice(buf);
+        self.extend(buf);
         Ok(())
     }
 
@@ -1940,14 +1941,14 @@ unsafe impl<const INLINE: usize, Heap: Allocator> BufMut for SmallVec<u8, INLINE
         while source.has_remaining() {
             let s = source.chunk();
             let l = s.len();
-            self.extend_from_slice(s);
+            self.extend(s);
             source.advance(l);
         }
     }
 
     #[inline]
     fn put_slice(&mut self, source: &[u8]) {
-        self.extend_from_slice(source);
+        self.extend(source);
     }
 
     #[inline]
