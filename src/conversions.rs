@@ -13,14 +13,14 @@ use {
         locatedlength::LocatedLength,
         rawsmallvec::RawSmallVec
     },
+    alloc::borrow::Cow,
     core::{
         mem::ManuallyDrop,
         ptr::{
             NonNull,
             copy_nonoverlapping
         }
-    },
-    alloc::borrow::Cow
+    }
 };
 
 impl<Item: Clone, const INLINE: usize> From<&[Item]> for SmallVec<Item, INLINE, Global> {
