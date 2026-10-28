@@ -25,6 +25,8 @@ mod mallocsizeof;
 mod newrange;
 mod rawsmallvec;
 mod references;
+#[cfg(feature = "rkyv")]
+mod rkyv;
 #[cfg(feature = "serde")]
 mod serde;
 #[cfg(feature = "specialization")]
