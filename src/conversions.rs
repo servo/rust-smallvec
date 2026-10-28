@@ -19,7 +19,8 @@ use {
             NonNull,
             copy_nonoverlapping
         }
-    }
+    },
+    alloc::borrow::Cow
 };
 
 impl<Item: Clone, const INLINE: usize> From<&[Item]> for SmallVec<Item, INLINE, Global> {
@@ -183,5 +184,17 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<<Box<[Item], Heap> as Like
 {
     fn from(boxed: <Box<[Item], Heap> as Like>::Type) -> Self {
         boxed.into_vec().into()
+    }
+}
+
+impl<Item: Clone, const INLINE: usize> From<Cow<'_, [Item]>> for SmallVec<Item, INLINE, Global> {
+    #[inline]
+    fn from(value: Cow<'_, [Item]>) -> Self {
+        match value {
+            Cow::Owned(mut vector) => unsafe {
+                Self::from_raw_parts(vector.as_mut_ptr(), vector.len(), vector.capacity())
+            },
+            Cow::Borrowed(slice) => slice.into()
+        }
     }
 }
