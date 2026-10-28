@@ -79,6 +79,15 @@ use std::io::{
 };
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
+#[cfg(feature = "schemars")]
+use {
+    alloc::borrow::Cow,
+    schemars::{
+        JsonSchema,
+        Schema,
+        SchemaGenerator
+    }
+};
 use {
     allocator::{
         Allocator,
@@ -1973,3 +1982,25 @@ impl_rts_array!(
     (T, const INLINE: usize, Heap: Allocator);
     using len truncate
 );
+
+#[cfg(feature = "schemars")]
+#[cfg_attr(docsrs, doc(cfg(feature = "scheamrs")))]
+impl<Item: JsonSchema, const INLINE: usize, Heap: Allocator> JsonSchema
+    for SmallVec<Item, INLINE, Heap>
+{
+    fn inline_schema() -> bool {
+        <alloc::vec::Vec<Item> as JsonSchema>::inline_schema()
+    }
+
+    fn schema_name() -> Cow<'static, str> {
+        <alloc::vec::Vec<Item> as JsonSchema>::schema_name()
+    }
+
+    fn schema_id() -> Cow<'static, str> {
+        <alloc::vec::Vec<Item> as JsonSchema>::schema_id()
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        <alloc::vec::Vec<Item> as JsonSchema>::json_schema(generator)
+    }
+}

@@ -32,6 +32,7 @@ malloc-size-of = ["dep:malloc_size_of"]
 may-dangle = []
 proptest = ["dep:proptest", "std"]
 rayon = ["dep:rayon", "std"]
+schemars = ["dep:schemars", "std"]
 serde = ["dep:serde_core"]
 specialization = []
 std = []
@@ -54,6 +55,7 @@ proptest = { version = "1", optional = true, features = [
     "std",
 ], default-features = false }
 rayon = { version = "1", optional = true, default-features = false }
+schemars = { version = "1", optional = true, default-features = false }
 serde_core = { version = "1", optional = true, default-features = false }
 smallvec-macro = { version = "0.0.0", path = "./macro", default-features = false }
 zeroize = { version = "1", optional = true, default-features = false }
@@ -90,6 +92,10 @@ required-features = ["may-dangle"]
 [[test]]
 name = "rayon"
 required-features = ["rayon"]
+
+[[test]]
+name = "schemars"
+required-features = ["schemars"]
 
 [[test]]
 name = "serde"
