@@ -13,7 +13,10 @@ use {
         locatedlength::LocatedLength,
         rawsmallvec::RawSmallVec
     },
-    alloc::borrow::Cow,
+    alloc::borrow::{
+        Cow,
+        ToOwned
+    },
     core::{
         mem::ManuallyDrop,
         ptr::{
