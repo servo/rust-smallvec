@@ -65,22 +65,7 @@ use proptest::{
     }
 };
 #[cfg(feature = "rkyv")]
-use rkyv::{
-    Archive,
-    Archived,
-    Deserialize as RkyvDeserialize,
-    Place,
-    Serialize as RkyvSerialize,
-    rancor::Fallible,
-    ser::{
-        Allocator as RkyvAllocator,
-        Writer
-    },
-    vec::{
-        ArchivedVec,
-        VecResolver
-    }
-};
+mod rkyv;
 #[cfg(feature = "specialization")]
 use specialization::{
     SpecCloneFrom,
@@ -2019,61 +2004,5 @@ impl<Item: JsonSchema, const INLINE: usize, Heap: Allocator> JsonSchema
 
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
         <alloc::vec::Vec<Item> as JsonSchema>::json_schema(generator)
-    }
-}
-
-#[cfg(feature = "rkyv")]
-#[cfg_attr(docsrs, doc(cfg(feature = "rkyv")))]
-impl<Item: Archive, const INLINE: usize, Heap: Allocator> Archive for SmallVec<Item, INLINE, Heap> {
-    type Archived = ArchivedVec<Archived<Item>>;
-    type Resolver = VecResolver;
-
-    fn resolve(&self, resolver: Self::Resolver, out: Place<Self::Archived>) {
-        ArchivedVec::resolve_from_slice(self, resolver, out);
-    }
-}
-
-#[cfg(feature = "rkyv")]
-#[cfg_attr(docsrs, doc(cfg(feature = "rkyv")))]
-impl<Item, S, const INLINE: usize, Heap: Allocator> RkyvSerialize<S>
-    for SmallVec<Item, INLINE, Heap>
-where
-    Item: RkyvSerialize<S>,
-    S: Fallible + RkyvAllocator + Writer + ?Sized
-{
-    fn serialize(&self, serializer: &mut S) -> Result<Self::Resolver, S::Error> {
-        ArchivedVec::serialize_from_slice(self, serializer)
-    }
-}
-
-#[cfg(feature = "rkyv")]
-#[cfg_attr(docsrs, doc(cfg(feature = "rkyv")))]
-impl<Item, D, const INLINE: usize> RkyvDeserialize<SmallVec<Item, INLINE, Global>, D>
-    for ArchivedVec<Archived<Item>>
-where
-    Item: Archive,
-    Archived<Item>: RkyvDeserialize<Item, D>,
-    D: Fallible + ?Sized
-{
-    fn deserialize(
-        &self,
-        deserializer: &mut D
-    ) -> Result<SmallVec<Item, INLINE, Global>, D::Error> {
-        let mut result = SmallVec::<Item, INLINE, Global>::with_capacity(self.len());
-        for item in self.as_slice() {
-            result.push(item.deserialize(deserializer)?);
-        }
-        Ok(result)
-    }
-}
-
-#[cfg(feature = "rkyv")]
-#[cfg_attr(docsrs, doc(cfg(feature = "rkyv")))]
-impl<T, U, const INLINE: usize, Heap: Allocator> PartialEq<SmallVec<U, INLINE, Heap>>
-    for ArchivedVec<T>
-where T: PartialEq<U>
-{
-    fn eq(&self, other: &SmallVec<U, INLINE, Heap>) -> bool {
-        self.as_slice() == &**other
     }
 }

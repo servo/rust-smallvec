@@ -55,7 +55,7 @@ proptest = { version = "1", optional = true, features = [
     "std",
 ], default-features = false }
 rayon = { version = "1", optional = true, default-features = false }
-rkyv = { version = "0.8", optional = true, default-features = false }
+rkyv = { version = "0.8", optional = true, default-features = false, features = ["alloc"] }
 schemars = { version = "1", optional = true, default-features = false }
 serde_core = { version = "1", optional = true, default-features = false }
 smallvec-macro = { version = "0.0.0", path = "./macro", default-features = false }
