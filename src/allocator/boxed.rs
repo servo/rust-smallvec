@@ -24,22 +24,26 @@ impl<Item, Heap: Allocator> Like for Box<[Item], Heap> {
     type Type = allocator_api2::boxed::Box<[Item], Heap>;
 
     #[inline]
-    fn destruct(
+    unsafe fn destruct(
         value: Self::Type
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
         usize,
         Self::Heap
     ) {
-        <Vec<Item, Heap> as Like>::destruct(value.into_vec())
+        unsafe {
+            <Vec<Item, Heap> as Like>::destruct(value.into_vec())
+        }
     }
 
     #[inline]
-    fn construct(
+    unsafe fn construct(
         pointer: Option<NonNull<[MaybeUninit<Self::Item>]>>,
         length: usize,
         allocator: Self::Heap
     ) -> Self::Type {
-        <Vec<Item, Heap> as Like>::construct(pointer, length, allocator).into_boxed_slice()
+        unsafe {
+            <Vec<Item, Heap> as Like>::construct(pointer, length, allocator).into_boxed_slice()
+        }
     }
 }
