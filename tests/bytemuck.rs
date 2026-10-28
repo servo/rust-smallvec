@@ -1,4 +1,3 @@
-#![cfg(feature = "bytemuck")]
 use {
     bytemuck::Zeroable,
     smallvec::SmallVec
