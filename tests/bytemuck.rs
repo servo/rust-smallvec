@@ -1,5 +1,8 @@
 #![cfg(feature = "bytemuck")]
-use {bytemuck::Zeroable, smallvec::SmallVec};
+use {
+    bytemuck::Zeroable,
+    smallvec::SmallVec
+};
 
 #[test]
 fn zeroed_is_empty_and_inline() {
