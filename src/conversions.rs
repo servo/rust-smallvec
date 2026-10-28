@@ -142,11 +142,13 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
         let (length, on_heap) = smallvec.length.parts();
         let smallvec = ManuallyDrop::new(smallvec);
         if !on_heap {
-            let mut vector = unsafe { <Vec<Item, Heap> as Like>::construct(
-                None, 
-                0,
-                (&raw const smallvec.allocator).read()
-            ) };
+            let mut vector = unsafe {
+                <Vec<Item, Heap> as Like>::construct(
+                    None,
+                    0,
+                    (&raw const smallvec.allocator).read()
+                )
+            };
             vector.reserve(length);
             // SAFETY: we create a new vector with sufficient capacity, copy our
             // elements into it to transfer ownership and then set

@@ -31,9 +31,7 @@ impl<Item, Heap: Allocator> Like for Box<[Item], Heap> {
         usize,
         Self::Heap
     ) {
-        unsafe {
-            <Vec<Item, Heap> as Like>::destruct(value.into_vec())
-        }
+        unsafe { <Vec<Item, Heap> as Like>::destruct(value.into_vec()) }
     }
 
     #[inline]
