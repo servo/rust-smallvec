@@ -83,6 +83,13 @@ use std::io::{
 };
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
+#[cfg(feature = "zerocopy")]
+use zerocopy::{
+    FromZeros,
+    Maybe,
+    TryFromBytes,
+    invariant::Alignment
+};
 #[cfg(feature = "schemars")]
 use {
     alloc::borrow::Cow,
@@ -2006,6 +2013,52 @@ impl<Item: JsonSchema, const INLINE: usize, Heap: Allocator> JsonSchema
 
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
         <alloc::vec::Vec<Item> as JsonSchema>::json_schema(generator)
+    }
+}
+
+#[cfg(feature = "zerocopy")]
+#[cfg_attr(docsrs, doc(cfg(feature = "zerocopy")))]
+// SAFETY:
+// - `only_derive_is_allowed_to_implement_this_trait`: this method is a compile-time
+//   guard intended to prevent unintended manual implementations.
+// - `is_bit_valid`: always returns `false` because arbitrary byte sequences cannot be
+//   guaranteed to represent a valid `SmallVec`.
+unsafe impl<Item, const INLINE: usize> TryFromBytes for SmallVec<Item, INLINE, Global> {
+    fn only_derive_is_allowed_to_implement_this_trait() {}
+
+    #[inline(always)]
+    fn is_bit_valid<A>(_candidate: Maybe<'_, Self, A>) -> bool
+    where
+        A: Alignment,
+    {
+        false
+    }
+}
+
+#[cfg(feature = "zerocopy")]
+#[cfg_attr(docsrs, doc(cfg(feature = "zerocopy")))]
+// SAFETY: the all-zero bit pattern is a valid empty, inline `SmallVec`.
+// - `LocatedLength::new(0, false)` is `0`: length 0, not on heap.
+// - `RawSmallVec`'s inline member is `MaybeUninit`, so any bytes are valid, and
+//   the heap member is never read while inline.
+// - `Global` is a zero-sized type in all three allocator backends.
+// `Item: FromZeros` is not needed: no `Item` is read from zeroed storage.
+unsafe impl<Item, const INLINE: usize> FromZeros for SmallVec<Item, INLINE, Global> {
+    fn only_derive_is_allowed_to_implement_this_trait() {}
+
+    fn zero(&mut self) {
+        drop(core::mem::replace(self, Self::new()));
+        // SAFETY:
+        // - `self` is guaranteed by the type system to be valid for writes of
+        //   size `size_of_val(self)`.
+        // - Setting all bytes to zero leaves `SmallVec` in a valid empty, inline state.
+        unsafe {
+            core::ptr::write_bytes(
+                (self as *mut Self).cast::<u8>(),
+                0,
+                core::mem::size_of_val(self),
+            );
+        }
     }
 }
 

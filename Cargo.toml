@@ -36,6 +36,7 @@ schemars = ["dep:schemars", "std"]
 serde = ["dep:serde_core"]
 specialization = []
 std = []
+zerocopy = ["dep:zerocopy"]
 
 [dependencies]
 allocator-api2 = { version = "0.4", optional = true, features = [
@@ -60,6 +61,7 @@ rkyv = { version = "0.8", optional = true, default-features = false, features = 
 schemars = { version = "1", optional = true, default-features = false }
 serde_core = { version = "1", optional = true, default-features = false }
 smallvec-macro = { version = "0.0.0", path = "./macro", default-features = false }
+zerocopy = { version = "0.8", optional = true, default-features = false }
 zeroize = { version = "1", optional = true, default-features = false }
 
 [dev-dependencies]
@@ -114,6 +116,10 @@ required-features = ["serde"]
 [[test]]
 name = "std"
 required-features = ["std"]
+
+[[test]]
+name = "zerocopy"
+required-features = ["zerocopy"]
 
 [[test]]
 name = "zeroize"
