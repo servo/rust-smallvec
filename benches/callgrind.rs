@@ -118,7 +118,7 @@ fn bench_smallvec_from_slice_spilled() -> SmallVec<u64, INLINE_CAP> {
 fn bench_smallvec_extend_from_slice_inline() -> SmallVec<u64, INLINE_CAP> {
     let mut v = SmallVec::<u64, INLINE_CAP>::new();
     let data = [42u64; INLINE_CAP];
-    v.extend_from_slice(black_box(&data));
+    v.extend(black_box(&data));
     v
 }
 
@@ -126,7 +126,7 @@ fn bench_smallvec_extend_from_slice_inline() -> SmallVec<u64, INLINE_CAP> {
 fn bench_smallvec_extend_from_slice_spilled() -> SmallVec<u64, INLINE_CAP> {
     let mut v = SmallVec::<u64, INLINE_CAP>::new();
     let data = [42u64; SPILLED_COUNT];
-    v.extend_from_slice(black_box(&data));
+    v.extend(black_box(&data));
     v
 }
 

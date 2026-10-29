@@ -25,6 +25,8 @@ mod mallocsizeof;
 mod newrange;
 mod rawsmallvec;
 mod references;
+#[cfg(feature = "rkyv")]
+mod rkyv;
 #[cfg(feature = "serde")]
 mod serde;
 #[cfg(feature = "specialization")]
@@ -37,6 +39,8 @@ use arbitrary::{
     Unstructured,
     size_hint::and
 };
+#[cfg(feature = "bytemuck")]
+use bytemuck::Zeroable;
 #[cfg(feature = "bytes")]
 use bytes::{
     Buf,
@@ -79,6 +83,15 @@ use std::io::{
 };
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
+#[cfg(feature = "schemars")]
+use {
+    alloc::borrow::Cow,
+    schemars::{
+        JsonSchema,
+        Schema,
+        SchemaGenerator
+    }
+};
 use {
     allocator::{
         Allocator,
@@ -281,6 +294,13 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
         vec.into()
     }
 
+    #[inline]
+    #[deprecated(since = "2.0.0-beta.3", note = "use `From::<&[Item]>::from` instead")]
+    pub fn from_slice_copy(slice: &[Item]) -> Self
+    where Item: Clone {
+        Self::from(slice)
+    }
+
     /// Creates a `SmallVec` directly from the raw components of another
     /// `SmallVec`.
     ///
@@ -364,27 +384,6 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
             raw: RawSmallVec::heap(ptr, capacity),
             allocator: Global
         }
-    }
-}
-
-impl<Item: Clone, const INLINE: usize> SmallVec<Item, INLINE, Global> {
-    /// A function for creating [`SmallVec`] values out of slices
-    /// for types with the [`Copy`] trait.
-    pub fn from_slice_copy(slice: &[Item]) -> Self
-    where Item: Copy {
-        let source = slice.as_ptr();
-        let length = slice.len();
-        let mut result = Self::with_capacity(length);
-
-        // SAFETY: By using `with_capacity`, the pointer will point to valid
-        // memory.
-        unsafe {
-            let destination = result.as_mut_ptr();
-            copy_nonoverlapping(source, destination, length);
-            result.set_len(length);
-        }
-
-        result
     }
 }
 
@@ -1394,6 +1393,7 @@ impl<Item: Clone, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, H
     }
 
     #[inline]
+    #[deprecated(since = "2.0.0-beta.3", note = "use `Extend::<&Item>::extend` instead")]
     pub fn extend_from_slice(&mut self, other: &[Item]) {
         self.extend(other.iter())
     }
@@ -1890,13 +1890,13 @@ where Item: Proptest + Debug
 impl<const INLINE: usize, Heap: Allocator> Write for SmallVec<u8, INLINE, Heap> {
     #[inline]
     fn write(&mut self, buf: &[u8]) -> IoResult<usize> {
-        self.extend_from_slice(buf);
+        self.extend(buf);
         Ok(buf.len())
     }
 
     #[inline]
     fn write_all(&mut self, buf: &[u8]) -> IoResult<()> {
-        self.extend_from_slice(buf);
+        self.extend(buf);
         Ok(())
     }
 
@@ -1954,14 +1954,14 @@ unsafe impl<const INLINE: usize, Heap: Allocator> BufMut for SmallVec<u8, INLINE
         while source.has_remaining() {
             let s = source.chunk();
             let l = s.len();
-            self.extend_from_slice(s);
+            self.extend(s);
             source.advance(l);
         }
     }
 
     #[inline]
     fn put_slice(&mut self, source: &[u8]) {
-        self.extend_from_slice(source);
+        self.extend(source);
     }
 
     #[inline]
@@ -1986,3 +1986,35 @@ impl_rts_array!(
     (T, const INLINE: usize, Heap: Allocator);
     using len truncate
 );
+
+#[cfg(feature = "schemars")]
+#[cfg_attr(docsrs, doc(cfg(feature = "scheamrs")))]
+impl<Item: JsonSchema, const INLINE: usize, Heap: Allocator> JsonSchema
+    for SmallVec<Item, INLINE, Heap>
+{
+    fn inline_schema() -> bool {
+        <alloc::vec::Vec<Item> as JsonSchema>::inline_schema()
+    }
+
+    fn schema_name() -> Cow<'static, str> {
+        <alloc::vec::Vec<Item> as JsonSchema>::schema_name()
+    }
+
+    fn schema_id() -> Cow<'static, str> {
+        <alloc::vec::Vec<Item> as JsonSchema>::schema_id()
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        <alloc::vec::Vec<Item> as JsonSchema>::json_schema(generator)
+    }
+}
+
+#[cfg(feature = "bytemuck")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bytemuck")))]
+// SAFETY: the all-zero bit pattern is a valid empty, inline `SmallVec`.
+// - `LocatedLength::new(0, false)` is `0`: length 0, not on heap.
+// - `RawSmallVec`'s inline member is `MaybeUninit`, so any bytes are valid, and
+//   the heap member is never read while inline.
+// - `Global` is a zero-sized type in all three allocator backends.
+// `Item: Zeroable` is not needed: no `Item` is read from zeroed storage.
+unsafe impl<Item, const INLINE: usize> Zeroable for SmallVec<Item, INLINE, Global> {}

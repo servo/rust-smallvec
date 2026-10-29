@@ -5,6 +5,10 @@ use smallvec::{
     smallvec
 };
 
+fn check_eq<T: PartialEq + core::fmt::Debug + ?Sized>(a: &T, b: &T) {
+    assert_eq!(a, b);
+}
+
 #[test]
 fn smallvec() {
     let mut vec: SmallVec<i32, 2>;
@@ -12,7 +16,7 @@ fn smallvec() {
     macro_rules! check {
         ($init:tt) => {
             vec = smallvec! $init;
-            assert_eq!(*vec, *vec! $init);
+            check_eq(&*vec, &*vec! $init);
         }
     }
 
