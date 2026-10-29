@@ -334,6 +334,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     ///
     /// ```
     /// use smallvec::SmallVec;
+    /// use core::ptr::NonNull;
     ///
     /// let mut v: SmallVec<_, 1> = SmallVec::from([1, 2, 3]);
     ///
@@ -360,11 +361,12 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     ///
     ///     // Put everything back together into a SmallVec with a different
     ///     // amount of inline storage, but which is still less than `cap`.
-    ///     let rebuilt = SmallVec::<_, 2>::from_raw_parts(p, length, cap);
+    ///     let rebuilt = SmallVec::<_, 2>::from((NonNull::new_unchecked(p), length, cap));
     ///     assert_eq!(&*rebuilt, &[4, 5, 6]);
     /// }
     /// ```
     #[inline]
+    #[deprecated(since = "2.0.0-beta.4", note = "use `SmallVec::from` instead")]
     pub unsafe fn from_raw_parts(
         ptr: *mut Item,
         length: usize,
@@ -378,12 +380,28 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
             debug_assert!(!ptr.is_null(), "Called `from_raw_parts` with null pointer.");
             NonNull::new_unchecked(ptr)
         };
+        SmallVec::from((ptr, length, capacity))
+    }
 
-        SmallVec {
-            length: LocatedLength::new(length, true),
-            raw: RawSmallVec::heap(ptr, capacity),
-            allocator: Global
-        }
+    /// Creates a `SmallVec` directly from the raw components of another
+    /// `SmallVec`.
+    ///
+    /// # Safety
+    ///
+    /// Same requirements as [`from_raw_parts`]; prefer the safe-looking
+    /// [`from`](SmallVec::from) conversion from a `(NonNull<Item>, usize,
+    /// usize)` tuple instead.
+    ///
+    /// [`from_raw_parts`]: SmallVec::from_raw_parts
+    #[inline]
+    #[deprecated(since = "2.0.0-beta.4", note = "use `SmallVec::from` instead")]
+    pub unsafe fn from_parts(
+        ptr: NonNull<Item>,
+        length: usize,
+        capacity: usize
+    ) -> SmallVec<Item, INLINE, Global> {
+        assert!(!Self::IS_ZST);
+        SmallVec::from((ptr, length, capacity))
     }
 }
 
@@ -1244,8 +1262,12 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     /// `Layout::array::<Item>(capacity)`; if `Item` is zero-sized or the
     /// capacity is zero, nothing needs to be done.
     ///
+    /// Deprecated in favor of [`into_parts`], which returns a `NonNull<Item>`
+    /// instead of a raw pointer.
+    ///
     /// [`from_raw_parts`]: SmallVec::from_raw_parts
     /// [`dealloc`]: alloc::alloc::GlobalAlloc::dealloc
+    /// [`into_parts`]: SmallVec::into_parts
     ///
     /// # Panics
     ///
@@ -1257,6 +1279,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     /// # use smallvec::SmallVec;
     /// let v: SmallVec<i32, 1> = SmallVec::from([-1, 0, 1]);
     ///
+    /// # #[allow(deprecated)]
     /// let (ptr, length, cap) = v.into_raw_parts();
     ///
     /// let rebuilt = unsafe {
@@ -1264,18 +1287,56 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     ///     // transmuting the raw pointer to a compatible type.
     ///     let ptr = ptr as *mut u32;
     ///
+    ///     # #[allow(deprecated)]
     ///     SmallVec::<u32, 5>::from_raw_parts(ptr, length, cap)
     /// };
     /// assert_eq!(rebuilt, [4294967295, 0, 1]);
     /// ```
     #[inline]
+    #[deprecated(since = "2.0.0-beta.4", note = "use `SmallVec::into_parts` instead")]
     pub fn into_raw_parts(self) -> (*mut Item, usize, usize) {
+        let (ptr, length, capacity) = self.into_parts();
+        (ptr.as_ptr(), length, capacity)
+    }
+
+    /// Decomposes a `SmallVec<Item, INLINE, Global>` into its raw components:
+    /// `(NonNull<Item>, length, capacity)`.
+    ///
+    /// Same semantics as [`into_raw_parts`], but returns a `NonNull` instead
+    /// of a raw pointer; prefer the [`into`](Into::into) conversion into the
+    /// `(NonNull<Item>, usize, usize)` tuple instead.
+    ///
+    /// [`into_raw_parts`]: SmallVec::into_raw_parts
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the contents are not spilled on the heap.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use smallvec::SmallVec;
+    /// let v: SmallVec<i32, 1> = SmallVec::from([-1, 0, 1]);
+    ///
+    /// let (ptr, length, cap) = v.into_parts();
+    ///
+    /// let rebuilt = unsafe {
+    ///     // We can now make changes to the components, such as
+    ///     // transmuting the raw pointer to a compatible type.
+    ///     let ptr = ptr.cast::<u32>();
+    ///
+    ///     SmallVec::<u32, 5>::from((ptr, length, cap))
+    /// };
+    /// assert_eq!(rebuilt, [4294967295, 0, 1]);
+    /// ```
+    #[inline]
+    pub fn into_parts(self) -> (NonNull<Item>, usize, usize) {
         #[cold]
         #[inline(never)]
         #[track_caller]
         fn assert_failed() -> ! {
             panic!(
-                "SmallVec::into_raw_parts() called on inline (stack) SmallVec, \
+                "SmallVec::into_parts() called on inline (stack) SmallVec, \
                  which cannot be safely leaked"
             );
         }
@@ -1284,7 +1345,9 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         }
 
         let mut me = ManuallyDrop::new(self);
-        (me.as_mut_ptr(), me.len(), me.capacity())
+        // SAFETY: `spilled` guarantees a non-null heap pointer.
+        let ptr = unsafe { NonNull::new_unchecked(me.as_mut_ptr()) };
+        (ptr, me.len(), me.capacity())
     }
 
     #[inline]

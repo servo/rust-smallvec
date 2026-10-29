@@ -805,21 +805,48 @@ fn shrink_after_from_empty_vec() {
 
 #[test]
 #[should_panic]
-fn into_raw_parts_inline() {
+fn into_parts_inline() {
     let v: SmallVec<i32, 10> = SmallVec::from([1, 2, 3]);
-    v.into_raw_parts();
+    let _ = v.into_parts();
 }
 
 #[test]
-fn into_raw_parts_heap() {
+fn into_parts_heap() {
     let v: SmallVec<i32, 1> = SmallVec::from([1, 2, 3]);
-    let (ptr, length, capacity) = v.into_raw_parts();
+    let (ptr, length, capacity) = v.into_parts();
 
     // It should be safe to create a standard `Vec` from the result.
     // SAFETY: allocated using `Global`, no changes to the element type.
     unsafe {
-        Vec::from_raw_parts(ptr, length, capacity);
+        Vec::from_raw_parts(ptr.as_ptr(), length, capacity);
     }
+}
+
+#[test]
+fn parts_roundtrip() {
+    let v: SmallVec<i32, 1> = SmallVec::from([1, 2, 3]);
+    let (ptr, length, capacity): (core::ptr::NonNull<i32>, usize, usize) = v.into();
+    let rebuilt: SmallVec<i32, 4> = (ptr, length, capacity).into();
+    assert_eq!(rebuilt, [1, 2, 3]);
+}
+
+#[test]
+#[allow(deprecated)]
+fn raw_parts_deprecated_still_works() {
+    let v: SmallVec<i32, 1> = SmallVec::from([1, 2, 3]);
+    let (ptr, length, capacity) = v.into_raw_parts();
+
+    // SAFETY: components came straight from `into_raw_parts`.
+    unsafe {
+        let rebuilt = SmallVec::<i32, 4>::from_raw_parts(ptr, length, capacity);
+        assert_eq!(rebuilt, [1, 2, 3]);
+    }
+
+    let v: SmallVec<i32, 1> = SmallVec::from([4, 5, 6]);
+    let (ptr, length, capacity) = v.into_parts();
+    // SAFETY: components came straight from `into_parts`.
+    let rebuilt = unsafe { SmallVec::<i32, 4>::from_parts(ptr, length, capacity) };
+    assert_eq!(rebuilt, [4, 5, 6]);
 }
 
 #[test]

@@ -211,3 +211,27 @@ impl<T, const N: usize> From<<Box<[T], Global> as Like>::Type> for SmallVec<T, N
         boxed.into_vec().into()
     }
 }
+
+impl<Item, const INLINE: usize> From<SmallVec<Item, INLINE, Global>>
+    for (NonNull<Item>, usize, usize)
+{
+    #[inline]
+    fn from(this: SmallVec<Item, INLINE, Global>) -> Self {
+        this.into_parts()
+    }
+}
+
+impl<Item, const INLINE: usize> From<(NonNull<Item>, usize, usize)>
+    for SmallVec<Item, INLINE, Global>
+{
+    #[inline]
+    fn from((ptr, length, capacity): (NonNull<Item>, usize, usize)) -> Self {
+        assert!(!Self::IS_ZST);
+
+        SmallVec {
+            length: LocatedLength::new(length, true),
+            raw: RawSmallVec::heap(ptr, capacity),
+            allocator: Global
+        }
+    }
+}
