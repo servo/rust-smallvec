@@ -33,13 +33,16 @@ fn zeroed_zst() {
 fn zero_method() {
     let mut v: SmallVec<u8, 8> = SmallVec::new();
     v.push(42);
+    v.extend([1, 2, 3, 4, 5]);
+    assert_eq!(v.len(), 6);
+
     v.zero();
     assert!(v.is_empty());
     assert!(!v.spilled());
+    assert_eq!(v.len(), 0);
 
-    // Verify all bytes are 0
     let bytes = unsafe {
-        core::slice::from_raw_parts(&v as *const _ as *const u8, core::mem::size_of_val(&v))
+        core::slice::from_raw_parts((&raw const v).cast::<u8>(), core::mem::size_of_val(&v))
     };
     assert!(bytes.iter().all(|&b| b == 0));
 }
