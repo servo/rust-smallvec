@@ -12,7 +12,10 @@ jobs:
     steps:
       - name: checkout
         uses: actions/checkout@v7
+      - name: authenticate
+        id: auth
+        uses: rust-lang/crates-io-auth-action@v1
       - name: publish
         run: cargo publish
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
