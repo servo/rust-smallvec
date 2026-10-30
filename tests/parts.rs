@@ -1,5 +1,3 @@
-#![cfg(feature = "internals")]
-
 use {
     smallvec::SmallVec,
     std::rc::Rc

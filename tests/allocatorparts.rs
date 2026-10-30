@@ -1,9 +1,8 @@
-#![cfg(feature = "internals")]
 #[cfg(feature = "allocator-api2")]
 use allocator_api2::alloc::Global;
-use smallvec::SmallVec;
 #[cfg(not(feature = "allocator-api2"))]
 use std::alloc::Global;
+use smallvec::SmallVec;
 
 #[test]
 fn round_trip_with_allocator() {
