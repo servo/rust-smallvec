@@ -312,6 +312,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     #[inline]
     #[must_use = "dropping the parts leaks the elements and the heap buffer"]
     #[cfg_attr(feature = "internals", syntax(pub))]
+    #[deprecated(since = "2.0.0-beta.4", note = "")]
     fn into_parts(self) -> (RawSmallVec<Item, INLINE>, LocatedLength<Item>) {
         let (raw, length, Global) = self.into_parts_with_allocator();
         (raw, length)
@@ -332,6 +333,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     /// - The parts are not used again afterwards.
     #[inline]
     #[cfg_attr(feature = "internals", syntax(pub))]
+    #[deprecated(since = "2.0.0-beta.4", note = "")]
     unsafe fn from_parts(raw: RawSmallVec<Item, INLINE>, length: LocatedLength<Item>) -> Self {
         unsafe { Self::from_parts_with_allocator(raw, length, Global) }
     }
@@ -1273,6 +1275,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     #[inline]
     #[must_use = "dropping the parts leaks the elements and the heap buffer"]
     #[cfg_attr(all(feature = "internals", feature = "allocator-api"), syntax(pub))]
+    #[deprecated(since = "2.0.0-beta.4", note = "")]
     fn into_parts_with_allocator(self) -> (RawSmallVec<Item, INLINE>, LocatedLength<Item>, Heap) {
         let this = ManuallyDrop::new(self);
         // SAFETY: `this` is never dropped or used again, so each field is moved
@@ -1292,6 +1295,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     /// must have been allocated by `allocator` (or an equivalent one).
     #[inline]
     #[cfg_attr(all(feature = "internals", feature = "allocator-api"), syntax(pub))]
+    #[deprecated(since = "2.0.0-beta.4", note = "")] 
     unsafe fn from_parts_with_allocator(
         raw: RawSmallVec<Item, INLINE>,
         length: LocatedLength<Item>,
