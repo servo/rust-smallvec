@@ -1295,7 +1295,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     /// must have been allocated by `allocator` (or an equivalent one).
     #[inline]
     #[cfg_attr(all(feature = "internals", feature = "allocator-api"), syntax(pub))]
-    #[deprecated(since = "2.0.0-beta.4", note = "")] 
+    #[deprecated(since = "2.0.0-beta.4", note = "")]
     unsafe fn from_parts_with_allocator(
         raw: RawSmallVec<Item, INLINE>,
         length: LocatedLength<Item>,
