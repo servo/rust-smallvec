@@ -3,6 +3,8 @@ use equivalent::{
     Comparable,
     Equivalent
 };
+#[cfg(feature = "rkyv")]
+use rkyv::vec::ArchivedVec;
 use {
     super::{
         SmallVec,
@@ -177,6 +179,23 @@ implementation!([] for Vec<Item> =<> SmallVec<Other, INLINE, Heap>);
 implementation!([] for SmallVec<Item, INLINE, Heap> =<>+ Vec<Other>);
 #[cfg(feature = "equivalent")]
 implementation!([] for Vec<Item> =<>+ SmallVec<Other, INLINE, Heap>);
+
+#[cfg(feature = "rkyv")]
+implementation!([] for ArchivedVec<Item> =? SmallVec<Other, INLINE, Heap>);
+#[cfg(feature = "rkyv")]
+implementation!([] for SmallVec<Item, INLINE, Heap> =? ArchivedVec<Other>);
+#[cfg(all(feature = "rkyv", feature = "equivalent"))]
+implementation!([] for ArchivedVec<Item> =?+ SmallVec<Other, INLINE, Heap>);
+#[cfg(all(feature = "rkyv", feature = "equivalent"))]
+implementation!([] for SmallVec<Item, INLINE, Heap> =?+ ArchivedVec<Other>);
+#[cfg(feature = "rkyv")]
+implementation!([] for ArchivedVec<Item> =<> SmallVec<Other, INLINE, Heap>);
+#[cfg(feature = "rkyv")]
+implementation!([] for SmallVec<Item, INLINE, Heap> =<> ArchivedVec<Other>);
+#[cfg(all(feature = "rkyv", feature = "equivalent"))]
+implementation!([] for ArchivedVec<Item> =<>+ SmallVec<Other, INLINE, Heap>);
+#[cfg(all(feature = "rkyv", feature = "equivalent"))]
+implementation!([] for SmallVec<Item, INLINE, Heap> =<>+ ArchivedVec<Other>);
 
 implementation!([] for SmallVec<Item, INLINE, Heap> =? Cow<'_, [Other]> where Other: Clone);
 implementation!([] for Cow<'_, [Item]> =? SmallVec<Other, INLINE, Heap> where Item: Clone);

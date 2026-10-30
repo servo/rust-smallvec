@@ -25,6 +25,8 @@ mod mallocsizeof;
 mod newrange;
 mod rawsmallvec;
 mod references;
+#[cfg(feature = "rkyv")]
+mod rkyv;
 #[cfg(feature = "serde")]
 mod serde;
 #[cfg(feature = "specialization")]
@@ -37,6 +39,8 @@ use arbitrary::{
     Unstructured,
     size_hint::and
 };
+#[cfg(feature = "bytemuck")]
+use bytemuck::Zeroable;
 #[cfg(feature = "bytes")]
 use bytes::{
     Buf,
@@ -2004,3 +2008,13 @@ impl<Item: JsonSchema, const INLINE: usize, Heap: Allocator> JsonSchema
         <alloc::vec::Vec<Item> as JsonSchema>::json_schema(generator)
     }
 }
+
+#[cfg(feature = "bytemuck")]
+#[cfg_attr(docsrs, doc(cfg(feature = "bytemuck")))]
+// SAFETY: the all-zero bit pattern is a valid empty, inline `SmallVec`.
+// - `LocatedLength::new(0, false)` is `0`: length 0, not on heap.
+// - `RawSmallVec`'s inline member is `MaybeUninit`, so any bytes are valid, and
+//   the heap member is never read while inline.
+// - `Global` is a zero-sized type in all three allocator backends.
+// `Item: Zeroable` is not needed: no `Item` is read from zeroed storage.
+unsafe impl<Item, const INLINE: usize> Zeroable for SmallVec<Item, INLINE, Global> {}
