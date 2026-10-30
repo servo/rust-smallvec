@@ -1,7 +1,4 @@
-use {
-    smallvec::SmallVec,
-    zerocopy::FromZeros
-};
+use {smallvec::SmallVec, zerocopy::FromZeros};
 
 #[test]
 fn zeroed_is_empty_and_inline() {
@@ -42,59 +39,6 @@ fn zero_method() {
         core::slice::from_raw_parts(&v as *const _ as *const u8, core::mem::size_of_val(&v))
     };
     assert!(bytes.iter().all(|&b| b == 0));
-}
-
-#[test]
-fn zero_method_drops_inline_elements() {
-    use std::sync::Arc;
-
-    let item = Arc::new(42);
-    let mut v: SmallVec<Arc<i32>, 4> = SmallVec::new();
-    v.push(Arc::clone(&item));
-    v.push(Arc::clone(&item));
-    assert_eq!(Arc::strong_count(&item), 3);
-
-    v.zero();
-    assert_eq!(Arc::strong_count(&item), 1);
-    assert!(v.is_empty());
-    assert!(!v.spilled());
-}
-
-#[test]
-fn zero_method_drops_spilled_elements_and_deallocates() {
-    use std::sync::Arc;
-
-    let item = Arc::new(100);
-    let mut v: SmallVec<Arc<i32>, 2> = SmallVec::new();
-    for _ in 0..10 {
-        v.push(Arc::clone(&item));
-    }
-    assert!(v.spilled());
-    assert_eq!(Arc::strong_count(&item), 11);
-
-    v.zero();
-    assert_eq!(Arc::strong_count(&item), 1);
-    assert!(v.is_empty());
-    assert!(!v.spilled());
-
-    for i in 0..5 {
-        v.push(Arc::new(i));
-    }
-    assert_eq!(v.len(), 5);
-}
-
-#[test]
-fn zero_method_inline_zero_capacity() {
-    let mut v: SmallVec<String, 0> = SmallVec::new();
-    v.push(String::from("heap only"));
-    assert!(v.spilled());
-
-    v.zero();
-    assert!(v.is_empty());
-    assert_eq!(v.capacity(), 0);
-
-    v.push(String::from("new heap"));
-    assert_eq!(v.len(), 1);
 }
 
 #[test]

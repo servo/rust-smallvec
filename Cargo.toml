@@ -36,7 +36,6 @@ schemars = ["dep:schemars", "std"]
 serde = ["dep:serde_core"]
 specialization = []
 std = []
-zerocopy = ["dep:zerocopy"]
 
 [dependencies]
 allocator-api2 = { version = "0.4", optional = true, features = [
