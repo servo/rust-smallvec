@@ -14,14 +14,12 @@ fn round_trip_with_allocator() {
         }
         assert_eq!(v.spilled(), len > 2);
 
-        let (raw, length, allocator) = v.into_parts_with_allocator();
+        let (length, raw, allocator) = v.into();
         assert_eq!(length.len(), len);
         assert_eq!(length.on_heap(), len > 2);
 
         // SAFETY: parts come straight from `into_parts_with_allocator`.
-        let rebuilt = unsafe {
-            SmallVec::<String, 2, Global>::from_parts_with_allocator(raw, length, allocator)
-        };
+        let rebuilt = unsafe { SmallVec::<String, 2, Global>::parts_in(length, raw, allocator) };
         assert_eq!(rebuilt.len(), len);
         assert_eq!(rebuilt[0], "0");
     }

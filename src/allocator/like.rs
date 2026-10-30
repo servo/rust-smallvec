@@ -10,7 +10,7 @@ pub trait Like {
     type Type;
     type Item;
     type Heap: Allocator;
-    unsafe fn destruct(
+    fn destruct(
         value: Self::Type
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,

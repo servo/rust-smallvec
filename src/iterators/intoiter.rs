@@ -208,7 +208,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> IntoIterator for SmallVec<Item,
     type Item = Item;
 
     fn into_iter(self) -> Self::IntoIter {
-        let (raw, end, allocator) = self.into_parts_with_allocator();
+        let (end, raw, allocator) = self.into();
         IntoIter {
             raw,
             allocator,

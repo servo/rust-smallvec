@@ -34,7 +34,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
 
     #[cfg(not(feature = "allocator-api"))]
     #[inline]
-    unsafe fn destruct(
+    fn destruct(
         value: Self::Type
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
@@ -59,7 +59,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
 
     #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
     #[inline]
-    unsafe fn destruct(
+    fn destruct(
         mut value: Self::Type
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
@@ -78,7 +78,7 @@ impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
 
     #[cfg(feature = "allocator-api2")]
     #[inline]
-    unsafe fn destruct(
+    fn destruct(
         value: Self::Type
     ) -> (
         Option<NonNull<[MaybeUninit<Self::Item>]>>,
