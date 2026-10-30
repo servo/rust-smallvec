@@ -1,4 +1,7 @@
-use {smallvec::SmallVec, zerocopy::FromZeros};
+use {
+    smallvec::SmallVec,
+    zerocopy::FromZeros
+};
 
 #[test]
 fn zeroed_is_empty_and_inline() {
