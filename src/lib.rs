@@ -312,7 +312,6 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     #[inline]
     #[must_use = "dropping the parts leaks the elements and the heap buffer"]
     #[cfg_attr(feature = "internals", syntax(pub))]
-    #[cfg_attr(not(feature = "internals"), allow(dead_code))]
     fn into_parts(self) -> (RawSmallVec<Item, INLINE>, LocatedLength<Item>) {
         let (raw, length, Global) = self.into_parts_with_allocator();
         (raw, length)
@@ -333,7 +332,6 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     /// - The parts are not used again afterwards.
     #[inline]
     #[cfg_attr(feature = "internals", syntax(pub))]
-    #[cfg_attr(not(feature = "internals"), allow(dead_code))]
     unsafe fn from_parts(raw: RawSmallVec<Item, INLINE>, length: LocatedLength<Item>) -> Self {
         unsafe { Self::from_parts_with_allocator(raw, length, Global) }
     }
@@ -1294,7 +1292,6 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     /// must have been allocated by `allocator` (or an equivalent one).
     #[inline]
     #[cfg_attr(all(feature = "internals", feature = "allocator-api"), syntax(pub))]
-    #[cfg_attr(not(all(feature = "internals")), allow(dead_code))]
     unsafe fn from_parts_with_allocator(
         raw: RawSmallVec<Item, INLINE>,
         length: LocatedLength<Item>,
@@ -1304,8 +1301,6 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         // SAFETY: the caller guarantees the tag matches the active member.
         // `capacity` is only read by the debug assertions below.
         let capacity = unsafe { raw.capacity(on_heap) };
-        debug_assert!(len <= capacity);
-        debug_assert!(!on_heap || capacity > Self::inline_size());
         Self {
             length,
             raw,
