@@ -306,89 +306,41 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
         Self::from(slice)
     }
 
-    /// Creates a `SmallVec` directly from the raw components of another
-    /// `SmallVec`.
+    /// Decomposes the vector into its complete representation.
+    ///
+    /// Unlike a `(ptr, len, cap)` triple, this works for inline vectors too:
+    /// the `LocatedLength` says which member of `RawSmallVec` is active.
+    ///
+    /// The parts own the elements and (if spilled) the heap buffer. Dropping
+    /// them leaks both; pass them to [`from_parts`](Self::from_parts) to get
+    /// a SmallVec back.
+    #[inline]
+    #[must_use = "dropping the parts leaks the elements and the heap buffer"]
+    #[cfg_attr(feature = "internals", syntax(pub))]
+    #[deprecated(since = "2.0.0-beta.4", note = "")]
+    fn into_parts(self) -> (RawSmallVec<Item, INLINE>, LocatedLength<Item>) {
+        let (raw, length, Global) = self.into_parts_with_allocator();
+        (raw, length)
+    }
+
+    /// Rebuilds a `SmallVec` from the parts returned by
+    /// [`into_parts`](Self::into_parts).
     ///
     /// # Safety
     ///
-    /// This is highly unsafe, due to the number of invariants that aren’t
-    /// checked:
-    ///
-    /// - `ptr` needs to have been previously allocated via `SmallVec` from its
-    ///   spilled storage (at least, it’s highly likely to be incorrect if it
-    ///   wasn’t).
-    /// - `ptr`’s `Item` type needs to be the same size and alignment that it
-    ///   was allocated with
-    /// - `length` needs to be less than or equal to `capacity`.
-    /// - `capacity` needs to be the capacity that the pointer was allocated
-    ///   with.
-    ///
-    /// Violating these may cause problems like corrupting the allocator’s
-    /// internal data structures.
-    ///
-    /// Additionally, `capacity` must be greater than `INLINE`; that is, the new
-    /// `SmallVec` must need to spill over into heap allocated storage. This
-    /// condition is asserted against.
-    ///
-    /// The ownership of `ptr` is effectively transferred to the `SmallVec`
-    /// which may then deallocate, reallocate or change the contents of memory
-    /// pointed to by the pointer at will. Ensure that nothing else uses the
-    /// pointer after calling this function.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use smallvec::SmallVec;
-    ///
-    /// let mut v: SmallVec<_, 1> = SmallVec::from([1, 2, 3]);
-    ///
-    /// // Pull out the important parts of `v`.
-    /// let p = v.as_mut_ptr();
-    /// let length = v.len();
-    /// let cap = v.capacity();
-    /// let spilled = v.spilled();
-    ///
-    /// unsafe {
-    ///     // Forget all about `v`. The heap allocation that stored the
-    ///     // three values won't be deallocated.
-    ///     std::mem::forget(v);
-    ///
-    ///     // Overwrite memory with [4, 5, 6].
-    ///     //
-    ///     // This is only safe if `spilled` is true! Otherwise, we are
-    ///     // writing into the old `SmallVec`'valid inline storage on the
-    ///     // stack.
-    ///     assert!(spilled);
-    ///     for i in 0..length {
-    ///         std::ptr::write(p.add(i), 4 + i);
-    ///     }
-    ///
-    ///     // Put everything back together into a SmallVec with a different
-    ///     // amount of inline storage, but which is still less than `cap`.
-    ///     let rebuilt = SmallVec::<_, 2>::from_raw_parts(p, length, cap);
-    ///     assert_eq!(&*rebuilt, &[4, 5, 6]);
-    /// }
-    /// ```
+    /// - `raw` is a valid `RawSmallVec`, and its active member is the one
+    ///   `length` says: `heap` if `length.on_heap()`, otherwise `inline`.
+    /// - The first `length.len()` elements of the active buffer are
+    ///   initialized, and `length.len()` does not exceed its capacity.
+    /// - If `length.on_heap()`, the capacity is greater than `INLINE` and the
+    ///   pointer was allocated by `Global` with
+    ///   `Layout::array::<Item>(capacity)`.
+    /// - The parts are not used again afterwards.
     #[inline]
-    pub unsafe fn from_raw_parts(
-        ptr: *mut Item,
-        length: usize,
-        capacity: usize
-    ) -> SmallVec<Item, INLINE, Global> {
-        assert!(!Self::IS_ZST);
-
-        // SAFETY: We require caller to provide same ptr as we alloc
-        // and we never alloc null pointer.
-        let ptr = unsafe {
-            debug_assert!(!ptr.is_null(), "Called `from_raw_parts` with null pointer.");
-            NonNull::new_unchecked(ptr)
-        };
-
-        SmallVec {
-            length: LocatedLength::new(length, true),
-            raw: RawSmallVec::heap(ptr, capacity),
-            allocator: Global
-        }
+    #[cfg_attr(feature = "internals", syntax(pub))]
+    #[deprecated(since = "2.0.0-beta.4", note = "")]
+    unsafe fn from_parts(raw: RawSmallVec<Item, INLINE>, length: LocatedLength<Item>) -> Self {
+        unsafe { Self::from_parts_with_allocator(raw, length, Global) }
     }
 }
 
@@ -1232,66 +1184,6 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         }
     }
 
-    /// Decomposes a `SmallVec<Item, INLINE, Global>` into its raw components:
-    /// `(pointer, length, capacity)`.
-    ///
-    /// Returns the raw pointer to the underlying data, the length of
-    /// the vector (in elements), and the allocated capacity of the
-    /// data (in elements). These are the same arguments in the same
-    /// order as the arguments to [`from_raw_parts`].
-    ///
-    /// After calling this function, the caller is responsible for the
-    /// memory previously managed by the `SmallVec`. Most often, one does
-    /// this by converting the raw pointer, length, and capacity back
-    /// into a `SmallVec` with the [`from_raw_parts`] function; more generally,
-    /// if `Item` is non-zero-sized and the capacity is nonzero, one may use
-    /// any method that calls [`dealloc`] with a layout of
-    /// `Layout::array::<Item>(capacity)`; if `Item` is zero-sized or the
-    /// capacity is zero, nothing needs to be done.
-    ///
-    /// [`from_raw_parts`]: SmallVec::from_raw_parts
-    /// [`dealloc`]: alloc::alloc::GlobalAlloc::dealloc
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the contents are not spilled on the heap.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use smallvec::SmallVec;
-    /// let v: SmallVec<i32, 1> = SmallVec::from([-1, 0, 1]);
-    ///
-    /// let (ptr, length, cap) = v.into_raw_parts();
-    ///
-    /// let rebuilt = unsafe {
-    ///     // We can now make changes to the components, such as
-    ///     // transmuting the raw pointer to a compatible type.
-    ///     let ptr = ptr as *mut u32;
-    ///
-    ///     SmallVec::<u32, 5>::from_raw_parts(ptr, length, cap)
-    /// };
-    /// assert_eq!(rebuilt, [4294967295, 0, 1]);
-    /// ```
-    #[inline]
-    pub fn into_raw_parts(self) -> (*mut Item, usize, usize) {
-        #[cold]
-        #[inline(never)]
-        #[track_caller]
-        fn assert_failed() -> ! {
-            panic!(
-                "SmallVec::into_raw_parts() called on inline (stack) SmallVec, \
-                 which cannot be safely leaked"
-            );
-        }
-        if !self.spilled() {
-            assert_failed();
-        }
-
-        let mut me = ManuallyDrop::new(self);
-        (me.as_mut_ptr(), me.len(), me.capacity())
-    }
-
     #[inline]
     pub fn extend_from_slice_copy(&mut self, other: &[Item])
     where Item: Copy {
@@ -1383,6 +1275,46 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     #[cfg_attr(feature = "allocator-api", syntax(pub))]
     fn with_capacity_in(capacity: usize, allocator: Heap) -> Self {
         Self::try_with_capacity_in(capacity, allocator).unwrap_or_else(SmallVecError::handle)
+    }
+
+    #[inline]
+    #[must_use = "dropping the parts leaks the elements and the heap buffer"]
+    #[cfg_attr(all(feature = "internals", feature = "allocator-api"), syntax(pub))]
+    #[deprecated(since = "2.0.0-beta.4", note = "")]
+    fn into_parts_with_allocator(self) -> (RawSmallVec<Item, INLINE>, LocatedLength<Item>, Heap) {
+        let this = ManuallyDrop::new(self);
+        // SAFETY: `this` is never dropped or used again, so each field is moved
+        // out exactly once and `Drop for SmallVec` never runs.
+        unsafe {
+            (
+                (&raw const this.raw).read(),
+                this.length,
+                (&raw const this.allocator).read()
+            )
+        }
+    }
+
+    /// # Safety
+    ///
+    /// Same contract as [`SmallVec::from_parts`], except that a heap buffer
+    /// must have been allocated by `allocator` (or an equivalent one).
+    #[inline]
+    #[cfg_attr(all(feature = "internals", feature = "allocator-api"), syntax(pub))]
+    #[deprecated(since = "2.0.0-beta.4", note = "")]
+    unsafe fn from_parts_with_allocator(
+        raw: RawSmallVec<Item, INLINE>,
+        length: LocatedLength<Item>,
+        allocator: Heap
+    ) -> Self {
+        let (len, on_heap) = length.parts();
+        // SAFETY: the caller guarantees the tag matches the active member.
+        // `capacity` is only read by the debug assertions below.
+        let capacity = unsafe { raw.capacity(on_heap) };
+        Self {
+            length,
+            raw,
+            allocator
+        }
     }
 }
 

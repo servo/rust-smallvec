@@ -68,6 +68,10 @@ criterion = "0.8"
 iai-callgrind = "0.16"
 
 [[test]]
+name = "allocatorparts"
+required-features = ["internals"]
+
+[[test]]
 name = "arbitrary"
 required-features = ["arbitrary"]
 
@@ -94,6 +98,10 @@ required-features = ["equivalent"]
 [[test]]
 name = "maydangle"
 required-features = ["may-dangle"]
+
+[[test]]
+name = "parts"
+required-features = ["internals"]
 
 [[test]]
 name = "rayon"
