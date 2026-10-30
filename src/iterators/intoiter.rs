@@ -17,7 +17,6 @@ use {
         },
         iter::FusedIterator,
         mem::{
-            ManuallyDrop,
             align_of,
             size_of
         },
@@ -209,18 +208,12 @@ impl<Item, const INLINE: usize, Heap: Allocator> IntoIterator for SmallVec<Item,
     type Item = Item;
 
     fn into_iter(self) -> Self::IntoIter {
-        // SAFETY: we move out of this.raw by reading the value at its address,
-        // which is fine since we don't drop it
-        unsafe {
-            // Set SmallVec length to zero as `IntoIter` drop handles dropping
-            // of the elements
-            let this = ManuallyDrop::new(self);
-            IntoIter {
-                raw: (&raw const this.raw).read(),
-                allocator: (&raw const this.allocator).read(),
-                begin: 0,
-                end: this.length
-            }
+        let (raw, end, allocator) = self.into_parts_with_allocator();
+        IntoIter {
+            raw,
+            allocator,
+            begin: 0,
+            end
         }
     }
 }
