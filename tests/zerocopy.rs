@@ -56,3 +56,35 @@ fn zero_method_zst() {
     assert!(v.is_empty());
     assert_eq!(v.len(), 0);
 }
+
+#[test]
+fn zeroed_drop_semantics() {
+    use std::sync::Arc;
+
+    let item = Arc::new(42);
+    // Ensure dropping an empty zeroed SmallVec does not misbehave.
+    {
+        let v: SmallVec<Arc<i32>, 4> = FromZeros::new_zeroed();
+        drop(v);
+    }
+    assert_eq!(Arc::strong_count(&item), 1);
+
+    // Ensure pushed elements (both inline and spilled) drop correctly.
+    {
+        let mut v: SmallVec<Arc<i32>, 4> = FromZeros::new_zeroed();
+        v.push(Arc::clone(&item));
+        v.push(Arc::clone(&item));
+        assert_eq!(Arc::strong_count(&item), 3);
+    }
+    assert_eq!(Arc::strong_count(&item), 1);
+
+    {
+        let mut v: SmallVec<Arc<i32>, 2> = FromZeros::new_zeroed();
+        for _ in 0..10 {
+            v.push(Arc::clone(&item));
+        }
+        assert!(v.spilled());
+        assert_eq!(Arc::strong_count(&item), 11);
+    }
+    assert_eq!(Arc::strong_count(&item), 1);
+}
