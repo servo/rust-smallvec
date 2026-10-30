@@ -246,9 +246,8 @@ impl<Item: Clone, const INLINE: usize> From<SmallVec<Item, INLINE, Global>> for 
             <[Item] as ToOwned>::Owned::from_raw_parts(
                 pointer
                     .map(NonNull::cast::<Item>)
-                    .map(NonNull::as_ptr)
-                    .unwrap_or_default()
-                    .cast(),
+                    .unwrap_or_else(NonNull::dangling)
+                    .as_ptr(),
                 length,
                 pointer.map(NonNull::len).unwrap_or_default()
             )
