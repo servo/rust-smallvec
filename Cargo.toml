@@ -1,11 +1,12 @@
 [package]
 name = "smallvec"
-version = "2.0.0-beta.3"
+version = "2.0.0-beta.4"
 edition.workspace = true
 rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
 description = "'Small vector' optimization: store up to a small number of items on the stack"
 keywords = ["small", "vec", "vector", "stack", "no_std"]
 categories = ["data-structures"]
@@ -27,8 +28,11 @@ strip = false
 allocator-api = []
 allocator-api2 = ["allocator-api", "dep:allocator-api2"]
 internals = []
+malloc-size-of = ["dep:malloc_size_of"]
+may-dangle = []
 proptest = ["dep:proptest", "std"]
 rayon = ["dep:rayon", "std"]
+schemars = ["dep:schemars", "std"]
 serde = ["dep:serde_core"]
 specialization = []
 std = []
@@ -42,6 +46,7 @@ borsh = { version = "1", optional = true, features = [
     "derive",
     "unstable__schema",
 ], default-features = false }
+bytemuck = { version = "1", optional = true, default-features = false }
 bytes = { version = "1", optional = true, default-features = false }
 defmt = { version = "1", optional = true, default-features = false }
 encase = { version = "0.13", optional = true, default-features = false }
@@ -51,6 +56,8 @@ proptest = { version = "1", optional = true, features = [
     "std",
 ], default-features = false }
 rayon = { version = "1", optional = true, default-features = false }
+rkyv = { version = "0.8", optional = true, default-features = false, features = ["alloc"] }
+schemars = { version = "1", optional = true, default-features = false }
 serde_core = { version = "1", optional = true, default-features = false }
 smallvec-macro = { version = "0.0.0", path = "./macro", default-features = false }
 zeroize = { version = "1", optional = true, default-features = false }
@@ -61,12 +68,20 @@ criterion = "0.8"
 iai-callgrind = "0.16"
 
 [[test]]
+name = "allocatorparts"
+required-features = ["internals"]
+
+[[test]]
 name = "arbitrary"
 required-features = ["arbitrary"]
 
 [[test]]
 name = "borsh"
 required-features = ["borsh"]
+
+[[test]]
+name = "bytemuck"
+required-features = ["bytemuck"]
 
 [[test]]
 name = "bytes"
@@ -81,8 +96,24 @@ name = "equivalent"
 required-features = ["equivalent"]
 
 [[test]]
+name = "maydangle"
+required-features = ["may-dangle"]
+
+[[test]]
+name = "parts"
+required-features = ["internals"]
+
+[[test]]
 name = "rayon"
 required-features = ["rayon"]
+
+[[test]]
+name = "rkyv"
+required-features = ["rkyv"]
+
+[[test]]
+name = "schemars"
+required-features = ["schemars"]
 
 [[test]]
 name = "serde"
@@ -115,6 +146,7 @@ package.edition = "2024"
 package.authors = ["The Servo Project Developers"]
 package.license = "MIT OR Apache-2.0"
 package.repository = "https://github.com/servo/rust-smallvec"
+package.homepage = "https://smallvec.rs"
 package.rust-version = "1.86"
 resolver = "3"
 members = [

@@ -64,10 +64,7 @@ impl<Item: Copy, const INLINE: usize> SpecFromElem<Item> for SmallVec<Item, INLI
     }
 }
 
-/// A trait for specializing the implementations of [`Extend`] and
-/// [`extend_from_slice`].
-///
-/// [`extend_from_slice`]: crate::SmallVec::extend_from_slice
+/// A trait for specializing the implementations of [`Extend`]
 pub trait SpecExtend<Item, I> {
     fn spec_extend(&mut self, iter: I);
 }
@@ -257,10 +254,10 @@ where I: TrustedLen<Item = Item>
     fn spec_from_iter(iter: I) -> Self {
         let mut v = match iter.size_hint() {
             (_, Some(upper)) => SmallVec::with_capacity(upper),
-            // TrustedLen contract guarantees that `size_hint() == (_, None)` means that there
-            // are more than `usize::MAX` elements.
-            // Since the previous branch would eagerly panic if the capacity is too large
-            // (via `with_capacity`) we do the same here.
+            // TrustedLen contract guarantees that `size_hint() == (_, None)`
+            // means that there are more than `usize::MAX` elements.
+            // Since the previous branch would eagerly panic if the capacity is
+            // too large (via `with_capacity`) we do the same here.
             _ => panic!("capacity overflow")
         };
         // Reuse the extend specialization for TrustedLen.
@@ -290,7 +287,7 @@ impl<Item: Copy, const INLINE: usize, Heap: Allocator> SpecCloneFrom<Item>
 {
     fn spec_clone_from(&mut self, source: &[Item]) {
         self.clear();
-        self.extend_from_slice(source);
+        self.extend(source);
     }
 }
 

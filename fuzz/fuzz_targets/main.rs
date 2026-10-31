@@ -161,8 +161,9 @@ fn test_with_inline_cap<const N: usize>(
                 small_vec = SmallVec::with_capacity(cap.0);
                 std_vec = Vec::with_capacity(cap.0);
             }
+            #[allow(deprecated)]
             Op::FromVec => {
-                small_vec = SmallVec::from(Into::<Vec<_>>::into(small_vec));
+                small_vec = SmallVec::from(small_vec.into_vec());
                 // No-op on `Vec`
             }
             Op::FromSlice(data) => {
@@ -263,7 +264,7 @@ fn test_with_inline_cap<const N: usize>(
                 std_vec.dedup();
             }
             Op::ExtendFromSlice(items) => {
-                small_vec.extend_from_slice(&items.0);
+                small_vec.extend(&items.0);
                 std_vec.extend_from_slice(&items.0);
             }
             Op::ExtendFromWithin => {

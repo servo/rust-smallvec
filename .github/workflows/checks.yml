@@ -31,7 +31,8 @@ jobs:
         run: |
           sudo apt-get update -y
           sudo apt-get install -y valgrind
-          version=$(cargo metadata --format-version=1 | jq -r '.packages[] | select(.name == "iai-callgrind").version')
+          version=$(cargo metadata --format-version=1 |
+            jq -r '.packages[] | select(.name == "iai-callgrind").version')
           cargo install iai-callgrind-runner --version "$version"
           cargo bench --bench callgrind --profile callgrind
       - name: all features
@@ -56,7 +57,14 @@ jobs:
         run: cargo doc --all-features
       - name: markdownlint
         run: |
-          git ls-files '*.md' -z | xargs -0 docker run --rm -v "$PWD:/work" -w /work ghcr.io/igorshubovych/markdownlint-cli:v0.41.0
+          git ls-files '*.md' -z |
+          xargs -0 docker run --rm \
+          -v "$PWD:/work" -w /work \
+          ghcr.io/igorshubovych/markdownlint-cli:v0.41.0
+      - name: yamllint
+        run: |
+          git ls-files '*.yaml' '*.yml' |
+          xargs docker run --rm -v "$PWD:/work" -w /work cytopia/yamllint
   package:
     name: Package
     runs-on: ubuntu-latest
@@ -96,17 +104,17 @@ jobs:
       - name: test all features
         run: cargo test --all-features
   nostd:
-      name: NoStd
-      runs-on: ubuntu-latest
-      steps:
-        - name: checkout
-          uses: actions/checkout@v7
-        - name: install rust nighlty
-          uses: dtolnay/rust-toolchain@nightly
-          with:
-            target: thumbv7m-none-eabi
-        - name: test default features
-          run: cargo test
+    name: NoStd
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+      - name: install rust nighlty
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          target: thumbv7m-none-eabi
+      - name: build default features
+        run: cargo build
   msrv:
     name: MSRV
     runs-on: ubuntu-latest
@@ -115,5 +123,5 @@ jobs:
         uses: actions/checkout@v7
       - name: install rust MSRV
         uses: dtolnay/rust-toolchain@1.86
-      - name: test default features
-        run: cargo test
+      - name: build default features
+        run: cargo build

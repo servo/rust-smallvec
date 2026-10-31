@@ -55,13 +55,23 @@ v.sort();
 - `arbitrary`: implements `Arbitrary` for any `SmallVec` storing elements
  that implement `Arbitrary`
 - `borsh`: implements `BorshSerialize`, `BorshDeserialize` and `BorshSchema`
+- `bytemuck`: implements `bytemuck::Zeroable` for `SmallVec` with the `Global` allocator
 - `bytes`: implements `BufMut` for SmallVec
 - `defmt`: implements `defmt::Format` for SmallVec
 - `encase`: implements encasing as a runtime-sized array
 - `equivalent`: implements `equivalent::Equivalent` for `SmallVec`
 - `internals`: exports through the public API `LocatedLength` and `RawSmallVec`
-- `malloc_size_of`: implements `MallocSizeOf` and `MallocShallowSizeOf`
+- `malloc-size-of`: implements `MallocSizeOf` and `MallocShallowSizeOf`
+- `may-dangle` (nightly): allows `SmallVec` to contain references that may
+ become invalid before its destructor runs
+- `proptest`: implements `proptest::arbitrary::Arbitrary` for `SmallVec` with
+ elements implementing `Arbitrary` and `Debug`
 - `rayon`: implements parallel iteration
+- `rkyv`: implements `Archive` and `Serialize` for `SmallVec`, with
+deserialization support
+ for the `Global` allocator
+- `schemars`: implements `schemars::JsonSchema` for `SmallVec` when elements
+ implement `JsonSchema`
 - `serde`: implements serde's serialization and deserialization
 - `specialization` (nightly): enables specialization,
  improving performance on some cases
@@ -71,6 +81,6 @@ v.sort();
 > [!NOTE]
 >
 > - SmallVec without any features enabled does not make use of the standard library.
-> - The `rayon` and `proptest` features implicitly require `std`.
+> - The `rayon`, `proptest` and `schemars` features implicitly require `std`.
 > - The `allocator-api2` feature requires `allocator-api`, though it does not
     require `nightly`

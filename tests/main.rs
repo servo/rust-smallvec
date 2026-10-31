@@ -494,6 +494,7 @@ fn drain_overflow() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn extend_from_slice() {
     let mut v: SmallVec<u8, 8> = SmallVec::new();
     for x in 0..4 {
@@ -800,25 +801,6 @@ fn shrink_after_from_empty_vec() {
     let mut v = SmallVec::<u8, 2>::from(Vec::new());
     v.shrink_to_fit();
     assert!(!v.spilled())
-}
-
-#[test]
-#[should_panic]
-fn into_raw_parts_inline() {
-    let v: SmallVec<i32, 10> = SmallVec::from([1, 2, 3]);
-    v.into_raw_parts();
-}
-
-#[test]
-fn into_raw_parts_heap() {
-    let v: SmallVec<i32, 1> = SmallVec::from([1, 2, 3]);
-    let (ptr, length, capacity) = v.into_raw_parts();
-
-    // It should be safe to create a standard `Vec` from the result.
-    // SAFETY: allocated using `Global`, no changes to the element type.
-    unsafe {
-        Vec::from_raw_parts(ptr, length, capacity);
-    }
 }
 
 #[test]

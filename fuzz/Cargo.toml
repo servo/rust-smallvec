@@ -5,6 +5,7 @@ authors.workspace = true
 edition.workspace = true
 repository.workspace = true
 license.workspace = true
+homepage.workspace = true
 description = "Fuzzer for SmallVec"
 publish = false
 
