@@ -231,7 +231,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     }
 
     #[inline]
-    pub fn inline_and_len(buf: [Item; INLINE], length: usize) -> Self {
+    pub fn inline_with_lenght(buf: [Item; INLINE], length: usize) -> Self {
         assert!(length <= INLINE);
         // SAFETY: all the members in 0..length are initialized
         let mut vec = Self {
@@ -267,7 +267,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     /// };
     ///
     /// let buf = [1, 2, 3, 4, 5, 0, 0, 0];
-    /// let sv = unsafe { SmallVec::inline_and_len_unchecked(buf.map(MaybeUninit::new), 5) };
+    /// let sv = unsafe { SmallVec::inline_with_lenght_unchecked(buf.map(MaybeUninit::new), 5) };
     ///
     /// assert_eq!(&*sv, &[1, 2, 3, 4, 5]);
     /// ```
@@ -277,7 +277,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     /// `length <= INLINE`, and all the elements in `buf[..length]` must be
     /// initialized
     #[inline]
-    pub const unsafe fn inline_and_len_unchecked(
+    pub const unsafe fn inline_with_lenght_unchecked(
         buf: [MaybeUninit<Item>; INLINE],
         length: usize
     ) -> Self {
