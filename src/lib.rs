@@ -32,6 +32,8 @@ mod rkyv;
 mod serde;
 #[cfg(feature = "specialization")]
 mod specialization;
+#[cfg(feature = "zerocopy")]
+mod zerocopy;
 
 #[cfg(feature = "arbitrary")]
 use arbitrary::{
