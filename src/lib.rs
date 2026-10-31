@@ -388,6 +388,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         self.length.on_heap()
     }
 
+    #[track_caller]
     pub fn drain<R>(&mut self, range: R) -> Drain<'_, Item, INLINE, Heap>
     where R: RangeBounds<usize> {
         let length = self.len();
@@ -525,6 +526,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         }
     }
 
+    #[track_caller]
     pub fn splice<R, I>(
         &mut self,
         range: R,
@@ -674,9 +676,11 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn reserve(&mut self, additional: usize) {
-        self.try_reserve(additional)
-            .unwrap_or_else(SmallVecError::handle);
+        if let Err(error) = self.try_reserve(additional) {
+            error.handle()
+        }
     }
 
     #[inline]
@@ -807,6 +811,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn swap_remove(&mut self, index: usize) -> Item {
         #[cold]
         #[inline(never)]
@@ -845,6 +850,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn remove(&mut self, index: usize) -> Item {
         #[cold]
         #[inline(never)]
@@ -871,12 +877,14 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn insert(&mut self, index: usize, value: Item) {
         _ = self.insert_mut(index, value);
     }
 
     #[inline]
     #[must_use]
+    #[track_caller]
     pub fn insert_mut(&mut self, index: usize, value: Item) -> &mut Item {
         #[cold]
         #[inline(never)]
@@ -1384,6 +1392,7 @@ impl<Item, const INLINE: usize, Heap: Allocator + Clone> SmallVec<Item, INLINE, 
     /// assert_eq!(vec2, [2, 3]);
     /// ```
     #[inline]
+    #[track_caller]
     pub fn split_off(&mut self, at: usize) -> Self {
         let length = self.len();
         assert!(at <= length);
