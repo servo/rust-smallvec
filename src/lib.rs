@@ -31,6 +31,8 @@ mod rkyv;
 mod serde;
 #[cfg(feature = "specialization")]
 mod specialization;
+#[cfg(feature = "zerocopy")]
+mod zerocopy;
 
 #[cfg(feature = "arbitrary")]
 use arbitrary::{
@@ -80,13 +82,6 @@ use specialization::{
 use std::io::{
     Result as IoResult,
     Write
-};
-#[cfg(feature = "zerocopy")]
-use zerocopy::{
-    FromZeros,
-    Maybe,
-    TryFromBytes,
-    invariant::Alignment
 };
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
@@ -2014,26 +2009,6 @@ impl<Item: JsonSchema, const INLINE: usize, Heap: Allocator> JsonSchema
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
         <alloc::vec::Vec<Item> as JsonSchema>::json_schema(generator)
     }
-}
-
-#[cfg(feature = "zerocopy")]
-#[cfg_attr(docsrs, doc(cfg(feature = "zerocopy")))]
-unsafe impl<Item, const INLINE: usize> TryFromBytes for SmallVec<Item, INLINE, Global> {
-    fn only_derive_is_allowed_to_implement_this_trait() {}
-
-    #[inline]
-    fn is_bit_valid<Align>(_candidate: Maybe<'_, Self, Align>) -> bool
-    where Align: Alignment {
-        // Disallow arbitrary byte reads; only `FromZeros::new_zeroed()` is
-        // supported.
-        false
-    }
-}
-
-#[cfg(feature = "zerocopy")]
-#[cfg_attr(docsrs, doc(cfg(feature = "zerocopy")))]
-unsafe impl<Item, const INLINE: usize> FromZeros for SmallVec<Item, INLINE, Global> {
-    fn only_derive_is_allowed_to_implement_this_trait() {}
 }
 
 #[cfg(feature = "bytemuck")]
