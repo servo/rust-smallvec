@@ -68,6 +68,12 @@ use proptest::{
         Strategy
     }
 };
+#[cfg(any(
+    feature = "allocator-api",
+    feature = "internals",
+    feature = "may-dangle"
+))]
+use smallvec_macro::syntax;
 #[cfg(feature = "specialization")]
 use specialization::{
     SpecCloneFrom,
@@ -144,8 +150,7 @@ use {
             from_raw_parts_mut
         }
     },
-    newrange::NewRange,
-    smallvec_macro::syntax
+    newrange::NewRange
 };
 pub use {
     error::SmallVecError,
@@ -307,15 +312,14 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     /// the `LocatedLength` says which member of `RawSmallVec` is active.
     ///
     /// The parts own the elements and (if spilled) the heap buffer. Dropping
-    /// them leaks both; pass them to [`from_parts`](Self::from_parts) to get
+    /// them leaks both; pass them to [`parts`](Self::parts) to get
     /// a SmallVec back.
     #[inline]
     #[must_use = "dropping the parts leaks the elements and the heap buffer"]
     #[cfg_attr(feature = "internals", syntax(pub))]
     #[deprecated(since = "2.0.0-beta.4", note = "")]
-    fn into_parts(self) -> (RawSmallVec<Item, INLINE>, LocatedLength<Item>) {
-        let (raw, length, Global) = self.into_parts_with_allocator();
-        (raw, length)
+    fn into_parts(self) -> (LocatedLength<Item>, RawSmallVec<Item, INLINE>) {
+        self.into()
     }
 
     /// Rebuilds a `SmallVec` from the parts returned by
@@ -333,9 +337,8 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     /// - The parts are not used again afterwards.
     #[inline]
     #[cfg_attr(feature = "internals", syntax(pub))]
-    #[deprecated(since = "2.0.0-beta.4", note = "")]
-    unsafe fn from_parts(raw: RawSmallVec<Item, INLINE>, length: LocatedLength<Item>) -> Self {
-        unsafe { Self::from_parts_with_allocator(raw, length, Global) }
+    unsafe fn parts(length: LocatedLength<Item>, raw: RawSmallVec<Item, INLINE>) -> Self {
+        unsafe { Self::parts_in(length, raw, Global) }
     }
 }
 
@@ -955,13 +958,13 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
 
     #[inline]
     #[deprecated(since = "2.0.0", note = "use `Into::<Vec<Item>>::into` instead")]
-    pub fn into_vec(self) -> <Vec<Item, Global> as Like>::Type {
+    pub fn into_vec(self) -> <Vec<Item, Heap> as Like>::Type {
         self.into()
     }
 
     #[inline]
     #[deprecated(since = "2.0.0", note = "use `Into::<Box<[Item]>>::into` instead")]
-    pub fn into_boxed_slice(self) -> <Box<[Item], Global> as Like>::Type {
+    pub fn into_boxed_slice(self) -> <Box<[Item], Heap> as Like>::Type {
         self.into()
     }
 
@@ -1276,35 +1279,21 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     #[must_use = "dropping the parts leaks the elements and the heap buffer"]
     #[cfg_attr(all(feature = "internals", feature = "allocator-api"), syntax(pub))]
     #[deprecated(since = "2.0.0-beta.4", note = "")]
-    fn into_parts_with_allocator(self) -> (RawSmallVec<Item, INLINE>, LocatedLength<Item>, Heap) {
-        let this = ManuallyDrop::new(self);
-        // SAFETY: `this` is never dropped or used again, so each field is moved
-        // out exactly once and `Drop for SmallVec` never runs.
-        unsafe {
-            (
-                (&raw const this.raw).read(),
-                this.length,
-                (&raw const this.allocator).read()
-            )
-        }
+    fn into_parts_with_allocator(self) -> (LocatedLength<Item>, RawSmallVec<Item, INLINE>, Heap) {
+        self.into()
     }
 
     /// # Safety
     ///
-    /// Same contract as [`SmallVec::from_parts`], except that a heap buffer
+    /// Same contract as [`SmallVec::parts`], except that a heap buffer
     /// must have been allocated by `allocator` (or an equivalent one).
     #[inline]
     #[cfg_attr(all(feature = "internals", feature = "allocator-api"), syntax(pub))]
-    #[deprecated(since = "2.0.0-beta.4", note = "")]
-    unsafe fn from_parts_with_allocator(
-        raw: RawSmallVec<Item, INLINE>,
+    unsafe fn parts_in(
         length: LocatedLength<Item>,
+        raw: RawSmallVec<Item, INLINE>,
         allocator: Heap
     ) -> Self {
-        let (len, on_heap) = length.parts();
-        // SAFETY: the caller guarantees the tag matches the active member.
-        // `capacity` is only read by the debug assertions below.
-        let capacity = unsafe { raw.capacity(on_heap) };
         Self {
             length,
             raw,

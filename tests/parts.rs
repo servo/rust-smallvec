@@ -8,7 +8,7 @@ fn into_from_parts_spilled() {
     let v: SmallVec<i32, 1> = SmallVec::from([-1, 0, 1]);
     assert!(v.spilled());
 
-    let (raw, length) = v.into_parts();
+    let (length, raw) = v.into();
     assert!(length.on_heap());
     assert_eq!(length.len(), 3);
 
@@ -17,7 +17,7 @@ fn into_from_parts_spilled() {
     assert!(cap > 1);
 
     // SAFETY: parts come straight from `into_parts`.
-    let rebuilt = unsafe { SmallVec::<i32, 1>::from_parts(raw, length) };
+    let rebuilt = unsafe { SmallVec::<i32, 1>::parts(length, raw) };
     assert_eq!(rebuilt, [-1, 0, 1]);
     assert_eq!(rebuilt.as_ptr(), ptr.as_ptr() as *const i32);
 }
@@ -27,12 +27,12 @@ fn into_from_parts_inline() {
     let v: SmallVec<i32, 4> = SmallVec::from([1, 2, 3]);
     assert!(!v.spilled());
 
-    let (raw, length) = v.into_parts();
+    let (length, raw) = v.into();
     assert!(!length.on_heap());
     assert_eq!(length.len(), 3);
 
     // SAFETY: parts come straight from `into_parts`.
-    let rebuilt = unsafe { SmallVec::<i32, 4>::from_parts(raw, length) };
+    let rebuilt = unsafe { SmallVec::<i32, 4>::parts(length, raw) };
     assert_eq!(rebuilt, [1, 2, 3]);
 }
 
@@ -50,12 +50,12 @@ fn parts_do_not_drop_or_double_drop() {
         assert_eq!(v.spilled(), spilled);
         assert_eq!(Rc::strong_count(&rc), 1 + count);
 
-        let (raw, length) = v.into_parts();
+        let (length, raw) = v.into();
         // nothing was dropped by `into_parts`
         assert_eq!(Rc::strong_count(&rc), 1 + count);
 
         // SAFETY: parts come straight from `into_parts`.
-        let rebuilt = unsafe { SmallVec::<Rc<()>, 2>::from_parts(raw, length) };
+        let rebuilt = unsafe { SmallVec::<Rc<()>, 2>::parts(length, raw) };
         assert_eq!(Rc::strong_count(&rc), 1 + count);
 
         drop(rebuilt);
@@ -68,12 +68,12 @@ fn parts_do_not_drop_or_double_drop() {
 fn into_from_parts_empty() {
     let v: SmallVec<i32, 2> = SmallVec::new();
 
-    let (raw, length) = v.into_parts();
+    let (length, raw) = v.into();
     assert_eq!(length.len(), 0);
     assert!(!length.on_heap());
 
     // SAFETY: parts come straight from `into_parts`.
-    let rebuilt = unsafe { SmallVec::<i32, 2>::from_parts(raw, length) };
+    let rebuilt = unsafe { SmallVec::<i32, 2>::parts(length, raw) };
     assert!(rebuilt.is_empty());
 }
 
@@ -81,11 +81,11 @@ fn into_from_parts_empty() {
 fn into_from_parts_zst() {
     let v: SmallVec<(), 2> = SmallVec::from([(), (), ()]);
 
-    let (raw, length) = v.into_parts();
+    let (length, raw) = v.into();
     assert!(!length.on_heap());
     assert_eq!(length.len(), 3);
 
     // SAFETY: parts come straight from `into_parts`.
-    let rebuilt = unsafe { SmallVec::<(), 2>::from_parts(raw, length) };
+    let rebuilt = unsafe { SmallVec::<(), 2>::parts(length, raw) };
     assert_eq!(rebuilt.len(), 3);
 }
