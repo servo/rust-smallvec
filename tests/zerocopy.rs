@@ -1,7 +1,18 @@
 use {
     smallvec::SmallVec,
-    zerocopy::FromZeros
+    zerocopy::{
+        FromZeros,
+        Immutable
+    }
 };
+
+#[test]
+fn immutable() {
+    fn assert_immutable<T: Immutable>() {}
+    assert_immutable::<SmallVec<u8, 4>>();
+    assert_immutable::<SmallVec<[u32; 3], 0>>();
+    assert_immutable::<SmallVec<(), 4>>();
+}
 
 #[test]
 fn zeroed_is_empty_and_inline() {
