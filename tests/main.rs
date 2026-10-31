@@ -470,7 +470,7 @@ fn append() {
     }
     assert_eq!(v.len(), 4);
 
-    let mut n: SmallVec<u8, 2> = SmallVec::from_buf([5, 6]);
+    let mut n: SmallVec<u8, 2> = SmallVec::inline([5, 6]);
     v.append(&mut n);
     assert_eq!(v.len(), 6);
     assert_eq!(n.len(), 0);
@@ -1017,10 +1017,10 @@ const fn const_new_inner() -> SmallVec<i32, 4> {
     SmallVec::<i32, 4>::new()
 }
 const fn const_new_inline_sized() -> SmallVec<i32, 4> {
-    SmallVec::from_buf([1; 4])
+    SmallVec::inline([1; 4])
 }
 const fn const_new_inline_args() -> SmallVec<i32, 2> {
-    SmallVec::from_buf([1, 4])
+    SmallVec::inline([1, 4])
 }
 
 #[test]
