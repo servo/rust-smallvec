@@ -2024,6 +2024,8 @@ unsafe impl<Item, const INLINE: usize> TryFromBytes for SmallVec<Item, INLINE, G
     #[inline]
     fn is_bit_valid<Align>(_candidate: Maybe<'_, Self, Align>) -> bool
     where Align: Alignment {
+        // Disallow arbitrary byte reads; only `FromZeros::new_zeroed()` is
+        // supported.
         false
     }
 }
