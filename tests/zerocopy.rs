@@ -1,0 +1,104 @@
+use {
+    smallvec::SmallVec,
+    zerocopy::{
+        FromZeros,
+        Immutable
+    }
+};
+
+#[test]
+fn immutable() {
+    fn assert_immutable<T: Immutable>() {}
+    assert_immutable::<SmallVec<u8, 4>>();
+    assert_immutable::<SmallVec<[u32; 3], 0>>();
+    assert_immutable::<SmallVec<(), 4>>();
+}
+
+#[test]
+fn zeroed_is_empty_and_inline() {
+    let mut v: SmallVec<String, 4> = FromZeros::new_zeroed();
+    assert!(v.is_empty());
+    assert!(!v.spilled());
+    assert_eq!(v.capacity(), SmallVec::<String, 4>::inline_size());
+    for i in 0..10 {
+        v.push(i.to_string());
+    }
+    assert_eq!(v.len(), 10);
+}
+
+#[test]
+fn zeroed_primitive() {
+    let v: SmallVec<u8, 8> = FromZeros::new_zeroed();
+    assert!(v.is_empty());
+    assert!(!v.spilled());
+}
+
+#[test]
+fn zeroed_zst() {
+    let v: SmallVec<(), 0> = FromZeros::new_zeroed();
+    assert!(v.is_empty());
+    assert!(!v.spilled());
+}
+
+#[test]
+fn zero_method() {
+    let mut v: SmallVec<u8, 8> = SmallVec::new();
+    v.push(42);
+    v.extend([1, 2, 3, 4, 5]);
+    assert_eq!(v.len(), 6);
+
+    v.zero();
+    assert!(v.is_empty());
+    assert!(!v.spilled());
+    assert_eq!(v.len(), 0);
+
+    let bytes = unsafe {
+        core::slice::from_raw_parts((&raw const v).cast::<u8>(), core::mem::size_of_val(&v))
+    };
+    assert!(bytes.iter().all(|&b| b == 0));
+}
+
+#[test]
+fn zero_method_zst() {
+    let mut v: SmallVec<(), 4> = SmallVec::new();
+    for _ in 0..10 {
+        v.push(());
+    }
+    assert_eq!(v.len(), 10);
+
+    v.zero();
+    assert!(v.is_empty());
+    assert_eq!(v.len(), 0);
+}
+
+#[test]
+fn zeroed_drop_semantics() {
+    use std::sync::Arc;
+
+    let item = Arc::new(42);
+    // Ensure dropping an empty zeroed SmallVec does not misbehave.
+    {
+        let v: SmallVec<Arc<i32>, 4> = FromZeros::new_zeroed();
+        drop(v);
+    }
+    assert_eq!(Arc::strong_count(&item), 1);
+
+    // Ensure pushed elements (both inline and spilled) drop correctly.
+    {
+        let mut v: SmallVec<Arc<i32>, 4> = FromZeros::new_zeroed();
+        v.push(Arc::clone(&item));
+        v.push(Arc::clone(&item));
+        assert_eq!(Arc::strong_count(&item), 3);
+    }
+    assert_eq!(Arc::strong_count(&item), 1);
+
+    {
+        let mut v: SmallVec<Arc<i32>, 2> = FromZeros::new_zeroed();
+        for _ in 0..10 {
+            v.push(Arc::clone(&item));
+        }
+        assert!(v.spilled());
+        assert_eq!(Arc::strong_count(&item), 11);
+    }
+    assert_eq!(Arc::strong_count(&item), 1);
+}

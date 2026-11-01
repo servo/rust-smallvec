@@ -14,7 +14,10 @@ use {
             Borrow,
             BorrowMut
         },
-        cell::Cell,
+        cell::{
+            Cell,
+            RefCell
+        },
         hash::{
             Hash,
             Hasher
@@ -32,7 +35,9 @@ use {
         hash::DefaultHasher,
         panic::{
             AssertUnwindSafe,
-            catch_unwind
+            catch_unwind,
+            set_hook,
+            take_hook
         },
         rc::Rc
     }
@@ -470,7 +475,7 @@ fn append() {
     }
     assert_eq!(v.len(), 4);
 
-    let mut n: SmallVec<u8, 2> = SmallVec::from_buf([5, 6]);
+    let mut n: SmallVec<u8, 2> = SmallVec::inline([5, 6]);
     v.append(&mut n);
     assert_eq!(v.len(), 6);
     assert_eq!(n.len(), 0);
@@ -1017,10 +1022,10 @@ const fn const_new_inner() -> SmallVec<i32, 4> {
     SmallVec::<i32, 4>::new()
 }
 const fn const_new_inline_sized() -> SmallVec<i32, 4> {
-    SmallVec::from_buf([1; 4])
+    SmallVec::inline([1; 4])
 }
 const fn const_new_inline_args() -> SmallVec<i32, 2> {
-    SmallVec::from_buf([1, 4])
+    SmallVec::inline([1, 4])
 }
 
 #[test]
@@ -1155,4 +1160,58 @@ fn spare_capacity_mut() {
     let spare = v.spare_capacity_mut();
     assert!(!spare.is_empty());
     assert_eq!(spare.as_ptr().cast::<u8>(), unsafe { v.as_ptr().add(3) });
+}
+
+thread_local! {
+    static LOCATION: RefCell<Option<(String, u32)>> = const { RefCell::new(None) };
+}
+
+/// Runs `f` and returns the file and line its panic was reported at.
+fn panic_location(f: impl FnOnce()) -> Option<(String, u32)> {
+    let previous = take_hook();
+    set_hook(std::boxed::Box::new(|info| {
+        let location = info
+            .location()
+            .map(|location| (location.file().to_owned(), location.line()));
+        LOCATION.with(|cell| *cell.borrow_mut() = location);
+    }));
+    let result = catch_unwind(AssertUnwindSafe(f));
+    set_hook(previous);
+    assert!(result.is_err(), "expected a panic");
+    LOCATION.with(|cell| cell.borrow_mut().take())
+}
+
+/// Asserts that the expression panics and that the panic points at this line.
+macro_rules! assert_panics_here {
+    ($expr:expr) => {
+        assert_eq!(
+            panic_location(|| _ = $expr),
+            Some((file!().to_owned(), line!())),
+            "`{}` panicked at the wrong location",
+            stringify!($expr)
+        )
+    };
+}
+
+#[test]
+fn panics_point_to_caller() {
+    let mut v: SmallVec<i32, 2> = SmallVec::from([1, 2, 3]);
+
+    assert_panics_here!(v.swap_remove(10));
+    assert_panics_here!(v.remove(10));
+    assert_panics_here!(v.insert(10, 0));
+    assert_panics_here!(v.insert_mut(10, 0));
+    assert_panics_here!(v.split_off(10));
+    assert_panics_here!(v.drain(2..10));
+    assert_panics_here!(v.drain(..=usize::MAX));
+    assert_panics_here!(v.splice(2..10, [0]));
+    assert_panics_here!(v.reserve(usize::MAX));
+    assert_panics_here!(v.reserve_exact(usize::MAX));
+    assert_panics_here!(v.grow(usize::MAX));
+    assert_panics_here!(v.insert_from_slice_copy(10, &[0]));
+    assert_panics_here!(v.extend_from_within(2..10));
+    assert_panics_here!(v.extend_from_within_copy(2..10));
+    assert_panics_here!(SmallVec::<i32, 2>::with_capacity(usize::MAX));
+    assert_panics_here!(SmallVec::<i32, 2>::inline_with_length([1, 2], 3));
+    assert_panics_here!(SmallVec::<i32, 2>::new().leak());
 }

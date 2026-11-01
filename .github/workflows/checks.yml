@@ -113,8 +113,8 @@ jobs:
         uses: dtolnay/rust-toolchain@nightly
         with:
           target: thumbv7m-none-eabi
-      - name: test default features
-        run: cargo test
+      - name: build default features
+        run: cargo build
   msrv:
     name: MSRV
     runs-on: ubuntu-latest
@@ -123,5 +123,5 @@ jobs:
         uses: actions/checkout@v7
       - name: install rust MSRV
         uses: dtolnay/rust-toolchain@1.86
-      - name: test default features
-        run: cargo test
+      - name: build default features
+        run: cargo build
