@@ -150,14 +150,18 @@ impl<Item, const INLINE: usize> From<<Vec<Item, Global> as Like>::Type>
             if vec.capacity() <= INLINE {
                 vec.reserve(INLINE + 1 - length);
             }
-            let cap = vec.capacity();
             // SAFETY: vec.capacity is not `0` (checked above), so the pointer
             // can not dangle and thus specifically cannot be null.
-            let ptr = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
+            let pointer = NonNull::slice_from_raw_parts(
+                unsafe { NonNull::new_unchecked(vec.as_mut_ptr()).cast() },
+                vec.capacity()
+            );
 
             Self {
                 length: LocatedLength::new(length, true),
-                raw: RawSmallVec::heap(ptr, cap),
+                raw: RawSmallVec {
+                    heap: pointer
+                },
                 allocator: Global
             }
         }
@@ -191,8 +195,13 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
             // - the first `length` entries are proper `Item`-values
             // - the allocation is not larger than `isize::MAX`
             unsafe {
-                let (ptr, cap) = this.raw.heap;
-                <Vec<Item, Global> as Like>::Type::from_raw_parts(ptr.as_ptr(), length, cap)
+                let pointer = this.raw.heap;
+                let capacity = pointer.len();
+                <Vec<Item, Global> as Like>::Type::from_raw_parts(
+                    pointer.cast().as_ptr(),
+                    length,
+                    capacity
+                )
             }
         }
     }

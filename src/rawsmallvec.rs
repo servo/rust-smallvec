@@ -20,29 +20,14 @@ use {
 #[repr(C)]
 pub union RawSmallVec<Item, const INLINE: usize> {
     pub inline: ManuallyDrop<[MaybeUninit<Item>; INLINE]>,
-    pub heap: (NonNull<Item>, usize)
+    pub heap: NonNull<[MaybeUninit<Item>]>
 }
 
 impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
-    pub const INLINE_CAP: usize = if Self::IS_ZST { usize::MAX } else { INLINE };
-    const IS_ZST: bool = size_of::<Item>() == 0;
-
     #[inline]
     pub const fn new() -> Self {
-        Self::inline([const { MaybeUninit::uninit() }; INLINE])
-    }
-
-    #[inline]
-    pub const fn inline(inline: [MaybeUninit<Item>; INLINE]) -> Self {
         Self {
-            inline: ManuallyDrop::new(inline)
-        }
-    }
-
-    #[inline]
-    pub const fn heap(ptr: NonNull<Item>, capacity: usize) -> Self {
-        Self {
-            heap: (ptr, capacity)
+            inline: ManuallyDrop::new([const { MaybeUninit::uninit() }; INLINE])
         }
     }
 
@@ -68,7 +53,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
     #[inline(always)]
     pub const unsafe fn as_ptr(&self, on_heap: bool) -> *const Item {
         if on_heap {
-            unsafe { self.heap.0.as_ptr() }
+            unsafe { self.heap.as_ptr().cast_const().cast() }
         } else {
             self.as_ptr_inline()
         }
@@ -80,7 +65,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
     #[inline(always)]
     pub const unsafe fn as_mut_ptr(&mut self, on_heap: bool) -> *mut Item {
         if on_heap {
-            unsafe { self.heap.0.as_ptr() }
+            unsafe { self.heap.as_ptr().cast() }
         } else {
             self.as_mut_ptr_inline()
         }
@@ -89,12 +74,14 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
     /// # Safety
     ///
     /// `on_heap` must be true if and only if `self.heap` is the active member.
-    #[inline(always)]
+    //#[inline(always)]
     pub const unsafe fn capacity(&self, on_heap: bool) -> usize {
         if on_heap {
-            unsafe { self.heap.1 }
+            unsafe { self.heap.len() }
+        } else if size_of::<Item>() == 0 {
+            usize::MAX
         } else {
-            Self::INLINE_CAP
+            INLINE
         }
     }
 
@@ -111,7 +98,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
         allocator: &Heap
     ) -> Result<(), SmallVecError> {
         let (length, was_on_heap) = length.parts();
-        debug_assert!(!Self::IS_ZST);
+        debug_assert!(size_of::<Item>() != 0);
         debug_assert!(new_capacity > 0 && new_capacity >= length);
 
         // SAFETY: the tag tells which member is active
@@ -138,7 +125,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
             // layout during the previous allocation
             let old_layout = unsafe {
                 Layout::from_size_align_unchecked(
-                    self.heap.1 * size_of::<Item>(),
+                    self.heap.len() * size_of::<Item>(),
                     align_of::<Item>()
                 )
             };
@@ -150,7 +137,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
             // alignment. since it was constructed
             // with Layout::array
             unsafe {
-                (if self.heap.1 < new_capacity {
+                (if self.heap.len() < new_capacity {
                     <Heap as Allocator>::grow
                 } else {
                     <Heap as Allocator>::shrink
@@ -164,7 +151,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
             .ok_or(SmallVecError::AllocationError(new_layout))?
             .cast()
         };
-        self.heap = (new_ptr, new_capacity);
+        self.heap = NonNull::slice_from_raw_parts(new_ptr.cast(), new_capacity);
         Ok(())
     }
 }

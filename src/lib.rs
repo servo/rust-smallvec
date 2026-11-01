@@ -224,7 +224,9 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
         // SAFETY: all the members in 0..S are initialized
         Self {
             length: LocatedLength::new(S, false),
-            raw: RawSmallVec::inline(buf),
+            raw: RawSmallVec {
+                inline: ManuallyDrop::new(buf)
+            },
             allocator: Global
         }
     }
@@ -235,7 +237,9 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
         // SAFETY: all the members in 0..length are initialized
         let mut vec = Self {
             length: LocatedLength::new(length, false),
-            raw: RawSmallVec::inline(buf.map(MaybeUninit::new)),
+            raw: RawSmallVec {
+                inline: ManuallyDrop::new(buf.map(MaybeUninit::new))
+            },
             allocator: Global
         };
         // Deallocate the remaining elements so no memory is leaked.
@@ -283,7 +287,9 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
         debug_assert!(length <= INLINE);
         Self {
             length: LocatedLength::new(length, false),
-            raw: RawSmallVec::inline(buf),
+            raw: RawSmallVec {
+                inline: ManuallyDrop::new(buf)
+            },
             allocator: Global
         }
     }
@@ -360,7 +366,11 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
 
     #[inline]
     pub const fn inline_size() -> usize {
-        RawSmallVec::<Item, INLINE>::INLINE_CAP
+        if size_of::<Item>() == 0 {
+            usize::MAX
+        } else {
+            INLINE
+        }
     }
 
     #[inline]
@@ -651,15 +661,20 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
             if on_heap {
                 unsafe {
                     // SAFETY: heap member is active
-                    let (ptr, old_cap) = self.raw.heap;
+                    let pointer = self.raw.heap;
+
                     // inline member is now active
 
                     // SAFETY: length <= new_capacity <= Self::inline_size()
                     // so the copy is within bounds of the inline member
-                    copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), length);
+                    copy_nonoverlapping(
+                        pointer.as_ptr().cast(),
+                        self.raw.as_mut_ptr_inline(),
+                        length
+                    );
                     drop(DropDealloc {
-                        ptr: ptr.cast(),
-                        size_bytes: old_cap * size_of::<Item>(),
+                        ptr: pointer.cast(),
+                        size_bytes: pointer.len() * size_of::<Item>(),
                         align: align_of::<Item>(),
                         allocator: &self.allocator
                     });
@@ -725,14 +740,18 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         if length <= Self::inline_size() {
             // SAFETY: on_heap is true, so we're on the heap
             unsafe {
-                let (ptr, capacity) = self.raw.heap;
-                copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), length);
+                let pointer = self.raw.heap;
+                copy_nonoverlapping(
+                    pointer.as_ptr().cast(),
+                    self.raw.as_mut_ptr_inline(),
+                    length
+                );
                 self.length.set_location::<false>();
                 Allocator::deallocate(
                     &self.allocator,
-                    ptr.cast(),
+                    pointer.cast(),
                     Layout::from_size_align_unchecked(
-                        capacity * size_of::<Item>(),
+                        pointer.len() * size_of::<Item>(),
                         align_of::<Item>()
                     )
                 );
@@ -757,20 +776,24 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
             return;
         }
         // SAFETY: the vector is on the heap
-        let capacity = unsafe { self.raw.heap.1 };
+        let capacity = unsafe { self.raw.heap.len() };
         if capacity > min_capacity {
             let target = length.max(min_capacity);
             if target <= Self::inline_size() {
                 // SAFETY: on_heap is true, so we're on the heap
                 unsafe {
-                    let (ptr, capacity) = self.raw.heap;
-                    copy_nonoverlapping(ptr.as_ptr(), self.raw.as_mut_ptr_inline(), length);
+                    let pointer = self.raw.heap;
+                    copy_nonoverlapping(
+                        pointer.as_ptr().cast(),
+                        self.raw.as_mut_ptr_inline(),
+                        length
+                    );
                     self.length.set_location::<false>();
                     Allocator::deallocate(
                         &self.allocator,
-                        ptr.cast(),
+                        pointer.cast(),
                         Layout::from_size_align_unchecked(
-                            capacity * size_of::<Item>(),
+                            pointer.len() * size_of::<Item>(),
                             align_of::<Item>()
                         )
                     );
@@ -1445,7 +1468,7 @@ impl<#[cfg_attr(feature = "may-dangle", may_dangle)] Item, const INLINE: usize, 
         // SAFETY: see above
         unsafe {
             let _drop_dealloc = if on_heap {
-                let capacity = self.raw.heap.1;
+                let capacity = self.raw.heap.len();
                 Some(DropDealloc {
                     ptr: NonNull::new_unchecked(ptr as *mut u8),
                     size_bytes: capacity * size_of::<Item>(),
