@@ -1,3 +1,9 @@
+#[cfg(feature = "defmt")]
+use defmt::{
+    Format as DeFormat,
+    Formatter as DeFormatter,
+    write as dewrite
+};
 use {
     super::super::{
         DropDealloc,
@@ -215,5 +221,14 @@ impl<Item, const INLINE: usize, Heap: Allocator> IntoIterator for SmallVec<Item,
 impl<Item: Debug, const INLINE: usize, Heap: Allocator> Debug for IntoIter<Item, INLINE, Heap> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Format {
         f.debug_tuple("IntoIter").field(&self.as_ref()).finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<Item: DeFormat, const INLINE: usize, Heap: Allocator> DeFormat
+    for IntoIter<Item, INLINE, Heap>
+{
+    fn format(&self, fmt: DeFormatter) {
+        dewrite!(fmt, "IntoIter({=[?]})", self.as_ref());
     }
 }

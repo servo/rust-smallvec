@@ -1,3 +1,9 @@
+#[cfg(feature = "defmt")]
+use defmt::{
+    Format as DeFormat,
+    Formatter as DeFormatter,
+    write as dewrite
+};
 use {
     super::{
         allocator::Allocator,
@@ -6,6 +12,11 @@ use {
     },
     core::{
         alloc::Layout,
+        fmt::{
+            Debug,
+            Formatter,
+            Result as Format
+        },
         mem::{
             ManuallyDrop,
             MaybeUninit
@@ -21,6 +32,21 @@ use {
 pub union RawSmallVec<Item, const INLINE: usize> {
     pub inline: ManuallyDrop<[MaybeUninit<Item>; INLINE]>,
     pub heap: (NonNull<Item>, usize)
+}
+
+// The active member is tracked by `LocatedLength`, not by the union itself, so
+// neither member can be read safely here.
+impl<Item, const INLINE: usize> Debug for RawSmallVec<Item, INLINE> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Format {
+        f.debug_struct("RawSmallVec").finish_non_exhaustive()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<Item, const INLINE: usize> DeFormat for RawSmallVec<Item, INLINE> {
+    fn format(&self, fmt: DeFormatter) {
+        dewrite!(fmt, "RawSmallVec {{ .. }}");
+    }
 }
 
 impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {

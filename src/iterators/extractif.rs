@@ -1,3 +1,9 @@
+#[cfg(feature = "defmt")]
+use defmt::{
+    Format as DeFormat,
+    Formatter as DeFormatter,
+    write as dewrite
+};
 use {
     super::super::{
         SmallVec,
@@ -48,6 +54,18 @@ where
         f.debug_tuple("ExtractIf")
             .field(&self.vec.as_ref())
             .finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<Item, const INLINE: usize, Heap: Allocator, F> DeFormat
+    for ExtractIf<'_, Item, INLINE, F, Heap>
+where
+    F: FnMut(&mut Item) -> bool,
+    Item: DeFormat
+{
+    fn format(&self, fmt: DeFormatter) {
+        dewrite!(fmt, "ExtractIf({=[?]})", self.vec.as_ref());
     }
 }
 

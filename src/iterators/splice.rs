@@ -1,3 +1,9 @@
+#[cfg(feature = "defmt")]
+use defmt::{
+    Format as DeFormat,
+    Formatter as DeFormatter,
+    write as dewrite
+};
 use {
     super::{
         super::{
@@ -40,6 +46,17 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Format {
         f.debug_tuple("Splice").field(&self.drain).finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<'valid, I, const INLINE: usize, Heap: Allocator> DeFormat for Splice<'valid, I, INLINE, Heap>
+where
+    I: Iterator + 'valid,
+    <I as Iterator>::Item: DeFormat
+{
+    fn format(&self, fmt: DeFormatter) {
+        dewrite!(fmt, "Splice({})", self.drain);
     }
 }
 
