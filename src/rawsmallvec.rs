@@ -74,7 +74,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
     /// # Safety
     ///
     /// `on_heap` must be true if and only if `self.heap` is the active member.
-    //#[inline(always)]
+    #[inline(always)]
     pub const unsafe fn capacity(&self, on_heap: bool) -> usize {
         if on_heap {
             unsafe { self.heap.len() }

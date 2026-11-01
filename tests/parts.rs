@@ -14,7 +14,6 @@ fn into_from_parts_spilled() {
 
     // SAFETY: `length` says on heap, so `heap` is the active member.
     let pointer = unsafe { raw.heap };
-    // let (ptr, cap) = unsafe { raw.heap };
     assert!(pointer.len() > 1);
 
     // SAFETY: parts come straight from `into_parts`.
