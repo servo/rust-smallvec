@@ -9,13 +9,13 @@ macro_rules! smallvec {
     });
 }
 
-#[deprecated(since = "2.0.0-alpha.13", note = "use `SmallVec::from_buf` instead")]
+#[deprecated(since = "2.0.0-alpha.13", note = "use `SmallVec::inline` instead")]
 #[macro_export]
 macro_rules! smallvec_inline {
     ($elem:expr; $n:expr) => ({
-        $crate::SmallVec::<_, $n, $crate::Global>::from_buf([$elem; $n])
+        $crate::SmallVec::<_, $n, $crate::Global>::inline([$elem; $n])
     });
     ($($($x:expr),+$(,)?)?) => ({
-        $crate::SmallVec::from_buf([$($($x),+)?])
+        $crate::SmallVec::inline([$($($x),+)?])
     });
 }

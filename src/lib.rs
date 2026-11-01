@@ -1,4 +1,5 @@
 #![doc = include_str!("../README.md")]
+#![warn(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(feature = "specialization", allow(incomplete_features))]
@@ -31,6 +32,8 @@ mod rkyv;
 mod serde;
 #[cfg(feature = "specialization")]
 mod specialization;
+#[cfg(feature = "zerocopy")]
+mod zerocopy;
 
 #[cfg(feature = "arbitrary")]
 use arbitrary::{
@@ -196,12 +199,13 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn with_capacity(capacity: usize) -> Self {
         Self::with_capacity_in(capacity, Global)
     }
 
     #[inline]
-    pub const fn from_buf<const S: usize>(elements: [Item; S]) -> Self {
+    pub const fn inline<const S: usize>(elements: [Item; S]) -> Self {
         const {
             assert!(S <= INLINE);
         }
@@ -232,7 +236,8 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     }
 
     #[inline]
-    pub fn from_buf_and_len(buf: [Item; INLINE], length: usize) -> Self {
+    #[track_caller]
+    pub fn inline_with_length(buf: [Item; INLINE], length: usize) -> Self {
         assert!(length <= INLINE);
         // SAFETY: all the members in 0..length are initialized
         let mut vec = Self {
@@ -270,7 +275,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     /// };
     ///
     /// let buf = [1, 2, 3, 4, 5, 0, 0, 0];
-    /// let sv = unsafe { SmallVec::from_buf_and_len_unchecked(buf.map(MaybeUninit::new), 5) };
+    /// let sv = unsafe { SmallVec::inline_with_length_unchecked(buf.map(MaybeUninit::new), 5) };
     ///
     /// assert_eq!(&*sv, &[1, 2, 3, 4, 5]);
     /// ```
@@ -280,7 +285,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     /// `length <= INLINE`, and all the elements in `buf[..length]` must be
     /// initialized
     #[inline]
-    pub const unsafe fn from_buf_and_len_unchecked(
+    pub const unsafe fn inline_with_length_unchecked(
         buf: [MaybeUninit<Item>; INLINE],
         length: usize
     ) -> Self {
@@ -395,6 +400,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         self.length.on_heap()
     }
 
+    #[track_caller]
     pub fn drain<R>(&mut self, range: R) -> Drain<'_, Item, INLINE, Heap>
     where R: RangeBounds<usize> {
         let length = self.len();
@@ -532,6 +538,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         }
     }
 
+    #[track_caller]
     pub fn splice<R, I>(
         &mut self,
         range: R,
@@ -628,9 +635,11 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn grow(&mut self, new_capacity: usize) {
-        self.try_grow(new_capacity)
-            .unwrap_or_else(SmallVecError::handle);
+        if let Err(error) = self.try_grow(new_capacity) {
+            error.handle()
+        }
     }
 
     pub fn try_grow(&mut self, new_capacity: usize) -> Result<(), SmallVecError> {
@@ -686,9 +695,11 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn reserve(&mut self, additional: usize) {
-        self.try_reserve(additional)
-            .unwrap_or_else(SmallVecError::handle);
+        if let Err(error) = self.try_reserve(additional) {
+            error.handle()
+        }
     }
 
     #[inline]
@@ -713,9 +724,11 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn reserve_exact(&mut self, additional: usize) {
-        self.try_reserve_exact(additional)
-            .unwrap_or_else(SmallVecError::handle);
+        if let Err(error) = self.try_reserve_exact(additional) {
+            error.handle()
+        }
     }
 
     #[inline]
@@ -827,6 +840,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn swap_remove(&mut self, index: usize) -> Item {
         #[cold]
         #[inline(never)]
@@ -865,6 +879,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn remove(&mut self, index: usize) -> Item {
         #[cold]
         #[inline(never)]
@@ -891,12 +906,14 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn insert(&mut self, index: usize, value: Item) {
         _ = self.insert_mut(index, value);
     }
 
     #[inline]
     #[must_use]
+    #[track_caller]
     pub fn insert_mut(&mut self, index: usize, value: Item) -> &mut Item {
         #[cold]
         #[inline(never)]
@@ -1173,6 +1190,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         }
     }
 
+    #[track_caller]
     pub fn leak<'valid>(self) -> &'valid mut [Item] {
         let (length, on_heap) = self.length.parts();
         if !on_heap {
@@ -1203,6 +1221,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
+    #[track_caller]
     pub fn extend_from_slice_copy(&mut self, other: &[Item])
     where Item: Copy {
         let length = other.len();
@@ -1220,6 +1239,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         }
     }
 
+    #[track_caller]
     pub fn extend_from_within_copy<R>(&mut self, source: R)
     where
         R: RangeBounds<usize>,
@@ -1244,6 +1264,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         }
     }
 
+    #[track_caller]
     pub fn insert_from_slice_copy(&mut self, index: usize, other: &[Item])
     where Item: Copy {
         let l = self.len();
@@ -1291,8 +1312,12 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[cfg_attr(feature = "allocator-api", syntax(pub))]
+    #[track_caller]
     fn with_capacity_in(capacity: usize, allocator: Heap) -> Self {
-        Self::try_with_capacity_in(capacity, allocator).unwrap_or_else(SmallVecError::handle)
+        match Self::try_with_capacity_in(capacity, allocator) {
+            Ok(vec) => vec,
+            Err(error) => error.handle()
+        }
     }
 
     #[inline]
@@ -1353,6 +1378,7 @@ impl<Item: Clone, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, H
         self.extend(other.iter())
     }
 
+    #[track_caller]
     pub fn extend_from_within<R>(&mut self, source: R)
     where R: RangeBounds<usize> {
         let source = Range::new(source, self.len());
@@ -1404,6 +1430,7 @@ impl<Item, const INLINE: usize, Heap: Allocator + Clone> SmallVec<Item, INLINE, 
     /// assert_eq!(vec2, [2, 3]);
     /// ```
     #[inline]
+    #[track_caller]
     pub fn split_off(&mut self, at: usize) -> Self {
         let length = self.len();
         assert!(at <= length);

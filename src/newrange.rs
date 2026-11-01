@@ -10,6 +10,7 @@ pub trait NewRange {
 
 impl NewRange for Range<usize> {
     #[inline]
+    #[track_caller]
     fn new(rangebounds: impl RangeBounds<usize>, length: usize) -> Self {
         #[cold]
         #[inline(never)]
@@ -24,16 +25,22 @@ impl NewRange for Range<usize> {
 
         let start = match rangebounds.start_bound() {
             Bound::Included(&start) => start,
-            Bound::Excluded(start) => start
-                .checked_add(1)
-                .unwrap_or_else(|| panic!("attempted to index slice from after maximum usize")),
+            Bound::Excluded(start) => {
+                let Some(start) = start.checked_add(1) else {
+                    panic!("attempted to index slice from after maximum usize")
+                };
+                start
+            }
             Bound::Unbounded => 0
         };
 
         let end = match rangebounds.end_bound() {
-            Bound::Included(end) => end
-                .checked_add(1)
-                .unwrap_or_else(|| panic!("attempted to index slice up to maximum usize")),
+            Bound::Included(end) => {
+                let Some(end) = end.checked_add(1) else {
+                    panic!("attempted to index slice up to maximum usize")
+                };
+                end
+            }
             Bound::Excluded(&end) => end,
             Bound::Unbounded => length
         };

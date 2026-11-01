@@ -1027,6 +1027,7 @@ dependencies = [
  "serde_core",
  "serde_test",
  "smallvec-macro",
+ "zerocopy",
  "zeroize",
 ]
 

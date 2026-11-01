@@ -29,6 +29,7 @@ impl Error for SmallVecError {}
 impl SmallVecError {
     #[cold]
     #[inline(never)]
+    #[track_caller]
     pub fn handle<Type>(self) -> Type {
         match self {
             SmallVecError::CapacityOverflow => panic!("capacity overflow"),
