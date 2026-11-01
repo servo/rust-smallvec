@@ -74,9 +74,7 @@ impl<Item, I, const INLINE: usize, Heap: Allocator> SpecExtend<Item, I>
 where I: Iterator<Item = Item>
 {
     #[inline]
-    default fn spec_extend(&mut self, iter: I) {
-        self.extend_fallback(iter);
-    }
+    default fn spec_extend(&mut self, iter: I) { self.extend_fallback(iter); }
 }
 
 impl<Item, I, const INLINE: usize, Heap: Allocator> SpecExtend<Item, I>
@@ -148,9 +146,7 @@ where
     Item: Clone
 {
     #[inline]
-    default fn spec_extend(&mut self, iterator: I) {
-        self.spec_extend(iterator.cloned())
-    }
+    default fn spec_extend(&mut self, iterator: I) { self.spec_extend(iterator.cloned()) }
 }
 
 impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator>
@@ -243,9 +239,7 @@ impl<Item, I, const INLINE: usize> SpecFromIterator<Item, I> for SmallVec<Item, 
 where I: Iterator<Item = Item>
 {
     #[inline]
-    default fn spec_from_iter(iter: I) -> Self {
-        Self::from_iter_fallback(iter)
-    }
+    default fn spec_from_iter(iter: I) -> Self { Self::from_iter_fallback(iter) }
 }
 
 impl<Item, I, const INLINE: usize> SpecFromIterator<Item, I> for SmallVec<Item, INLINE, Global>
@@ -277,9 +271,7 @@ impl<Item: Clone, const INLINE: usize, Heap: Allocator> SpecCloneFrom<Item>
     for SmallVec<Item, INLINE, Heap>
 {
     #[inline]
-    default fn spec_clone_from(&mut self, source: &[Item]) {
-        self.clone_from_fallback(source);
-    }
+    default fn spec_clone_from(&mut self, source: &[Item]) { self.clone_from_fallback(source); }
 }
 
 impl<Item: Copy, const INLINE: usize, Heap: Allocator> SpecCloneFrom<Item>

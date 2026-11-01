@@ -59,9 +59,7 @@ impl<Item: BorshDeserialize, const INLINE: usize> BorshDeserialize
 impl<Item: BorshSchema, const INLINE: usize, Heap: Allocator> BorshSchema
     for SmallVec<Item, INLINE, Heap>
 {
-    fn declaration() -> Declaration {
-        format!("Vec<{}>", Item::declaration())
-    }
+    fn declaration() -> Declaration { format!("Vec<{}>", Item::declaration()) }
 
     fn add_definitions_recursively(definitions: &mut Map<Declaration, Definition>) {
         let declaration = Self::declaration();

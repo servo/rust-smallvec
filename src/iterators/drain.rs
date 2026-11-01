@@ -59,9 +59,7 @@ impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> Iterator
     }
 
     #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.iter.size_hint()
-    }
+    fn size_hint(&self) -> (usize, Option<usize>) { self.iter.size_hint() }
 }
 
 impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> DoubleEndedIterator
@@ -80,9 +78,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> ExactSizeIterator
     for Drain<'_, Item, INLINE, Heap>
 {
     #[inline]
-    fn len(&self) -> usize {
-        self.iter.len()
-    }
+    fn len(&self) -> usize { self.iter.len() }
 }
 
 impl<Item, const INLINE: usize, Heap: Allocator> FusedIterator for Drain<'_, Item, INLINE, Heap> {}
@@ -176,9 +172,7 @@ impl<'valid, Item, const INLINE: usize, Heap: Allocator> AsRef<[Item]>
     for Drain<'valid, Item, INLINE, Heap>
 {
     #[inline]
-    fn as_ref(&self) -> &[Item] {
-        self.iter.as_slice()
-    }
+    fn as_ref(&self) -> &[Item] { self.iter.as_slice() }
 }
 
 impl<Item, const INLINE: usize, Heap: Allocator> Drain<'_, Item, INLINE, Heap> {
@@ -187,9 +181,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> Drain<'_, Item, INLINE, Heap> {
         note = "use `<Drain<'_, Item, INLINE, Heap> as AsRef<[Item]>>::as_ref` instead"
     )]
     #[must_use]
-    pub fn as_slice(&self) -> &[Item] {
-        self.as_ref()
-    }
+    pub fn as_slice(&self) -> &[Item] { self.as_ref() }
 
     /// The range from `self.vec.length` to `self.tail_start` contains elements
     /// that have been moved out.

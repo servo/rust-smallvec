@@ -16,9 +16,7 @@ pub struct LocatedLength<Item>(usize, PhantomData<Item>);
 // be `Copy` or `Clone`.
 impl<Item> Clone for LocatedLength<Item> {
     #[inline]
-    fn clone(&self) -> Self {
-        *self
-    }
+    fn clone(&self) -> Self { *self }
 }
 
 impl<Item> Copy for LocatedLength<Item> {}
@@ -40,20 +38,14 @@ impl<Item> LocatedLength<Item> {
     }
 
     #[inline(always)]
-    pub const fn len(self) -> usize {
-        self.0 >> Self::SHIFT
-    }
+    pub const fn len(self) -> usize { self.0 >> Self::SHIFT }
 
     #[inline(always)]
     #[must_use]
-    pub const fn on_heap(self) -> bool {
-        self.0 & Self::TAG != 0
-    }
+    pub const fn on_heap(self) -> bool { self.0 & Self::TAG != 0 }
 
     #[inline(always)]
-    pub const fn parts(self) -> (usize, bool) {
-        (self.0 >> Self::SHIFT, (self.0 & Self::TAG) != 0)
-    }
+    pub const fn parts(self) -> (usize, bool) { (self.0 >> Self::SHIFT, (self.0 & Self::TAG) != 0) }
 
     #[inline(always)]
     pub const fn set_location<const ON: bool>(&mut self) {
@@ -71,9 +63,7 @@ impl<Item> LocatedLength<Item> {
         {
             #[cold]
             #[inline(never)]
-            const fn assert_failed() {
-                panic!("smallvec length overflow")
-            }
+            const fn assert_failed() { panic!("smallvec length overflow") }
             match self.len().checked_add(n) {
                 Some(value) => {
                     if value > Self::MAX_LEN {

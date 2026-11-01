@@ -7,9 +7,7 @@ struct Key(&'static str);
 struct Query(&'static str);
 
 impl Equivalent<Key> for Query {
-    fn equivalent(&self, key: &Key) -> bool {
-        self.0.eq_ignore_ascii_case(key.0)
-    }
+    fn equivalent(&self, key: &Key) -> bool { self.0.eq_ignore_ascii_case(key.0) }
 }
 
 #[test]

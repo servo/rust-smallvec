@@ -48,27 +48,21 @@ impl<Item: Clone, const INLINE: usize> From<&[Item]> for SmallVec<Item, INLINE, 
 
 impl<Item: Clone, const INLINE: usize> From<&mut [Item]> for SmallVec<Item, INLINE, Global> {
     #[inline]
-    fn from(slice: &mut [Item]) -> Self {
-        Self::from(slice as &[Item])
-    }
+    fn from(slice: &mut [Item]) -> Self { Self::from(slice as &[Item]) }
 }
 
 impl<Item: Clone, const M: usize, const INLINE: usize> From<&[Item; M]>
     for SmallVec<Item, INLINE, Global>
 {
     #[inline]
-    fn from(slice: &[Item; M]) -> Self {
-        Self::from(slice as &[Item])
-    }
+    fn from(slice: &[Item; M]) -> Self { Self::from(slice as &[Item]) }
 }
 
 impl<Item: Clone, const M: usize, const INLINE: usize> From<&mut [Item; M]>
     for SmallVec<Item, INLINE, Global>
 {
     #[inline]
-    fn from(slice: &mut [Item; M]) -> Self {
-        Self::from(slice as &[Item])
-    }
+    fn from(slice: &mut [Item; M]) -> Self { Self::from(slice as &[Item]) }
 }
 
 impl<Item, const INLINE: usize, const M: usize> From<[Item; M]> for SmallVec<Item, INLINE, Global> {
@@ -207,7 +201,5 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
 }
 
 impl<T, const N: usize> From<<Box<[T], Global> as Like>::Type> for SmallVec<T, N> {
-    fn from(boxed: <Box<[T], Global> as Like>::Type) -> Self {
-        boxed.into_vec().into()
-    }
+    fn from(boxed: <Box<[T], Global> as Like>::Type) -> Self { boxed.into_vec().into() }
 }

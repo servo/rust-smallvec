@@ -143,9 +143,7 @@ pub fn double_spill() {
 
 // https://github.com/servo/rust-smallvec/issues/4
 #[test]
-fn issue_4() {
-    SmallVec::<Box<u32>, 2>::new();
-}
+fn issue_4() { SmallVec::<Box<u32>, 2>::new(); }
 
 // https://github.com/servo/rust-smallvec/issues/5
 #[test]
@@ -254,9 +252,7 @@ fn splice_reserve_panic() {
     struct CountDrop<'valid>(&'valid Cell<usize>);
 
     impl Drop for CountDrop<'_> {
-        fn drop(&mut self) {
-            self.0.set(self.0.get() + 1);
-        }
+        fn drop(&mut self) { self.0.set(self.0.get() + 1); }
     }
 
     for capacity in [4, 8] {
@@ -328,9 +324,7 @@ fn into_iter_drop() {
     struct DropCounter<'valid>(&'valid Cell<i32>);
 
     impl<'valid> Drop for DropCounter<'valid> {
-        fn drop(&mut self) {
-            self.0.set(self.0.get() + 1);
-        }
+        fn drop(&mut self) { self.0.set(self.0.get() + 1); }
     }
 
     {
@@ -999,9 +993,7 @@ fn grow_spilled_same_size() {
 }
 
 #[test]
-fn const_generics() {
-    let _v = SmallVec::<i32, 987>::default();
-}
+fn const_generics() { let _v = SmallVec::<i32, 987>::default(); }
 
 #[test]
 fn const_new() {
@@ -1018,20 +1010,12 @@ fn const_new() {
     assert_eq!(v[0], 1);
     assert_eq!(v[1], 4);
 }
-const fn const_new_inner() -> SmallVec<i32, 4> {
-    SmallVec::<i32, 4>::new()
-}
-const fn const_new_inline_sized() -> SmallVec<i32, 4> {
-    SmallVec::inline([1; 4])
-}
-const fn const_new_inline_args() -> SmallVec<i32, 2> {
-    SmallVec::inline([1, 4])
-}
+const fn const_new_inner() -> SmallVec<i32, 4> { SmallVec::<i32, 4>::new() }
+const fn const_new_inline_sized() -> SmallVec<i32, 4> { SmallVec::inline([1; 4]) }
+const fn const_new_inline_args() -> SmallVec<i32, 2> { SmallVec::inline([1, 4]) }
 
 #[test]
-fn zero_size_items() {
-    SmallVec::<(), 0>::new().push(());
-}
+fn zero_size_items() { SmallVec::<(), 0>::new().push(()); }
 
 #[test]
 fn clone_from() {
@@ -1108,9 +1092,7 @@ fn collect_from_iter() {
     impl<I: Iterator> Iterator for IterNoHint<I> {
         type Item = I::Item;
 
-        fn next(&mut self) -> Option<Self::Item> {
-            self.0.next()
-        }
+        fn next(&mut self) -> Option<Self::Item> { self.0.next() }
 
         // no implementation of size_hint means it returns (0, None) - which
         // forces from_iter to grow the allocated space iteratively.

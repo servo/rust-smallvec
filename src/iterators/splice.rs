@@ -46,21 +46,15 @@ where
 impl<I: Iterator, const INLINE: usize, Heap: Allocator> Iterator for Splice<'_, I, INLINE, Heap> {
     type Item = I::Item;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.drain.next()
-    }
+    fn next(&mut self) -> Option<Self::Item> { self.drain.next() }
 
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.drain.size_hint()
-    }
+    fn size_hint(&self) -> (usize, Option<usize>) { self.drain.size_hint() }
 }
 
 impl<I: Iterator, const INLINE: usize, Heap: Allocator> DoubleEndedIterator
     for Splice<'_, I, INLINE, Heap>
 {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.drain.next_back()
-    }
+    fn next_back(&mut self) -> Option<Self::Item> { self.drain.next_back() }
 }
 
 impl<I: Iterator, const INLINE: usize, Heap: Allocator> ExactSizeIterator

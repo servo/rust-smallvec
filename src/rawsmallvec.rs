@@ -28,9 +28,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
     const IS_ZST: bool = size_of::<Item>() == 0;
 
     #[inline]
-    pub const fn new() -> Self {
-        Self::inline([const { MaybeUninit::uninit() }; INLINE])
-    }
+    pub const fn new() -> Self { Self::inline([const { MaybeUninit::uninit() }; INLINE]) }
 
     #[inline]
     pub const fn inline(inline: [MaybeUninit<Item>; INLINE]) -> Self {
@@ -170,7 +168,5 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
 }
 
 impl<Item, const INLINE: usize> Default for RawSmallVec<Item, INLINE> {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
