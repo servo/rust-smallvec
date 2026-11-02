@@ -74,8 +74,8 @@ impl<Item, const INLINE: usize, Heap: Allocator> AsRef<[Item]> for IntoIter<Item
         // `self.begin..end` are all initialized. So the pointer arithmetic is
         // valid, and so is the construction of the slice
         unsafe {
-            let ptr = self.raw.as_ptr(on_heap);
-            from_raw_parts(ptr.add(self.begin), end - self.begin)
+            let pointer = self.raw.as_ptr(on_heap);
+            from_raw_parts(pointer.add(self.begin), end - self.begin)
         }
     }
 }
@@ -86,8 +86,8 @@ impl<Item, const INLINE: usize, Heap: Allocator> AsMut<[Item]> for IntoIter<Item
         let (end, on_heap) = self.end.parts();
         // SAFETY: see above
         unsafe {
-            let ptr = self.raw.as_mut_ptr(on_heap);
-            from_raw_parts_mut(ptr.add(self.begin), end - self.begin)
+            let pointer = self.raw.as_mut_ptr(on_heap);
+            from_raw_parts_mut(pointer.add(self.begin), end - self.begin)
         }
     }
 }
@@ -128,8 +128,8 @@ impl<Item, const INLINE: usize, Heap: Allocator> Iterator for IntoIter<Item, INL
         } else {
             // SAFETY: see above
             unsafe {
-                let ptr = self.raw.as_mut_ptr(on_heap);
-                let value = ptr.add(self.begin).read();
+                let pointer = self.raw.as_mut_ptr(on_heap);
+                let value = pointer.add(self.begin).read();
                 self.begin += 1;
                 Some(value)
             }
@@ -154,9 +154,9 @@ impl<Item, const INLINE: usize, Heap: Allocator> DoubleEndedIterator
         } else {
             // SAFETY: see above
             unsafe {
-                let ptr = self.raw.as_mut_ptr(on_heap);
+                let pointer = self.raw.as_mut_ptr(on_heap);
                 self.end.sub(1);
-                let value = ptr.add(end - 1).read();
+                let value = pointer.add(end - 1).read();
                 Some(value)
             }
         }
@@ -175,11 +175,11 @@ impl<Item, const INLINE: usize, Heap: Allocator> Drop for IntoIter<Item, INLINE,
         unsafe {
             let (end, on_heap) = self.end.parts();
             let begin = self.begin;
-            let ptr = self.raw.as_mut_ptr(on_heap);
+            let pointer = self.raw.as_mut_ptr(on_heap);
             let _drop_dealloc = if on_heap {
                 let capacity = self.raw.heap.1;
                 Some(DropDealloc {
-                    ptr: NonNull::new_unchecked(ptr as *mut u8),
+                    pointer: NonNull::new_unchecked(pointer as *mut u8),
                     size_bytes: capacity * size_of::<Item>(),
                     align: align_of::<Item>(),
                     allocator: &self.allocator
@@ -187,7 +187,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> Drop for IntoIter<Item, INLINE,
             } else {
                 None
             };
-            slice_from_raw_parts_mut(ptr.add(begin), end - begin).drop_in_place();
+            slice_from_raw_parts_mut(pointer.add(begin), end - begin).drop_in_place();
         }
     }
 }
