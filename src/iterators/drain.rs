@@ -113,9 +113,9 @@ impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> Drop
                         let start = source_vec.len();
                         let tail = self.0.tail_start;
                         if tail != start {
-                            let ptr = source_vec.as_mut_ptr();
-                            let source = ptr.add(tail);
-                            let destination = ptr.add(start);
+                            let pointer = source_vec.as_mut_ptr();
+                            let source = pointer.add(tail);
+                            let destination = pointer.add(start);
                             copy(source, destination, self.0.tail_len);
                         }
                         source_vec.length.add(self.0.tail_len);
@@ -236,10 +236,10 @@ impl<Item, const INLINE: usize, Heap: Allocator> Drain<'_, Item, INLINE, Heap> {
 
         let new_tail_start = self.tail_start + additional;
         unsafe {
-            let ptr = vec.as_mut_ptr();
+            let pointer = vec.as_mut_ptr();
             copy(
-                ptr.add(self.tail_start),
-                ptr.add(new_tail_start),
+                pointer.add(self.tail_start),
+                pointer.add(new_tail_start),
                 self.tail_len
             );
         }

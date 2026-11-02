@@ -66,9 +66,9 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
     }
 
     #[inline]
-    pub const fn heap(ptr: NonNull<Item>, capacity: usize) -> Self {
+    pub const fn heap(pointer: NonNull<Item>, capacity: usize) -> Self {
         Self {
-            heap: (ptr, capacity)
+            heap: (pointer, capacity)
         }
     }
 
@@ -141,7 +141,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
         debug_assert!(new_capacity > 0 && new_capacity >= length);
 
         // SAFETY: the tag tells which member is active
-        let ptr = unsafe { self.as_mut_ptr(was_on_heap) };
+        let pointer = unsafe { self.as_mut_ptr(was_on_heap) };
 
         let new_layout =
             Layout::array::<Item>(new_capacity).map_err(|_| SmallVecError::CapacityOverflow)?;
@@ -155,7 +155,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
             let new_ptr = Allocator::allocate(allocator, new_layout)
                 .ok_or(SmallVecError::AllocationError(new_layout))?
                 .cast();
-            unsafe { copy_nonoverlapping(ptr, new_ptr.as_ptr(), length) };
+            unsafe { copy_nonoverlapping(pointer, new_ptr.as_ptr(), length) };
             new_ptr
         } else {
             // use grow
@@ -169,7 +169,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
                 )
             };
 
-            // SAFETY: ptr was allocated with this allocator
+            // SAFETY: pointer was allocated with this allocator
             // old_layout is the same as the layout used to allocate the
             // previous memory block new_layout.size() is greater
             // than zero does not overflow when rounded up to
@@ -182,7 +182,7 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
                     <Heap as Allocator>::shrink
                 })(
                     allocator,
-                    NonNull::new(ptr as *mut u8).unwrap(),
+                    NonNull::new(pointer as *mut u8).unwrap(),
                     old_layout,
                     new_layout
                 )
