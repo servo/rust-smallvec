@@ -13,13 +13,13 @@ fn into_from_parts_spilled() {
     assert_eq!(length.len(), 3);
 
     // SAFETY: `length` says on heap, so `heap` is the active member.
-    let (ptr, cap) = unsafe { raw.heap };
+    let (pointer, cap) = unsafe { raw.heap };
     assert!(cap > 1);
 
     // SAFETY: parts come straight from `into_parts`.
     let rebuilt = unsafe { SmallVec::<i32, 1>::from_parts(raw, length) };
     assert_eq!(rebuilt, [-1, 0, 1]);
-    assert_eq!(rebuilt.as_ptr(), ptr.as_ptr() as *const i32);
+    assert_eq!(rebuilt.as_ptr(), pointer.as_ptr() as *const i32);
 }
 
 #[test]

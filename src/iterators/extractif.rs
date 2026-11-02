@@ -117,8 +117,8 @@ where F: FnMut(&mut Item) -> bool
                 // backshift is required to prevent a
                 // double-drop of the last successfully
                 // drained item prior to a panic in the predicate.
-                let ptr = self.vec.as_mut_ptr();
-                let source = ptr.add(self.idx);
+                let pointer = self.vec.as_mut_ptr();
+                let source = pointer.add(self.idx);
                 let destination = source.sub(self.del);
                 let tail_len = self.old_len - self.idx;
                 source.copy_to(destination, tail_len);
