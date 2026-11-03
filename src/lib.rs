@@ -660,7 +660,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
             if on_heap {
                 unsafe {
                     // SAFETY: heap member is active
-                    let (pointer, old_cap) = self.raw.heap;
+                    let (pointer, old_capacity) = self.raw.heap;
                     // inline member is now active
 
                     // SAFETY: length <= new_capacity <= Self::inline_size()
@@ -668,7 +668,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
                     copy_nonoverlapping(pointer.as_ptr(), self.raw.as_mut_ptr_inline(), length);
                     drop(DropDealloc {
                         pointer: pointer.cast(),
-                        size_bytes: old_cap * size_of::<Item>(),
+                        size_bytes: old_capacity * size_of::<Item>(),
                         align: align_of::<Item>(),
                         allocator: &self.allocator
                     });
@@ -695,10 +695,10 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
                 .checked_add(additional)
                 .ok_or(SmallVecError::CapacityOverflow)?;
 
-            let double_cap = self.capacity().saturating_mul(2);
+            let double_capacity = self.capacity().saturating_mul(2);
 
             let new_capacity = required
-                .max(double_cap)
+                .max(double_capacity)
                 .checked_next_power_of_two()
                 .ok_or(SmallVecError::CapacityOverflow)?;
 
@@ -1894,12 +1894,12 @@ unsafe impl<const INLINE: usize, Heap: Allocator> BufMut for SmallVec<u8, INLINE
 
         let (length, on_heap) = self.length.parts();
         // SAFETY: the tag tells which member is active
-        let cap = unsafe { self.raw.capacity(on_heap) };
+        let capacity = unsafe { self.raw.capacity(on_heap) };
         let pointer = unsafe { self.raw.as_mut_ptr(on_heap) };
-        // SAFETY: Since `pointer` is valid for `cap` bytes,
-        // `pointer.add(length)` must be valid for `cap - length` bytes. The
-        // subtraction will not underflow since `length <= cap`.
-        unsafe { UninitSlice::from_raw_parts_mut(pointer.add(length), cap - length) }
+        // SAFETY: Since `pointer` is valid for `capacity` bytes,
+        // `pointer.add(length)` must be valid for `capacity - length` bytes.
+        // The subtraction will not underflow since `length <= capacity`.
+        unsafe { UninitSlice::from_raw_parts_mut(pointer.add(length), capacity - length) }
     }
 
     // Specialize these methods so they can skip checking `remaining_mut`
