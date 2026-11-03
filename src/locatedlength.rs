@@ -1,4 +1,17 @@
-use core::marker::PhantomData;
+use core::{
+    fmt::{
+        Debug,
+        Formatter,
+        Result as Format
+    },
+    marker::PhantomData
+};
+#[cfg(feature = "defmt")]
+use defmt::{
+    Format as DeFormat,
+    Formatter as DeFormatter,
+    write as dewrite
+};
 
 /// Vec guarantees that its length is always less than [`isize::MAX`] in
 /// *bytes*.
@@ -22,6 +35,29 @@ impl<Item> Clone for LocatedLength<Item> {
 }
 
 impl<Item> Copy for LocatedLength<Item> {}
+
+impl<Item> Debug for LocatedLength<Item> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Format {
+        let (length, on_heap) = self.parts();
+        f.debug_struct("LocatedLength")
+            .field("length", &length)
+            .field("on_heap", &on_heap)
+            .finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<Item> DeFormat for LocatedLength<Item> {
+    fn format(&self, fmt: DeFormatter) {
+        let (length, on_heap) = self.parts();
+        dewrite!(
+            fmt,
+            "LocatedLength {{ length: {=usize}, on_heap: {=bool} }}",
+            length,
+            on_heap
+        );
+    }
+}
 
 #[allow(clippy::len_without_is_empty)]
 impl<Item> LocatedLength<Item> {

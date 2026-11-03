@@ -161,10 +161,11 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
             vector
         } else {
             // SAFETY:
-            // - `ptr` was created with the SmallVec's allocator
-            // - `ptr` was created with the appropriate alignment for `Item`
-            // - the allocation pointed to by ptr is exactly cap * sizeof(Item)
-            // - `length` is less than or equal to `cap`
+            // - `pointer` was created with the SmallVec's allocator
+            // - `pointer` was created with the appropriate alignment for `Item`
+            // - the allocation pointed to by pointer is exactly capacity *
+            //   sizeof(Item)
+            // - `length` is less than or equal to `capacity`
             // - the first `length` entries are proper `Item`-values
             // - the allocation is not larger than `isize::MAX`
             unsafe {

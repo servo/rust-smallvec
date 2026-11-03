@@ -10,7 +10,15 @@ homepage.workspace = true
 description = "'Small vector' optimization: store up to a small number of items on the stack"
 keywords = ["small", "vec", "vector", "stack", "no_std"]
 categories = ["data-structures"]
-exclude = [".gitignore", "tests/", "fuzz/", "benches/", ".github/", "rustfmt.toml", ".vscode/"]
+exclude = [
+  ".gitignore",
+  "tests/",
+  "fuzz/",
+  "benches/",
+  ".github/",
+  "rustfmt.toml",
+  ".vscode/",
+]
 
 [profile.bench]
 lto = "fat"
@@ -39,12 +47,12 @@ std = []
 
 [dependencies]
 allocator-api2 = { version = "0.4", optional = true, features = [
-    "alloc",
+  "alloc",
 ], default-features = false }
 arbitrary = { version = "1", optional = true, default-features = false }
 borsh = { version = "1", optional = true, features = [
-    "derive",
-    "unstable__schema",
+  "derive",
+  "unstable__schema",
 ], default-features = false }
 bytemuck = { version = "1", optional = true, default-features = false }
 bytes = { version = "1", optional = true, default-features = false }
@@ -53,10 +61,12 @@ encase = { version = "0.13", optional = true, default-features = false }
 equivalent = { version = "1", optional = true, default-features = false }
 malloc_size_of = { version = "0.1", optional = true, default-features = false }
 proptest = { version = "1", optional = true, features = [
-    "std",
+  "std",
 ], default-features = false }
 rayon = { version = "1", optional = true, default-features = false }
-rkyv = { version = "0.8", optional = true, default-features = false, features = ["alloc"] }
+rkyv = { version = "0.8", optional = true, default-features = false, features = [
+  "alloc",
+] }
 schemars = { version = "1", optional = true, default-features = false }
 serde_core = { version = "1", optional = true, default-features = false }
 smallvec-macro = { version = "0.0.0", path = "./macro", default-features = false }
@@ -154,7 +164,4 @@ package.repository = "https://github.com/servo/rust-smallvec"
 package.homepage = "https://smallvec.rs"
 package.rust-version = "1.86"
 resolver = "3"
-members = [
-    ".",
-    "fuzz"
-]
+members = [".", "fuzz"]

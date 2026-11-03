@@ -1,3 +1,9 @@
+#[cfg(feature = "defmt")]
+use defmt::{
+    Format as DeFormat,
+    Formatter as DeFormatter,
+    write as dewrite
+};
 use {
     super::super::{
         SmallVec,
@@ -51,6 +57,18 @@ where
     }
 }
 
+#[cfg(feature = "defmt")]
+impl<Item, const INLINE: usize, Heap: Allocator, F> DeFormat
+    for ExtractIf<'_, Item, INLINE, F, Heap>
+where
+    F: FnMut(&mut Item) -> bool,
+    Item: DeFormat
+{
+    fn format(&self, fmt: DeFormatter) {
+        dewrite!(fmt, "ExtractIf({=[?]})", self.vec.as_ref());
+    }
+}
+
 impl<Item, F, const INLINE: usize, Heap: Allocator> Iterator
     for ExtractIf<'_, Item, INLINE, F, Heap>
 where F: FnMut(&mut Item) -> bool
@@ -99,8 +117,8 @@ where F: FnMut(&mut Item) -> bool
                 // backshift is required to prevent a
                 // double-drop of the last successfully
                 // drained item prior to a panic in the predicate.
-                let ptr = self.vec.as_mut_ptr();
-                let source = ptr.add(self.idx);
+                let pointer = self.vec.as_mut_ptr();
+                let source = pointer.add(self.idx);
                 let destination = source.sub(self.del);
                 let tail_len = self.old_len - self.idx;
                 source.copy_to(destination, tail_len);
