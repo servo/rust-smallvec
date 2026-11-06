@@ -64,14 +64,14 @@ jobs:
       - run: cargo test
       - run: cargo test --all-features
   nostd:
-      name: NoStd
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v7
-        - uses: dtolnay/rust-toolchain@nightly
-          with:
-            target: thumbv7m-none-eabi
-        - run: cargo build
+    name: NoStd
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          target: thumbv7m-none-eabi
+      - run: cargo build
   msrv:
     name: MSRV
     runs-on: ubuntu-latest

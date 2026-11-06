@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'servo/rust-smallvec'
     permissions:
-        id-token: write
+      id-token: write
     steps:
       - uses: actions/checkout@v7
       - uses: rust-lang/crates-io-auth-action@v1
