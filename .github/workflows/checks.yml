@@ -9,87 +9,73 @@ jobs:
     name: Benchmarks
     runs-on: ubuntu-latest
     steps:
-      - name: checkout
-        uses: actions/checkout@v7
-      - name: install rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-      - name: default features
-        run: cargo bench --no-run
-      - name: all features
-        run: cargo bench --all-features --no-run
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo bench --no-run
+      - run: cargo bench --all-features --no-run
   practices:
     name: Practices
     runs-on: ubuntu-latest
     steps:
-      - name: checkout
-        uses: actions/checkout@v7
-      - name: install rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-      - name: style
-        run: |
-          rustup component add rustfmt
-          cargo fmt --all --check
-      - name: clippy
-        run: |
-          rustup component add clippy
-          cargo clippy
-      - name: docs
-        run: cargo doc --all-features
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --all --check
+      - run: cargo clippy
+      - run: cargo doc --all-features
+      - run: |
+          git ls-files '*.md' -z |
+          xargs -0 docker run --rm \
+          -v "$PWD:/work" -w /work \
+          ghcr.io/igorshubovych/markdownlint-cli:v0.41.0
+      - run: |
+          git ls-files '*.yaml' '*.yml' |
+          xargs docker run --rm -v "$PWD:/work" -w /work cytopia/yamllint
+      - run: |
+          git ls-files '*.toml' -z |
+          xargs -0 docker run --rm \
+          -v "$PWD:/work" -w /work \
+          tamasfe/taplo:0.10.0 fmt --check
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo package
+      - run: cargo package --all-features
   miri:
     name: Miri
     runs-on: ubuntu-latest
     steps:
-      - name: checkout
-        uses: actions/checkout@v7
-      - name: install rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-      - name: default features
-        run: |
-          rustup component add miri
-          cargo miri test
-      - name: all features
-        run: cargo miri test --all-features
-  stable:
-    name: Stable
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+      - run: cargo miri test
+      - run: cargo miri test --all-features
+  tests:
+    name: Tests
     runs-on: ubuntu-latest
     steps:
-      - name: checkout
-        uses: actions/checkout@v7
-      - name: install rust nightly
-        uses: dtolnay/rust-toolchain@stable
-      - name: test default features
-        run: cargo test
-  nightly:
-    name: Nightly
-    runs-on: ubuntu-latest
-    steps:
-      - name: checkout
-        uses: actions/checkout@v7
-      - name: install rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-      - name: test default features
-        run: cargo test
-      - name: test all features
-        run: cargo test --all-features
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo test
+      - run: cargo test --all-features
   nostd:
-      name: NoStd
-      runs-on: ubuntu-latest
-      steps:
-        - name: checkout
-          uses: actions/checkout@v7
-        - name: install rust stable
-          uses: dtolnay/rust-toolchain@stable
-          with:
-            target: thumbv7m-none-eabi
-        - name: test default features
-          run: cargo test
+    name: NoStd
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          target: thumbv7m-none-eabi
+      - run: cargo build
   msrv:
     name: MSRV
     runs-on: ubuntu-latest
     steps:
-      - name: checkout
-        uses: actions/checkout@v7
-      - name: install rust MSRV
-        uses: dtolnay/rust-toolchain@1.36
-      - name: test default features
-        run: cargo test
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.36
+      - run: cargo build
