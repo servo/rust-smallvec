@@ -1,5 +1,4 @@
-rust-smallvec
-=============
+# rust-smallvec
 
 [Documentation](https://docs.rs/smallvec/)
 
