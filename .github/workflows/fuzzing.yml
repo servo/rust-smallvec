@@ -9,27 +9,20 @@ jobs:
     if: github.repository == 'servo/rust-smallvec'
     runs-on: ubuntu-latest
     steps:
-      - name: checkout
-        uses: actions/checkout@v7
-      - name: install rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-      - name: restore corpus
-        uses: actions/cache/restore@v6
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: actions/cache/restore@v6
         with:
           path: fuzz/corpus
           key: fuzz-corpus-${{ github.run_id }}
           restore-keys: |
             fuzz-corpus-
-      - name: fuzz
-        run: |
-          cargo install cargo-fuzz
-          cargo fuzz run main -- -max_total_time=1800 -rss_limit_mb=4096
-      - name: minimize corpus
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run main -- -max_total_time=3600 -rss_limit_mb=4096
+      - run: cargo fuzz cmin main
         if: always()
-        run: cargo fuzz cmin main
-      - name: save corpus
+      - uses: actions/cache/save@v6
         if: always()
-        uses: actions/cache/save@v6
         with:
           path: fuzz/corpus
           key: fuzz-corpus-${{ github.run_id }}
