@@ -123,6 +123,9 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<<Vec<Item, Heap> as Like>:
         } else if let Some(pointer) = pointer {
             Self {
                 length: LocatedLength::new(length, true),
+                raw: RawSmallVec {
+                    heap: pointer
+                }
                 raw: RawSmallVec::heap(pointer.cast(), pointer.len()),
                 allocator
             }
@@ -169,9 +172,9 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
             // - the first `length` entries are proper `Item`-values
             // - the allocation is not larger than `isize::MAX`
             unsafe {
-                let (ptr, cap) = smallvec.raw.heap;
+                let pointer = self.raw.heap;
                 Vec::construct(
-                    Some(NonNull::slice_from_raw_parts(ptr.cast(), cap)),
+                    Some(pointer),
                     length,
                     (&raw const smallvec.allocator).read()
                 )
