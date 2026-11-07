@@ -192,7 +192,6 @@ all = "warn"
 [lints.rustdoc]
 all = "warn"
 
-
 [workspace]
 package.edition = "2024"
 package.authors = ["The Servo Project Developers"]
