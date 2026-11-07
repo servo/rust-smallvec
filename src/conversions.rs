@@ -102,9 +102,9 @@ impl<Item, const INLINE: usize, const M: usize, Heap: Allocator>
             unsafe {
                 this.set_len(0);
             }
-            let ptr = this.as_ptr() as *const [Item; M];
+            let pointer = this.as_ptr() as *const [Item; M];
             // SAFETY: these elements are initialized since the length was `M`
-            unsafe { Ok(ptr.read()) }
+            unsafe { Ok(pointer.read()) }
         }
     }
 }
@@ -140,18 +140,18 @@ impl<Item, const INLINE: usize> From<<Vec<Item, Global> as Like>::Type>
             let length = vec.len();
 
             // A heap-allocated `SmallVec` must always observe the invariant
-            // that `cap > INLINE`.
+            // that `capacity > INLINE`.
             if vec.capacity() <= INLINE {
                 vec.reserve(INLINE + 1 - length);
             }
-            let cap = vec.capacity();
+            let capacity = vec.capacity();
             // SAFETY: vec.capacity is not `0` (checked above), so the pointer
             // can not dangle and thus specifically cannot be null.
-            let ptr = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
+            let pointer = unsafe { NonNull::new_unchecked(vec.as_mut_ptr()) };
 
             Self {
                 length: LocatedLength::new(length, true),
-                raw: RawSmallVec::heap(ptr, cap),
+                raw: RawSmallVec::heap(pointer, capacity),
                 allocator: Global
             }
         }
@@ -178,15 +178,20 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
         } else {
             let this = ManuallyDrop::new(this);
             // SAFETY:
-            // - `ptr` was created with the SmallVec's allocator
-            // - `ptr` was created with the appropriate alignment for `Item`
-            // - the allocation pointed to by ptr is exactly cap * sizeof(Item)
-            // - `length` is less than or equal to `cap`
+            // - `pointer` was created with the SmallVec's allocator
+            // - `pointer` was created with the appropriate alignment for `Item`
+            // - the allocation pointed to by pointer is exactly capacity *
+            //   sizeof(Item)
+            // - `length` is less than or equal to `capacity`
             // - the first `length` entries are proper `Item`-values
             // - the allocation is not larger than `isize::MAX`
             unsafe {
-                let (ptr, cap) = this.raw.heap;
-                <Vec<Item, Global> as Like>::Type::from_raw_parts(ptr.as_ptr(), length, cap)
+                let (pointer, capacity) = this.raw.heap;
+                <Vec<Item, Global> as Like>::Type::from_raw_parts(
+                    pointer.as_ptr(),
+                    length,
+                    capacity
+                )
             }
         }
     }

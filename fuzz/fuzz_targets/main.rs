@@ -157,9 +157,9 @@ fn test_with_inline_cap<const N: usize>(
                 small_vec = SmallVec::new();
                 std_vec = Vec::new();
             }
-            Op::WithCapacity(cap) => {
-                small_vec = SmallVec::with_capacity(cap.0);
-                std_vec = Vec::with_capacity(cap.0);
+            Op::WithCapacity(capacity) => {
+                small_vec = SmallVec::with_capacity(capacity.0);
+                std_vec = Vec::with_capacity(capacity.0);
             }
             #[allow(deprecated)]
             Op::FromVec => {
