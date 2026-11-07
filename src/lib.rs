@@ -682,7 +682,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
                         length
                     );
                     drop(DropDealloc {
-                        ptr: pointer.cast(),
+                        pointer: pointer.cast(),
                         size_bytes: pointer.len() * size_of::<Item>(),
                         align: align_of::<Item>(),
                         allocator: &self.allocator
