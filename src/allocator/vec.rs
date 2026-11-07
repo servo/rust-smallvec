@@ -2,22 +2,170 @@
 pub use alloc::vec;
 #[cfg(feature = "allocator-api2")]
 pub use allocator_api2::vec;
+#[cfg(not(feature = "allocator-api2"))]
+use core::mem::ManuallyDrop;
 use {
     super::{
         Allocator,
-        like::Like,
-        requirement::Requirement
+        like::Like
     },
-    core::marker::PhantomData
+    core::{
+        marker::PhantomData,
+        mem::MaybeUninit,
+        num::NonZero,
+        ptr::{
+            NonNull,
+            slice_from_raw_parts_mut
+        }
+    }
 };
 
-pub struct Vec<Item, Heap: Allocator + Requirement>(PhantomData<(Heap, Item)>);
+pub struct Vec<Item, Heap: Allocator>(PhantomData<(Heap, Item)>);
 
-impl<Item, Heap: Allocator + Requirement> Like for Vec<Item, Heap> {
+impl<Item, Heap: Allocator> Like for Vec<Item, Heap> {
+    type Heap = Heap;
+    type Item = Item;
     #[cfg(not(feature = "allocator-api"))]
     type Type = alloc::vec::Vec<Item>;
     #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
     type Type = alloc::vec::Vec<Item, Heap>;
     #[cfg(feature = "allocator-api2")]
     type Type = allocator_api2::vec::Vec<Item, Heap>;
+
+    #[cfg(not(feature = "allocator-api"))]
+    #[inline]
+    fn destruct(
+        value: Self::Type
+    ) -> (
+        Option<NonNull<[MaybeUninit<Self::Item>]>>,
+        usize,
+        Self::Heap
+    ) {
+        let mut data = ManuallyDrop::new(value);
+        (
+            NonZero::new(data.capacity()).and_then(|capacity| {
+                NonNull::new(slice_from_raw_parts_mut(
+                    data.as_mut_ptr().cast(),
+                    capacity.get()
+                ))
+            }),
+            data.len(),
+            #[allow(clippy::uninit_assumed_init)]
+            unsafe {
+                MaybeUninit::uninit().assume_init()
+            }
+        )
+    }
+
+    #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
+    #[inline]
+    fn destruct(
+        mut value: Self::Type
+    ) -> (
+        Option<NonNull<[MaybeUninit<Self::Item>]>>,
+        usize,
+        Self::Heap
+    ) {
+        let (pointer, length, capacity, allocator) = value.into_raw_parts_with_allocator();
+        (
+            NonZero::new(capacity).and_then(|capacity| {
+                NonNull::new(slice_from_raw_parts_mut(pointer.cast(), capacity.get()))
+            }),
+            length,
+            allocator
+        )
+    }
+
+    #[cfg(feature = "allocator-api2")]
+    #[inline]
+    fn destruct(
+        value: Self::Type
+    ) -> (
+        Option<NonNull<[MaybeUninit<Self::Item>]>>,
+        usize,
+        Self::Heap
+    ) {
+        let (pointer, length, capacity, allocator) = value.into_raw_parts_with_alloc();
+        (
+            NonZero::new(capacity).and_then(|capacity| {
+                NonNull::new(slice_from_raw_parts_mut(pointer.cast(), capacity.get()))
+            }),
+            length,
+            allocator
+        )
+    }
+
+    #[cfg(not(feature = "allocator-api"))]
+    #[inline]
+    unsafe fn construct(
+        pointer: Option<NonNull<[MaybeUninit<Self::Item>]>>,
+        length: usize,
+        _allocator: Self::Heap
+    ) -> Self::Type {
+        if let Some(pointer) = pointer {
+            unsafe { Self::Type::from_raw_parts(pointer.as_ptr().cast(), length, pointer.len()) }
+        } else {
+            let mut vector = Self::Type::new();
+            if size_of::<Self::Item>() == 0 {
+                // SAFETY: we can change the length freely as copying the item
+                // because it is a ZST
+                unsafe { vector.set_len(length) }
+            };
+            vector
+        }
+    }
+
+    #[cfg(all(feature = "allocator-api", not(feature = "allocator-api2")))]
+    #[inline]
+    unsafe fn construct(
+        pointer: Option<NonNull<[MaybeUninit<Self::Item>]>>,
+        length: usize,
+        allocator: Self::Heap
+    ) -> Self::Type {
+        if let Some(pointer) = pointer {
+            unsafe {
+                Self::Type::from_raw_parts_in(
+                    pointer.as_ptr().cast(),
+                    length,
+                    pointer.len(),
+                    allocator
+                )
+            }
+        } else {
+            let mut vector = Self::Type::new_in(allocator);
+            if size_of::<Self::Item>() == 0 {
+                // SAFETY: we can change the length freely as copying the item
+                // because it is a ZST
+                unsafe { vector.set_len(length) }
+            };
+            vector
+        }
+    }
+
+    #[cfg(feature = "allocator-api2")]
+    #[inline]
+    unsafe fn construct(
+        pointer: Option<NonNull<[MaybeUninit<Self::Item>]>>,
+        length: usize,
+        allocator: Self::Heap
+    ) -> Self::Type {
+        if let Some(pointer) = pointer {
+            unsafe {
+                Self::Type::from_raw_parts_in(
+                    pointer.as_ptr().cast(),
+                    length,
+                    pointer.len(),
+                    allocator
+                )
+            }
+        } else {
+            let mut vector = Self::Type::new_in(allocator);
+            if size_of::<Self::Item>() == 0 {
+                // SAFETY: we can change the length freely as copying the item
+                // because it is a ZST
+                unsafe { vector.set_len(length) }
+            };
+            vector
+        }
+    }
 }
