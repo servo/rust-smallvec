@@ -141,13 +141,13 @@ pub fn double_spill() {
     );
 }
 
-// https://github.com/servo/rust-smallvec/issues/4
+// https://github.com/smallvec/smallvec/issues/4
 #[test]
 fn issue_4() {
     SmallVec::<Box<u32>, 2>::new();
 }
 
-// https://github.com/servo/rust-smallvec/issues/5
+// https://github.com/smallvec/smallvec/issues/5
 #[test]
 fn issue_5() {
     assert!(Some(SmallVec::<&u32, 2>::new()).is_some());
@@ -1102,7 +1102,7 @@ fn max_insert() {
 
 #[test]
 fn collect_from_iter() {
-    // Regression test for https://github.com/servo/rust-smallvec/issues/353
+    // Regression test for https://github.com/smallvec/smallvec/issues/353
     struct IterNoHint<I: Iterator>(I);
 
     impl<I: Iterator> Iterator for IterNoHint<I> {

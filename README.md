@@ -22,7 +22,7 @@
 > an issue on the repo
 > if you find some unexpected behavior or have a request for a feature
 
-[Release notes](https://github.com/servo/rust-smallvec/releases)
+[Release notes](https://github.com/smallvec/smallvec/releases)
 
 Small vectors in various sizes. These store a certain number of elements
 inline, and fall back to the heap for larger allocations.  This can be a

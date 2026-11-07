@@ -1,7 +1,7 @@
 # Contributing to rust-smallvec
 
 > [!WARNING]
-> AI contributions are not allowed in any [**@servo**](https://github.com/servo)
+> AI contributions are not allowed in any [**@smallvec**](https://github.com/smallvec)
 > repository. Please read the
 > [AI contributions policy](https://book.servo.org/contributing/getting-started.html#ai-contributions)
 > before contributing.
@@ -11,12 +11,12 @@
 
 This branch contains the code for SmallVec v2, which is on pre-release.
 
-Visit the [wiki](https://github.com/servo/rust-smallvec/wiki) for more
+Visit the [wiki](https://github.com/smallvec/smallvec/wiki) for more
 information about the status and management of v2. Visit it before making any
 contribution.
 
 The source code for the latest smallvec 1.x.y release can be found on the
-[v1 branch](https://github.com/servo/rust-smallvec/tree/v1). Bug fixes for
+[v1 branch](https://github.com/smallvec/smallvec/tree/v1). Bug fixes for
 smallvec v1 should be based on that branch, while new feature development
 should go on the v2 branch.
 
@@ -31,4 +31,4 @@ SmallVec:
 * [@pedrodesu](https://github.com/pedrodesu)
 * [@GauravPawar101](https://github.com/GauravPawar101)
 
-[![SmallVec contributors](https://contrib.rocks/image?repo=servo/rust-smallvec)](https://github.com/servo/rust-smallvec/graphs/contributors)
+[![SmallVec contributors](https://contrib.rocks/image?repo=smallvec/smallvec)](https://github.com/smallvec/smallvec/graphs/contributors)
