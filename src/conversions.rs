@@ -125,8 +125,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<<Vec<Item, Heap> as Like>:
                 length: LocatedLength::new(length, true),
                 raw: RawSmallVec {
                     heap: pointer
-                }
-                raw: RawSmallVec::heap(pointer.cast(), pointer.len()),
+                },
                 allocator
             }
         } else {
@@ -172,9 +171,8 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
             // - the first `length` entries are proper `Item`-values
             // - the allocation is not larger than `isize::MAX`
             unsafe {
-                let pointer = self.raw.heap;
                 Vec::construct(
-                    Some(pointer),
+                    Some(smallvec.raw.heap),
                     length,
                     (&raw const smallvec.allocator).read()
                 )
@@ -229,13 +227,15 @@ impl<Item: Clone, const INLINE: usize> From<Cow<'_, [Item]>> for SmallVec<Item, 
     fn from(value: Cow<'_, [Item]>) -> Self {
         match value {
             Cow::Owned(mut vector) => unsafe {
-                Self::parts(
-                    LocatedLength::new(vector.len(), true),
-                    RawSmallVec::heap(
-                        NonNull::new(vector.as_mut_ptr()).unwrap_or_else(NonNull::dangling),
-                        vector.capacity()
-                    )
-                )
+                match NonNull::new(vector.as_mut_ptr()) {
+                    Some(pointer) => Self::parts(
+                        LocatedLength::new(vector.len(), true),
+                        RawSmallVec {
+                            heap: NonNull::slice_from_raw_parts(pointer.cast(), vector.capacity())
+                        }
+                    ),
+                    None => Self::parts(LocatedLength::new(vector.len(), false), RawSmallVec::new())
+                }
             },
             Cow::Borrowed(slice) => slice.into()
         }
