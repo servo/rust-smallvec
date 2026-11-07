@@ -108,9 +108,9 @@ impl<Item, const INLINE: usize, const M: usize, Heap: Allocator>
             unsafe {
                 this.set_len(0);
             }
-            let ptr = this.as_ptr() as *const [Item; M];
+            let pointer = this.as_ptr() as *const [Item; M];
             // SAFETY: these elements are initialized since the length was `M`
-            unsafe { Ok(ptr.read()) }
+            unsafe { Ok(pointer.read()) }
         }
     }
 }
@@ -146,7 +146,7 @@ impl<Item, const INLINE: usize> From<<Vec<Item, Global> as Like>::Type>
             let length = vec.len();
 
             // A heap-allocated `SmallVec` must always observe the invariant
-            // that `cap > INLINE`.
+            // that `capacity > INLINE`.
             if vec.capacity() <= INLINE {
                 vec.reserve(INLINE + 1 - length);
             }
@@ -186,10 +186,11 @@ impl<Item, const INLINE: usize, Heap: Allocator> From<SmallVec<Item, INLINE, Hea
         } else {
             let this = ManuallyDrop::new(this);
             // SAFETY:
-            // - `ptr` was created with the SmallVec's allocator
-            // - `ptr` was created with the appropriate alignment for `Item`
-            // - the allocation pointed to by ptr is exactly cap * sizeof(Item)
-            // - `length` is less than or equal to `cap`
+            // - `pointer` was created with the SmallVec's allocator
+            // - `pointer` was created with the appropriate alignment for `Item`
+            // - the allocation pointed to by pointer is exactly capacity *
+            //   sizeof(Item)
+            // - `length` is less than or equal to `capacity`
             // - the first `length` entries are proper `Item`-values
             // - the allocation is not larger than `isize::MAX`
             unsafe {

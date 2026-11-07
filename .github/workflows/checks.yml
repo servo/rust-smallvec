@@ -65,6 +65,12 @@ jobs:
         run: |
           git ls-files '*.yaml' '*.yml' |
           xargs docker run --rm -v "$PWD:/work" -w /work cytopia/yamllint
+      - name: tomllint
+        run: |
+          git ls-files '*.toml' -z |
+          xargs -0 docker run --rm \
+          -v "$PWD:/work" -w /work \
+          tamasfe/taplo:0.10.0 fmt --check
   package:
     name: Package
     runs-on: ubuntu-latest

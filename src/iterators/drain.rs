@@ -1,3 +1,9 @@
+#[cfg(feature = "defmt")]
+use defmt::{
+    Format as DeFormat,
+    Formatter as DeFormatter,
+    write as dewrite
+};
 use {
     super::super::{
         SmallVec,
@@ -107,9 +113,9 @@ impl<'valid, Item: 'valid, const INLINE: usize, Heap: Allocator> Drop
                         let start = source_vec.len();
                         let tail = self.0.tail_start;
                         if tail != start {
-                            let ptr = source_vec.as_mut_ptr();
-                            let source = ptr.add(tail);
-                            let destination = ptr.add(start);
+                            let pointer = source_vec.as_mut_ptr();
+                            let source = pointer.add(tail);
+                            let destination = pointer.add(start);
                             copy(source, destination, self.0.tail_len);
                         }
                         source_vec.length.add(self.0.tail_len);
@@ -230,10 +236,10 @@ impl<Item, const INLINE: usize, Heap: Allocator> Drain<'_, Item, INLINE, Heap> {
 
         let new_tail_start = self.tail_start + additional;
         unsafe {
-            let ptr = vec.as_mut_ptr();
+            let pointer = vec.as_mut_ptr();
             copy(
-                ptr.add(self.tail_start),
-                ptr.add(new_tail_start),
+                pointer.add(self.tail_start),
+                pointer.add(new_tail_start),
                 self.tail_len
             );
         }
@@ -244,5 +250,14 @@ impl<Item, const INLINE: usize, Heap: Allocator> Drain<'_, Item, INLINE, Heap> {
 impl<Item: Debug, const INLINE: usize, Heap: Allocator> Debug for Drain<'_, Item, INLINE, Heap> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Format {
         f.debug_tuple("Drain").field(&self.iter.as_slice()).finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<Item: DeFormat, const INLINE: usize, Heap: Allocator> DeFormat
+    for Drain<'_, Item, INLINE, Heap>
+{
+    fn format(&self, fmt: DeFormatter) {
+        dewrite!(fmt, "Drain({=[?]})", self.iter.as_slice());
     }
 }
