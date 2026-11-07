@@ -182,16 +182,12 @@ unsafe impl<Item: Sync, const INLINE: usize, Heap: Allocator + Sync> Sync
 
 impl<Item, const INLINE: usize> Default for SmallVec<Item, INLINE, Global> {
     #[inline]
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
     #[inline]
-    pub const fn new() -> SmallVec<Item, INLINE, Global> {
-        Self::new_in(Global)
-    }
+    pub const fn new() -> SmallVec<Item, INLINE, Global> { Self::new_in(Global) }
 
     pub fn try_with_capacity(capacity: usize) -> Result<Self, SmallVecError> {
         Self::try_with_capacity_in(capacity, Global)
@@ -199,9 +195,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
 
     #[inline]
     #[track_caller]
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self::with_capacity_in(capacity, Global)
-    }
+    pub fn with_capacity(capacity: usize) -> Self { Self::with_capacity_in(capacity, Global) }
 
     #[inline]
     pub const fn inline<const S: usize>(elements: [Item; S]) -> Self {
@@ -300,9 +294,7 @@ impl<Item, const INLINE: usize> SmallVec<Item, INLINE, Global> {
 
     #[inline]
     #[deprecated(since = "2.0.0-beta.3", note = "use `From::<Vec<T>>::from` instead")]
-    pub fn from_vec(vec: <Vec<Item, Global> as Like>::Type) -> Self {
-        vec.into()
-    }
+    pub fn from_vec(vec: <Vec<Item, Global> as Like>::Type) -> Self { vec.into() }
 
     #[inline]
     #[deprecated(since = "2.0.0-beta.3", note = "use `From::<&[Item]>::from` instead")]
@@ -378,15 +370,11 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
-    pub const fn len(&self) -> usize {
-        self.length.len()
-    }
+    pub const fn len(&self) -> usize { self.length.len() }
 
     #[must_use]
     #[inline]
-    pub const fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
+    pub const fn is_empty(&self) -> bool { self.len() == 0 }
 
     #[inline]
     pub const fn capacity(&self) -> usize {
@@ -395,9 +383,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
-    pub const fn spilled(&self) -> bool {
-        self.length.on_heap()
-    }
+    pub const fn spilled(&self) -> bool { self.length.on_heap() }
 
     #[track_caller]
     pub fn drain<R>(&mut self, range: R) -> Drain<'_, Item, INLINE, Heap>
@@ -551,9 +537,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
-    pub fn push(&mut self, value: Item) {
-        _ = self.push_mut(value);
-    }
+    pub fn push(&mut self, value: Item) { _ = self.push_mut(value); }
 
     #[inline]
     #[must_use]
@@ -906,9 +890,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
 
     #[inline]
     #[track_caller]
-    pub fn insert(&mut self, index: usize, value: Item) {
-        _ = self.insert_mut(index, value);
-    }
+    pub fn insert(&mut self, index: usize, value: Item) { _ = self.insert_mut(index, value); }
 
     #[inline]
     #[must_use]
@@ -967,18 +949,14 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
         note = "use `<SmallVec<Item, INLINE, Heap> as AsRef<[Item]>>::as_ref` instead"
     )]
     #[inline]
-    pub fn as_slice(&self) -> &[Item] {
-        self.as_ref()
-    }
+    pub fn as_slice(&self) -> &[Item] { self.as_ref() }
 
     #[deprecated(
         since = "2.0.0-beta.3",
         note = "use `<SmallVec<Item, INLINE, Heap> as AsMut<[Item]>>::as_mut` instead"
     )]
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [Item] {
-        self.as_mut()
-    }
+    pub fn as_mut_slice(&mut self) -> &mut [Item] { self.as_mut() }
 
     #[inline]
     pub const fn as_ptr(&self) -> *const Item {
@@ -994,15 +972,11 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
 
     #[inline]
     #[deprecated(since = "2.0.0", note = "use `Into::<Vec<Item>>::into` instead")]
-    pub fn into_vec(self) -> <Vec<Item, Global> as Like>::Type {
-        self.into()
-    }
+    pub fn into_vec(self) -> <Vec<Item, Global> as Like>::Type { self.into() }
 
     #[inline]
     #[deprecated(since = "2.0.0", note = "use `Into::<Box<[Item]>>::into` instead")]
-    pub fn into_boxed_slice(self) -> <Box<[Item], Global> as Like>::Type {
-        self.into()
-    }
+    pub fn into_boxed_slice(self) -> <Box<[Item], Global> as Like>::Type { self.into() }
 
     #[inline]
     #[deprecated(
@@ -1028,9 +1002,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, Heap> {
     }
 
     #[inline]
-    pub fn retain<F: FnMut(&Item) -> bool>(&mut self, mut f: F) {
-        self.retain_mut(|elem| f(elem))
-    }
+    pub fn retain<F: FnMut(&Item) -> bool>(&mut self, mut f: F) { self.retain_mut(|elem| f(elem)) }
 
     #[inline]
     pub fn retain_mut<F: FnMut(&mut Item) -> bool>(&mut self, mut f: F) {
@@ -1373,9 +1345,7 @@ impl<Item: Clone, const INLINE: usize, Heap: Allocator> SmallVec<Item, INLINE, H
 
     #[inline]
     #[deprecated(since = "2.0.0-beta.3", note = "use `Extend::<&Item>::extend` instead")]
-    pub fn extend_from_slice(&mut self, other: &[Item]) {
-        self.extend(other.iter())
-    }
+    pub fn extend_from_slice(&mut self, other: &[Item]) { self.extend(other.iter()) }
 
     #[track_caller]
     pub fn extend_from_within<R>(&mut self, source: R)
@@ -1790,9 +1760,7 @@ impl<'valid, Item, const INLINE: usize, Heap: Allocator> IntoIterator
     type IntoIter = Iter<'valid, Item>;
     type Item = &'valid Item;
 
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
+    fn into_iter(self) -> Self::IntoIter { self.iter() }
 }
 
 impl<'valid, Item, const INLINE: usize, Heap: Allocator> IntoIterator
@@ -1801,15 +1769,11 @@ impl<'valid, Item, const INLINE: usize, Heap: Allocator> IntoIterator
     type IntoIter = IterMut<'valid, Item>;
     type Item = &'valid mut Item;
 
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter_mut()
-    }
+    fn into_iter(self) -> Self::IntoIter { self.iter_mut() }
 }
 
 impl<Item: Hash, const INLINE: usize, Heap: Allocator> Hash for SmallVec<Item, INLINE, Heap> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_ref().hash(state)
-    }
+    fn hash<H: Hasher>(&self, state: &mut H) { self.as_ref().hash(state) }
 }
 
 impl<Item: Debug, const INLINE: usize, Heap: Allocator> Debug for SmallVec<Item, INLINE, Heap> {
@@ -1839,9 +1803,7 @@ impl<Item: Zeroize, const INLINE: usize, Heap: Allocator> Zeroize for SmallVec<I
 impl<'valid, Item, const INLINE: usize> Arbitrary<'valid> for SmallVec<Item, INLINE, Global>
 where Item: Arbitrary<'valid>
 {
-    fn arbitrary(u: &mut Unstructured<'valid>) -> Random<Self> {
-        u.arbitrary_iter()?.collect()
-    }
+    fn arbitrary(u: &mut Unstructured<'valid>) -> Random<Self> { u.arbitrary_iter()?.collect() }
 
     fn arbitrary_take_rest(u: Unstructured<'valid>) -> Random<Self> {
         u.arbitrary_take_rest_iter()?.collect()
@@ -1882,9 +1844,7 @@ impl<const INLINE: usize, Heap: Allocator> Write for SmallVec<u8, INLINE, Heap> 
     }
 
     #[inline]
-    fn flush(&mut self) -> IoResult<()> {
-        Ok(())
-    }
+    fn flush(&mut self) -> IoResult<()> { Ok(()) }
 }
 
 #[cfg(feature = "bytes")]
@@ -1941,9 +1901,7 @@ unsafe impl<const INLINE: usize, Heap: Allocator> BufMut for SmallVec<u8, INLINE
     }
 
     #[inline]
-    fn put_slice(&mut self, source: &[u8]) {
-        self.extend(source);
-    }
+    fn put_slice(&mut self, source: &[u8]) { self.extend(source); }
 
     #[inline]
     fn put_bytes(&mut self, val: u8, cnt: usize) {
@@ -1973,17 +1931,11 @@ impl_rts_array!(
 impl<Item: JsonSchema, const INLINE: usize, Heap: Allocator> JsonSchema
     for SmallVec<Item, INLINE, Heap>
 {
-    fn inline_schema() -> bool {
-        <alloc::vec::Vec<Item> as JsonSchema>::inline_schema()
-    }
+    fn inline_schema() -> bool { <alloc::vec::Vec<Item> as JsonSchema>::inline_schema() }
 
-    fn schema_name() -> Cow<'static, str> {
-        <alloc::vec::Vec<Item> as JsonSchema>::schema_name()
-    }
+    fn schema_name() -> Cow<'static, str> { <alloc::vec::Vec<Item> as JsonSchema>::schema_name() }
 
-    fn schema_id() -> Cow<'static, str> {
-        <alloc::vec::Vec<Item> as JsonSchema>::schema_id()
-    }
+    fn schema_id() -> Cow<'static, str> { <alloc::vec::Vec<Item> as JsonSchema>::schema_id() }
 
     fn json_schema(generator: &mut SchemaGenerator) -> Schema {
         <alloc::vec::Vec<Item> as JsonSchema>::json_schema(generator)

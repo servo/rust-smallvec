@@ -98,23 +98,17 @@ impl<Item, const INLINE: usize, Heap: Allocator> IntoIter<Item, INLINE, Heap> {
         note = "use `<IntoIter<Item, INLINE, Heap> as AsRef<[Item]>>::as_ref` instead"
     )]
     #[inline]
-    pub fn as_slice(&self) -> &[Item] {
-        self.as_ref()
-    }
+    pub fn as_slice(&self) -> &[Item] { self.as_ref() }
 
     #[deprecated(
         since = "2.0.0-beta.3",
         note = "use `<IntoIter<Item, INLINE, Heap> as AsMut<[Item]>>::as_mut` instead"
     )]
     #[inline]
-    pub fn as_mut_slice(&mut self) -> &mut [Item] {
-        self.as_mut()
-    }
+    pub fn as_mut_slice(&mut self) -> &mut [Item] { self.as_mut() }
 
     #[cfg(feature = "specialization")]
-    pub(crate) fn mark_consumed(&mut self) {
-        self.begin = self.end.len();
-    }
+    pub(crate) fn mark_consumed(&mut self) { self.begin = self.end.len(); }
 }
 
 impl<Item, const INLINE: usize, Heap: Allocator> Iterator for IntoIter<Item, INLINE, Heap> {

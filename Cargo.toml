@@ -157,7 +157,40 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [lints.rust]
+unused = "warn"
+deprecated = "warn"
+unreachable_code = "warn"
+nonstandard_style = "warn"
+warnings = "warn"
+missing_debug_implementations = "warn"
+dropping_copy_types = "warn"
+dropping_references = "warn"
+elided_lifetimes_in_paths = "warn"
+explicit_builtin_cfgs_in_flags = "warn"
+forgetting_copy_types = "warn"
+forgetting_references = "warn"
+impl_trait_redundant_captures = "warn"
+invalid_doc_attributes = "warn"
+irrefutable_let_patterns = "warn"
+macro_use_extern_crate = "warn"
+missing_copy_implementations = "warn"
+mutable_transmutes = "warn"
+noop_method_call = "warn"
+opaque_hidden_inferred_bound = "warn"
+overflowing_literals = "warn"
+redundant_imports = "warn"
+single_use_lifetimes = "warn"
+trivial_casts = "warn"
+unknown_lints = "warn"
+arithmetic_overflow = "warn"
 missing_docs = "warn"
+type_alias_bounds = "warn"
+
+[lints.clippy]
+all = "warn"
+
+[lints.rustdoc]
+all = "warn"
 
 [workspace]
 package.edition = "2024"

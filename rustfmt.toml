@@ -15,3 +15,4 @@ style_edition = "2024"
 trailing_comma = "Never"
 use_try_shorthand = true
 where_single_line = true
+fn_single_line = true

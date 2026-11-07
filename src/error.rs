@@ -19,9 +19,7 @@ pub enum SmallVecError {
 }
 
 impl Display for SmallVecError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Format {
-        write!(f, "Allocation error: {self:?}")
-    }
+    fn fmt(&self, f: &mut Formatter<'_>) -> Format { write!(f, "Allocation error: {self:?}") }
 }
 
 impl Error for SmallVecError {}

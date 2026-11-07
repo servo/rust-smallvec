@@ -183,7 +183,5 @@ impl<Item, const INLINE: usize> RawSmallVec<Item, INLINE> {
 }
 
 impl<Item, const INLINE: usize> Default for RawSmallVec<Item, INLINE> {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }

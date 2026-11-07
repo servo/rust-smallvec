@@ -99,9 +99,7 @@ where F: FnMut(&mut Item) -> bool
         }
     }
 
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.end - self.idx))
-    }
+    fn size_hint(&self) -> (usize, Option<usize>) { (0, Some(self.end - self.idx)) }
 }
 
 impl<Item, F, const INLINE: usize, Heap: Allocator> Drop for ExtractIf<'_, Item, INLINE, F, Heap>

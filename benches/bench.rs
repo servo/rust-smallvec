@@ -29,37 +29,21 @@ trait Vector<T>: for<'valid> From<&'valid [T]> + Extend<T> + FromIterator<T> {
 }
 
 impl<T: Copy> Vector<T> for Vec<T> {
-    fn new() -> Self {
-        Self::with_capacity(VEC_SIZE)
-    }
+    fn new() -> Self { Self::with_capacity(VEC_SIZE) }
 
-    fn push(&mut self, val: T) {
-        self.push(val)
-    }
+    fn push(&mut self, val: T) { self.push(val) }
 
-    fn pop(&mut self) -> Option<T> {
-        self.pop()
-    }
+    fn pop(&mut self) -> Option<T> { self.pop() }
 
-    fn remove(&mut self, p: usize) -> T {
-        self.remove(p)
-    }
+    fn remove(&mut self, p: usize) -> T { self.remove(p) }
 
-    fn insert(&mut self, n: usize, val: T) {
-        self.insert(n, val)
-    }
+    fn insert(&mut self, n: usize, val: T) { self.insert(n, val) }
 
-    fn from_elem(val: T, n: usize) -> Self {
-        vec![val; n]
-    }
+    fn from_elem(val: T, n: usize) -> Self { vec![val; n] }
 
-    fn from_elems(val: &[T]) -> Self {
-        val.to_owned()
-    }
+    fn from_elems(val: &[T]) -> Self { val.to_owned() }
 
-    fn extend_from_slice(&mut self, other: &[T]) {
-        Vec::extend_from_slice(self, other)
-    }
+    fn extend_from_slice(&mut self, other: &[T]) { Vec::extend_from_slice(self, other) }
 
     fn retain_mut<F>(&mut self, f: F)
     where F: FnMut(&mut T) -> bool {
@@ -68,37 +52,21 @@ impl<T: Copy> Vector<T> for Vec<T> {
 }
 
 impl<T: Copy> Vector<T> for SmallVec<T, VEC_SIZE> {
-    fn new() -> Self {
-        Self::new()
-    }
+    fn new() -> Self { Self::new() }
 
-    fn push(&mut self, val: T) {
-        self.push(val)
-    }
+    fn push(&mut self, val: T) { self.push(val) }
 
-    fn pop(&mut self) -> Option<T> {
-        self.pop()
-    }
+    fn pop(&mut self) -> Option<T> { self.pop() }
 
-    fn remove(&mut self, p: usize) -> T {
-        self.remove(p)
-    }
+    fn remove(&mut self, p: usize) -> T { self.remove(p) }
 
-    fn insert(&mut self, n: usize, val: T) {
-        self.insert(n, val)
-    }
+    fn insert(&mut self, n: usize, val: T) { self.insert(n, val) }
 
-    fn from_elem(val: T, n: usize) -> Self {
-        smallvec::from_elem(val, n)
-    }
+    fn from_elem(val: T, n: usize) -> Self { smallvec::from_elem(val, n) }
 
-    fn from_elems(val: &[T]) -> Self {
-        SmallVec::from(val)
-    }
+    fn from_elems(val: &[T]) -> Self { SmallVec::from(val) }
 
-    fn extend_from_slice(&mut self, other: &[T]) {
-        SmallVec::extend(self, other)
-    }
+    fn extend_from_slice(&mut self, other: &[T]) { SmallVec::extend(self, other) }
 
     fn retain_mut<F>(&mut self, f: F)
     where F: FnMut(&mut T) -> bool {
@@ -188,9 +156,7 @@ make_benches! {
 
 fn gen_push<V: Vector<u64>>(n: u64, b: &mut Bencher) {
     #[inline(never)]
-    fn push_noinline<V: Vector<u64>>(vec: &mut V, x: u64) {
-        vec.push(black_box(x));
-    }
+    fn push_noinline<V: Vector<u64>>(vec: &mut V, x: u64) { vec.push(black_box(x)); }
 
     b.iter(|| {
         let n = black_box(n);
@@ -242,9 +208,7 @@ fn gen_insert<V: Vector<u64>>(n: u64, b: &mut Bencher) {
 
 fn gen_remove<V: Vector<u64>>(n: usize, b: &mut Bencher) {
     #[inline(never)]
-    fn remove_noinline<V: Vector<u64>>(vec: &mut V, p: usize) -> u64 {
-        vec.remove(black_box(p))
-    }
+    fn remove_noinline<V: Vector<u64>>(vec: &mut V, p: usize) -> u64 { vec.remove(black_box(p)) }
 
     b.iter_with_setup(
         || V::from_elem(0, black_box(n)),

@@ -11,9 +11,7 @@ pub struct Proxy<'valid, Heap: Allocator>(pub &'valid Heap);
 
 impl<'valid, Heap: Allocator> Allocator for Proxy<'valid, Heap> {
     #[inline]
-    fn allocate(&self, layout: Layout) -> Option<NonNull<[u8]>> {
-        self.0.allocate(layout)
-    }
+    fn allocate(&self, layout: Layout) -> Option<NonNull<[u8]>> { self.0.allocate(layout) }
 
     #[inline]
     unsafe fn deallocate(&self, pointer: NonNull<u8>, layout: Layout) {
