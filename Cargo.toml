@@ -50,6 +50,7 @@ allocator-api2 = { version = "0.4", optional = true, features = [
   "alloc",
 ], default-features = false }
 arbitrary = { version = "1", optional = true, default-features = false }
+arrayvec = { version = "0.7", optional = true, default-features = false }
 borsh = { version = "1", optional = true, features = [
   "derive",
   "unstable__schema",
@@ -85,6 +86,10 @@ required-features = ["internals"]
 [[test]]
 name = "arbitrary"
 required-features = ["arbitrary"]
+
+[[test]]
+name = "arrayvec"
+required-features = ["arrayvec"]
 
 [[test]]
 name = "borsh"
