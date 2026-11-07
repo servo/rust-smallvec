@@ -69,7 +69,7 @@ rkyv = { version = "0.8", optional = true, default-features = false, features = 
 ] }
 schemars = { version = "1", optional = true, default-features = false }
 serde_core = { version = "1", optional = true, default-features = false }
-smallvec-macro = { version = "0.0.0", path = "./macro", default-features = false }
+smallvec-macro = { version = "0.0.0", default-features = false }
 zerocopy = { version = "0.8", optional = true, default-features = false }
 zeroize = { version = "1", optional = true, default-features = false }
 

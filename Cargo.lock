@@ -1034,6 +1034,8 @@ dependencies = [
 [[package]]
 name = "smallvec-macro"
 version = "0.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8aa3a1ebad7c7d912534fac818e45203fe094907e97806786285f8f440222e5a"
 
 [[package]]
 name = "syn"
