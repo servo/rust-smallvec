@@ -177,7 +177,7 @@ impl<Item, const INLINE: usize, Heap: Allocator> Drop for IntoIter<Item, INLINE,
             let begin = self.begin;
             let pointer = self.raw.as_mut_ptr(on_heap);
             let _drop_dealloc = if on_heap {
-                let capacity = self.raw.heap.1;
+                let capacity = self.raw.heap.len();
                 Some(DropDealloc {
                     pointer: NonNull::new_unchecked(pointer as *mut u8),
                     size_bytes: capacity * size_of::<Item>(),
