@@ -1,4 +1,3 @@
-github: [alejandro-vaz, servo]
-open_collective: servo
+github: [alejandro-vaz]
 thanks_dev: servo
-custom: ["https://smallvec.rs", "https://servo.org/sponsorship/"]
+custom: ["https://smallvec.rs"]
