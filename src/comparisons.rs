@@ -1,3 +1,5 @@
+#[cfg(feature = "arrayvec")]
+use arrayvec::ArrayVec;
 #[cfg(feature = "equivalent")]
 use equivalent::{
     Comparable,
@@ -196,6 +198,23 @@ implementation!([] for SmallVec<Item, INLINE, Heap> =<> ArchivedVec<Other>);
 implementation!([] for ArchivedVec<Item> =<>+ SmallVec<Other, INLINE, Heap>);
 #[cfg(all(feature = "rkyv", feature = "equivalent"))]
 implementation!([] for SmallVec<Item, INLINE, Heap> =<>+ ArchivedVec<Other>);
+
+#[cfg(feature = "arrayvec")]
+implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =? ArrayVec<Other, LENGTH>);
+#[cfg(feature = "arrayvec")]
+implementation!([const LENGTH: usize] for ArrayVec<Item, LENGTH> =? SmallVec<Other, INLINE, Heap>);
+#[cfg(all(feature = "arrayvec", feature = "equivalent"))]
+implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =?+ ArrayVec<Other, LENGTH>);
+#[cfg(all(feature = "arrayvec", feature = "equivalent"))]
+implementation!([const LENGTH: usize] for ArrayVec<Item, LENGTH> =?+ SmallVec<Other, INLINE, Heap>);
+#[cfg(feature = "arrayvec")]
+implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =<> ArrayVec<Other, LENGTH>);
+#[cfg(feature = "arrayvec")]
+implementation!([const LENGTH: usize] for ArrayVec<Item, LENGTH> =<> SmallVec<Other, INLINE, Heap>);
+#[cfg(all(feature = "arrayvec", feature = "equivalent"))]
+implementation!([const LENGTH: usize] for SmallVec<Item, INLINE, Heap> =<>+ ArrayVec<Other, LENGTH>);
+#[cfg(all(feature = "arrayvec", feature = "equivalent"))]
+implementation!([const LENGTH: usize] for ArrayVec<Item, LENGTH> =<>+ SmallVec<Other, INLINE, Heap>);
 
 implementation!([] for SmallVec<Item, INLINE, Heap> =? Cow<'_, [Other]> where Other: Clone);
 implementation!([] for Cow<'_, [Item]> =? SmallVec<Other, INLINE, Heap> where Item: Clone);

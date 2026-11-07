@@ -1,5 +1,7 @@
 #[cfg(feature = "specialization")]
 use super::specialization::SpecFromSlice;
+#[cfg(feature = "arrayvec")]
+use arrayvec::ArrayVec;
 use {
     super::{
         SmallVec,
@@ -106,6 +108,44 @@ impl<Item, const INLINE: usize, const LENGTH: usize, Heap: Allocator>
                 smallvec.as_ptr().cast::<[Item; LENGTH]>().read()
             })
             .ok_or(smallvec)
+    }
+}
+
+#[cfg(feature = "arrayvec")]
+impl<Item, const INLINE: usize, const LENGTH: usize> From<ArrayVec<Item, LENGTH>>
+    for SmallVec<Item, INLINE, Global>
+{
+    fn from(mut array: ArrayVec<Item, LENGTH>) -> Self {
+        let length = array.len();
+        let mut smallvec = Self::with_capacity(length);
+        unsafe {
+            copy_nonoverlapping(array.as_ptr(), smallvec.as_mut_ptr(), length);
+            array.set_len(0);
+            smallvec.set_len(length);
+        }
+        smallvec
+    }
+}
+#[cfg(feature = "arrayvec")]
+impl<Item, const INLINE: usize, const LENGTH: usize, Heap: Allocator>
+    TryFrom<SmallVec<Item, INLINE, Heap>> for ArrayVec<Item, LENGTH>
+{
+    type Error = SmallVec<Item, INLINE, Heap>;
+
+    fn try_from(
+        mut smallvec: SmallVec<Item, INLINE, Heap>
+    ) -> Result<ArrayVec<Item, LENGTH>, SmallVec<Item, INLINE, Heap>> {
+        let length = smallvec.len();
+        if length > LENGTH {
+            return Err(smallvec);
+        }
+        let mut array = ArrayVec::new();
+        unsafe {
+            copy_nonoverlapping(smallvec.as_ptr(), array.as_mut_ptr(), length);
+            smallvec.set_len(0);
+            array.set_len(length);
+        }
+        Ok(array)
     }
 }
 
